@@ -1,5 +1,5 @@
 # Pubblica l'app su GitHub Pages a ogni modifica.
-# Le icone vengono disegnate qui (rombo lime su fondo scuro), così nel repository c'è solo testo.
+# Le icone vengono disegnate qui (rombo rosso su fondo scuro), così nel repository c'è solo testo.
 name: pages
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
                   d.rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=(13, 14, 17, 255))
               c = S / 2
               r = S * (0.17 if maskable else 0.22) * 1.35
-              d.polygon([(c, c - r), (c + r, c), (c, c + r), (c - r, c)], fill=(215, 255, 62, 255))
+              d.polygon([(c, c - r), (c + r, c), (c, c + r), (c - r, c)], fill=(255, 42, 42, 255))
               im.resize((size, size), Image.LANCZOS).save('_site/' + path)
           icon(192, 'icon-192.png')
           icon(512, 'icon-512.png')
