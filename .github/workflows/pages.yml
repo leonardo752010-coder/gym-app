@@ -1,0 +1,56 @@
+# Pubblica l'app su GitHub Pages a ogni modifica.
+# Le icone vengono disegnate qui (rombo lime su fondo scuro), così nel repository c'è solo testo.
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepara i file e disegna le icone
+        run: |
+          pip install pillow
+          mkdir -p _site
+          cp index.html manifest.webmanifest sw.js _site/
+          python - <<'PY'
+          from PIL import Image, ImageDraw
+          def icon(size, path, maskable=False):
+              S = size * 4
+              im = Image.new('RGBA', (S, S), (0, 0, 0, 0))
+              d = ImageDraw.Draw(im)
+              if maskable:
+                  d.rectangle([0, 0, S, S], fill=(13, 14, 17, 255))
+              else:
+                  d.rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=(13, 14, 17, 255))
+              c = S / 2
+              r = S * (0.17 if maskable else 0.22) * 1.35
+              d.polygon([(c, c - r), (c + r, c), (c, c + r), (c - r, c)], fill=(215, 255, 62, 255))
+              im.resize((size, size), Image.LANCZOS).save('_site/' + path)
+          icon(192, 'icon-192.png')
+          icon(512, 'icon-512.png')
+          icon(512, 'icon-maskable-512.png', True)
+          icon(180, 'apple-touch-icon.png', True)
+          PY
+          ls -la _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
