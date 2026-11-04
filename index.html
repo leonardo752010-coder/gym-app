@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0e11">
+<title>Gym</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  html,body{margin:0;height:100%;background:#0d0e11;color:#f3f4f6;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#0d0e11}
+  .splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0d0e11;z-index:2;transition:opacity .3s}
+  .splash.gone{opacity:0;pointer-events:none}
+  .mark{width:34px;height:34px;background:#d7ff3e;border-radius:7px;transform:rotate(45deg)}
+  .name{font-weight:800;font-size:24px;letter-spacing:-.02em}
+  .spin{width:26px;height:26px;border-radius:50%;border:3px solid #272b33;border-top-color:#d7ff3e;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .help{display:none;max-width:320px;text-align:center;padding:0 24px;color:#9097a3;font-size:14px;line-height:1.5}
+  .help b{color:#f3f4f6}
+  .help button{display:block;width:100%;height:50px;margin-top:12px;border:0;border-radius:14px;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+  .p{background:#d7ff3e;color:#13160a}.s{background:#272b33;color:#f3f4f6}
+  .slow .help{display:block}.slow .spin{display:none}
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <div class="mark"></div>
+  <div class="name">Gym</div>
+  <div class="spin"></div>
+  <div class="help">
+    <b>L'app non si è aperta.</b><br>Di solito vuol dire che Google ti chiede di accedere.
+    Accedi una volta con il tuo account Google, poi torna qui e premi Riprova.
+    <button class="p" id="login">Accedi a Google</button>
+    <button class="s" id="retry">Riprova</button>
+  </div>
+</div>
+<iframe id="app" title="Gym" allow="vibrate; clipboard-write"></iframe>
+<script>
+  // Link della web app (Apps Script). Se un giorno cambia, si aggiorna solo questa riga.
+  const APP_URL = 'https://script.google.com/macros/s/AKfycbzzcW10qo1Z2XJvcbdbdDbumn2PsJuK48vIPmYmG4v4G6yQCx6vVXu1mBF8Ma-DxQr2Qg/exec';
+  const splash = document.getElementById('splash'), frame = document.getElementById('app');
+  let ready = false, slowT;
+
+  function start() {
+    ready = false;
+    splash.classList.remove('gone', 'slow');
+    frame.src = APP_URL + '?t=' + Date.now();
+    clearTimeout(slowT);
+    slowT = setTimeout(() => { if (!ready) splash.classList.add('slow'); }, 15000);
+  }
+  // la pagina dell'app avvisa quando è pronta
+  window.addEventListener('message', ev => {
+    if (!/\.googleusercontent\.com$|\.google\.com$/.test(new URL(ev.origin).hostname)) return;
+    if (ev.data && ev.data.gymApp === 'ready') { ready = true; clearTimeout(slowT); splash.classList.add('gone'); }
+  });
+  document.getElementById('login').onclick = () => window.open(APP_URL, '_blank');
+  document.getElementById('retry').onclick = start;
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  start();
+</script>
+</body>
+</html>
