@@ -11,9 +11,9 @@ Aggiornato: 2026-11-06 (Claude)
 
 ## Passo 2 — Database: fatto
 
-- Schema in `supabase/migrations/` (7 file: base, persone, libreria, piano, log, corpo, permessi). 26 tabelle, tutte con regole di accesso (RLS) e permessi (GRANT) espliciti tabella per tabella.
+- Schema in `supabase/migrations/` (8 file: base, persone, libreria, piano, log, corpo, permessi, permessi di `rls_auto_enable`). 26 tabelle, tutte con regole di accesso (RLS) e permessi (GRANT) espliciti tabella per tabella.
 - Dati finti per lo sviluppo in `supabase/seed.sql` (nessun dato vero, nessuna password). Mai applicati online.
-- 105 prove automatiche in `supabase/tests/database/`: passano tutte in locale e online. Controllo dello schema (`db lint`): nessun errore.
+- 106 prove automatiche in `supabase/tests/database/`: passano tutte in locale e online. Controllo dello schema (`db lint`): nessun errore.
 - Spiegazione in `docs/database.md`; decisioni in `DECISIONI.md` (2026-11-06).
 - Sul PC di Leonardo: Docker Desktop + WSL installati; Supabase CLI nel progetto (`npm install`), collegata a `gym-app`.
 
@@ -22,14 +22,17 @@ Aggiornato: 2026-11-06 (Claude)
 - Organizzazione Gym App, piano free, regione Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`. Creato da Leonardo il 2026-11-05.
 - Impostazioni di Leonardo: "Automatically expose new tables" spento, "automatic RLS" acceso. In locale `auto_expose_new_tables = false` per provare nelle stesse condizioni.
 - 2026-11-06: applicate le 7 migrazioni (`npx supabase db push --remote`), senza dati finti.
-- 105 prove online passate (`npx supabase test db --remote`). Dopo le prove il progetto è identico a prima: 0 utenti, 19 muscoli, 5 tipi di serie, nessun'altra riga, nessuno schema di prova, pgTAP non installata.
+- 105 prove online passate (`npx supabase test db --remote`), prima della migrazione 08. Dopo le prove il progetto era identico a prima: 0 utenti, 19 muscoli, 5 tipi di serie, nessun'altra riga, nessuno schema di prova, pgTAP non installata.
 - RLS, permessi e numero di regole delle 26 tabelle: identici online e in locale.
-- Controllo di sicurezza (`npx supabase db advisors --remote`): nessun problema sulle nostre tabelle e funzioni; nessun avviso di prestazioni. 2 avvisi WARN sulla funzione `public.rls_auto_enable()`, creata da Supabase per "automatic RLS" (eseguibile da anon e authenticated). Rischio pratico nullo (è una funzione di event trigger e non si può chiamare direttamente). Correzione proposta, in attesa dell'ok di Leonardo: una migrazione che toglie il permesso di esecuzione.
+- Il primo controllo di sicurezza (`npx supabase db advisors --remote`) aveva trovato 2 avvisi WARN sulla funzione `public.rls_auto_enable()`. È la funzione che Supabase crea per "automatic RLS", ed era eseguibile da anon e authenticated.
+- 2026-11-06: con l'ok di Leonardo, applicata la migrazione `20261106100000_rls_auto_enable_permissions.sql`, che toglie l'esecuzione a PUBLIC, anon e authenticated (resta solo a `postgres`). Prima l'ho provata in locale con una copia della funzione, poi online dentro una transazione annullata: una tabella nuova nasce ancora con RLS attiva. In locale la migrazione non fa nulla, perché lì la funzione non esiste.
+- Dopo la migrazione: controllo di sicurezza e prestazioni "No issues found"; 106 prove online passate; "automatic RLS" verificato di nuovo (tabella di prova creata e annullata, nata con RLS).
+- Stato finale online: 0 utenti, 19 muscoli, 5 tipi di serie, nessun'altra riga, nessuna tabella o schema di prova, pgTAP non installata, 8 migrazioni registrate.
+- Nuova prova in 000_schema: nessuna funzione SECURITY DEFINER dello schema pubblico è eseguibile da anon o authenticated.
 - Le prove online girano come `cli_login_postgres`: per questo ogni file di prova passa a `postgres` solo dentro la sua transazione.
 
 ## Passo 2 — Manca
 
-- Decidere sulla correzione dell'avviso `rls_auto_enable` (sopra).
 - Merge su `main`: lo approva Leonardo.
 
 ## Roadmap (passo attuale in grassetto)

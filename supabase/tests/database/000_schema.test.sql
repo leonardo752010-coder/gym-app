@@ -6,7 +6,15 @@ set local role postgres;
 create extension if not exists pgtap with schema extensions;
 -- pgTAP sta nello schema extensions.
 set local search_path = public, extensions;
-select plan(15);
+select plan(16);
+
+-- Nessuna funzione SECURITY DEFINER dello schema pubblico (esposto dall'API) è
+-- eseguibile da anon o authenticated (es. public.rls_auto_enable di "automatic RLS").
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prosecdef
+     and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'))),
+  0, 'Nessuna funzione SECURITY DEFINER pubblica è eseguibile da anon o authenticated');
 
 select tables_are('public', array[
   'profiles', 'coach_links', 'import_batches',
