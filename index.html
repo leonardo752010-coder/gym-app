@@ -14,8 +14,7 @@
   iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:transparent}
   .splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0b0b0d;z-index:2;transition:opacity .3s}
   .splash.gone{opacity:0;pointer-events:none}
-  .mark{width:34px;height:34px;background:#ff2a2a;border-radius:7px;transform:rotate(45deg);box-shadow:0 0 28px rgba(255,42,42,.6)}
-  .name{font-weight:800;font-size:24px;letter-spacing:-.02em}
+  .logo{width:132px;height:132px;border-radius:50%;box-shadow:0 0 40px rgba(224,68,43,.45)}
   .spin{width:26px;height:26px;border-radius:50%;border:3px solid #272b33;border-top-color:#ff2a2a;animation:sp .8s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
   .help{display:none;max-width:320px;text-align:center;padding:0 24px;color:#9097a3;font-size:14px;line-height:1.5}
@@ -28,8 +27,7 @@
 </head>
 <body>
 <div class="splash" id="splash">
-  <div class="mark"></div>
-  <div class="name">Gym</div>
+  <img class="logo" src="icon-192.png" alt="Gym">
   <div class="spin"></div>
   <div class="help">
     <b>L'app non si è aperta.</b><br>Di solito vuol dire che Google ti chiede di accedere.
