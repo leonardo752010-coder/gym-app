@@ -1,0 +1,6 @@
+node_modules/
+tests/out/
+supabase/.branches/
+supabase/.temp/
+.env
+.env.*
