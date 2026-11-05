@@ -1,12 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-05 (Claude)
+Aggiornato: 2026-11-06 (Claude)
 
 ## Dove siamo
 
 - App in uso: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 - Branch di riferimento per l'app attuale: `codex/handoff-2026-11-05` (commit 02d342f).
-- Questo branch: `claude/fondamenta` — aggiunge `AGENTS.md`, `DECISIONI.md`, `STATO.md`.
+- Branch `claude/fondamenta` — aggiunge `AGENTS.md`, `DECISIONI.md`, `STATO.md`.
+- Branch `claude/nota-funzioni` (partito da `claude/fondamenta`) — aggiunge `docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md` (perche' il piano elenca tante funzioni e come decidiamo quali entrano nella versione 1) e `CLAUDE.md` con la sezione "Portata delle funzioni".
+- Branch `claude/database` — lavoro sul passo 2 in corso, non ancora salvato su GitHub.
 - `main`: solo la cornice PWA pubblicata su GitHub Pages. Nessun merge fatto.
 
 ## Roadmap (passo attuale in grassetto)
@@ -23,9 +25,12 @@ Aggiornato: 2026-11-05 (Claude)
 
 ## Prossimo passo
 
-Preparare lo schema del database (passo 2) su un nuovo branch `claude/database`.
+Preparare lo schema del database (passo 2) sul branch `claude/database`.
+
+Prima di costruire una funzione nuova: leggere `docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`. La divisione delle funzioni (cosa sta al centro, cosa si rimanda) e' una bozza da confermare dopo le interviste ai bodybuilder.
 
 ## Da fare per Leonardo
 
 - Creare il progetto Supabase (regione Sydney) quando inizia il passo 2.
 - Rendere privato il repository solo dopo lo spostamento dell'hosting.
+- Decidere se fare il merge di `claude/nota-funzioni` su `main` (insieme a `claude/fondamenta`).
