@@ -86,7 +86,7 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.sets (session_exercise_id, user_id, set_number, set_type, weight_kg, reps)
      values ('66666666-5200-4000-8000-000000000001', '66666666-0000-4000-8000-00000000000a', 2, 'superset', 50, 10) $$,
-  '23503', null, '"superset" non esiste come tipo di serie');
+  '42501', null, '"superset" non esiste come tipo di serie: rifiutato');
 
 -- Cambiare il piano non tocca lo storico.
 update public.plan_exercises set reps_min = 6, reps_max = 8 where id = '66666666-9300-4000-8000-000000000001';

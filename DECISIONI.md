@@ -36,3 +36,20 @@ Obiettivo: portare l'app da Google Sheets + Apps Script a un'app veloce su datab
 - Nome e logo del prodotto.
 - Elenco delle tecniche di intensità da supportare (serve ricerca).
 - Cosa fare di SESSIONE, del foglio THE COMEBACK e della sync MacroFactor dopo il passaggio.
+
+## 2026-11-06 — Schema del database (passo 2)
+
+Approvate da Leonardo sul piano del database. Dettagli in `docs/database.md`.
+
+| Tema | Decisione |
+| --- | --- |
+| Superserie | Non è un tipo di serie: è un gruppo di esercizi (nel giorno del piano e nella seduta), con ordine e un solo recupero a fine giro |
+| Tipi di serie | Normale, riscaldamento, drop, rest-pause, myo-reps + tipi personalizzati dell'utente. Le serie in più parti hanno le parti salvate a parte |
+| Club | Entità condivisa come le macchine (pubblico/privato, verificato o no), con le sue macchine. Gli utenti si collegano ai club che frequentano. Più club possono appartenere a una catena |
+| Importazioni | Ogni dato importato è legato a un utente esistente in Supabase Auth e al suo registro importazioni; il database impedisce di mescolare persone |
+| Coach | Vede tutto dell'atleta dopo la sua conferma; modifica il piano solo se l'atleta lo permette; lo storico mai |
+| Cancellazione | Morbida per sedute, esercizi della seduta e serie (`deleted_at`) |
+| Libreria iniziale | Solo gli esercizi dei PIANO di Leonardo e Raina (al passo 3); la libreria completa resta al passo 9 |
+| Volume per muscolo | 1 per il muscolo principale, 0,5 per i secondari, con il peso salvato per ogni coppia esercizio-muscolo |
+| Libreria pubblica (provvisorio) | Finché non si decide sulle macchine degli utenti: gli utenti creano solo elementi privati e non verificati; quelli pubblici li crea solo l'importazione/manutenzione |
+| Strumenti | Supabase CLI nel progetto (`package.json`), prove pgTAP in `supabase/tests/database`, Docker Desktop per provare in locale |
