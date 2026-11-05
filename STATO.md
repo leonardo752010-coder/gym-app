@@ -9,19 +9,21 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è s
 | Branch | Cosa contiene |
 | --- | --- |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
-| `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) |
+| `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
 | `codex/handoff-2026-11-05` | Copia dell'app attuale Google Apps Script + `HANDOFF.md` (commit 02d342f). Già tutto dentro `claude/database` |
 | `handoff/codex-2026-11-05` | Versione precedente dello stesso handoff (commit 0816122). Già tutto dentro `claude/database` |
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (controllo dell'accesso, solo lettura)
+## Fatto in questa sessione (accesso: controllo, iscrizioni chiuse, config locale allineata)
 
-- Confrontata la configurazione di accesso locale (`supabase/config.toml`) con quella online di `gym-app` usando `npx supabase config diff`, che legge soltanto. Nessuna modifica online, nessun account creato, nessun file cambiato a parte questo.
-- Uguali: accesso con email acceso, durata del token 1 ora. **Iscrizioni nuove APERTE sia in locale sia online** (oggi 0 utenti; la chiave pubblica del progetto non è in nessun file del repository).
-- Diversi: conferma email (locale spenta, online accesa), indirizzo del sito (locale `http://127.0.0.1:3000`, online `http://localhost:3000`), URL di reindirizzamento (locale uno sbagliato in https, online nessuno), codice email (6 cifre locale, 8 online), attesa tra due email (1 secondo locale, 1 minuto online), app di autenticazione a due fattori (spenta locale, accesa online).
-- Proposta in attesa del tuo ok (niente applicato): solo email e password; iscrizioni nuove chiuse online e in locale; account tuo e di Raina creati a mano dal pannello con "Auto Confirm User"; conferma email lasciata accesa online; un solo indirizzo, quello locale, finché la nuova app non ha un indirizzo vero.
+- Primo controllo con `npx supabase config diff` (legge soltanto, sempre con il ref di `gym-app`): iscrizioni nuove aperte sia in locale sia online, più alcune differenze (vedi sotto).
+- Leonardo ha chiuso le iscrizioni nuove dal pannello di `gym-app`. **Verificato con `config diff`: online `enable_signup = false`.**
+- `supabase/config.toml` (solo locale): `enable_signup = false` e tolto l'URL di reindirizzamento sbagliato `https://127.0.0.1:3000` (ora `additional_redirect_urls = []`). Nient'altro cambiato. Dopo la modifica `config diff` non mostra più queste due differenze.
+- Database locale non riavviato: gira solo il container del database, e le due impostazioni valgono solo per il servizio di accesso. 106 prove su 106 verdi.
+- Differenze rimaste, lasciate così di proposito: conferma email (locale spenta, online accesa: va bene così), indirizzo del sito (locale `http://127.0.0.1:3000`, online `http://localhost:3000`), codice email (6 cifre locale, 8 online), attesa tra due email (1 secondo locale, 1 minuto online), autenticazione a due fattori con app (spenta locale, accesa online), più pooler e storage (non riguardano l'accesso).
+- Nessuna modifica online fatta da Claude, nessun account creato.
 
 ## Sessione precedente (backup dei dati)
 
@@ -46,7 +48,7 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è s
 
 ## Cosa è online
 
-- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Contiene le 8 migrazioni (26 tabelle) e nessun dato: 0 utenti, solo 19 muscoli e 5 tipi di serie. pgTAP non installata.
+- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene le 8 migrazioni (26 tabelle) e nessun dato: 0 utenti, solo 19 muscoli e 5 tipi di serie. pgTAP non installata.
 - **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra. `main` pubblica la PWA su GitHub Pages.
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
@@ -59,13 +61,14 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è s
 
 ## Prossimo passo
 
-Chiudere le iscrizioni nuove online (pannello Supabase, Authentication, Sign In / Providers, "Allow new users to sign up" spento), poi creare a mano gli account di Leonardo e Raina.
+Creare a mano gli account di Leonardo e Raina nel pannello di `gym-app` (Authentication, Users, Add user, con "Auto Confirm User" spuntato). Le iscrizioni nuove sono già chiuse.
 
 Dopo: passo 3, trasferire PIANO e STORICO di Leonardo e Raina nel database, con controllo serie per serie. Ogni dato importato deve essere legato a un utente esistente. Prima dell'importazione: `npm run backup`.
 
 ## Da decidere o fare per Leonardo
 
-- Approvare (o no) la proposta sull'accesso: iscrizioni chiuse, conferma email accesa, indirizzi di reindirizzamento. Le modifiche online le fai tu dal pannello (oppure con un `config push` approvato da te).
+- Quando la nuova app avrà un indirizzo vero (Cloudflare Pages o Vercel): aggiungerlo come indirizzo del sito e di reindirizzamento, online e in locale.
+- Reset della password per Raina: il servizio email gratuito di Supabase manda poche email e solo agli indirizzi del team del progetto. Se serve, configurare un servizio email proprio (SMTP).
 - Backup settimanale dei dati (docs/backup.md)
 - Approvare (o no) il merge di `claude/database` su `main`.
 - Creare gli account tuoi e di Raina in `gym-app` (o dirmi come vuoi farlo), prima del passo 3.
