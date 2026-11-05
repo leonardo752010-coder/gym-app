@@ -16,7 +16,14 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è s
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (backup dei dati)
+## Fatto in questa sessione (controllo dell'accesso, solo lettura)
+
+- Confrontata la configurazione di accesso locale (`supabase/config.toml`) con quella online di `gym-app` usando `npx supabase config diff`, che legge soltanto. Nessuna modifica online, nessun account creato, nessun file cambiato a parte questo.
+- Uguali: accesso con email acceso, durata del token 1 ora. **Iscrizioni nuove APERTE sia in locale sia online** (oggi 0 utenti; la chiave pubblica del progetto non è in nessun file del repository).
+- Diversi: conferma email (locale spenta, online accesa), indirizzo del sito (locale `http://127.0.0.1:3000`, online `http://localhost:3000`), URL di reindirizzamento (locale uno sbagliato in https, online nessuno), codice email (6 cifre locale, 8 online), attesa tra due email (1 secondo locale, 1 minuto online), app di autenticazione a due fattori (spenta locale, accesa online).
+- Proposta in attesa del tuo ok (niente applicato): solo email e password; iscrizioni nuove chiuse online e in locale; account tuo e di Raina creati a mano dal pannello con "Auto Confirm User"; conferma email lasciata accesa online; un solo indirizzo, quello locale, finché la nuova app non ha un indirizzo vero.
+
+## Sessione precedente (backup dei dati)
 
 - Script `scripts/backup.ps1`, si lancia con `npm run backup`. Legge solo `gym-app` (ref scritto nello script, mai altri progetti) con l'accesso già fatto della CLI: nessuna password in nessun file.
 - Salva 2 file con la data (`gym-app_AAAA-MM-GG_struttura.sql` e `..._dati.sql`) in `C:\Users\Leonardo Valentini\Documents\gym-app-backup`, fuori dal repository. Tiene gli ultimi 8 backup e scrive quando ne cancella uno; tocca solo i file con quel nome esatto. Alla fine stampa cartella, dimensioni e righe per tabella principale.
@@ -52,10 +59,13 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è s
 
 ## Prossimo passo
 
-Passo 3: trasferire PIANO e STORICO di Leonardo e Raina nel database, con controllo serie per serie. Prima servono gli account di Leonardo e Raina nel progetto `gym-app`: ogni dato importato deve essere legato a un utente esistente. Prima dell'importazione: `npm run backup`.
+Chiudere le iscrizioni nuove online (pannello Supabase, Authentication, Sign In / Providers, "Allow new users to sign up" spento), poi creare a mano gli account di Leonardo e Raina.
+
+Dopo: passo 3, trasferire PIANO e STORICO di Leonardo e Raina nel database, con controllo serie per serie. Ogni dato importato deve essere legato a un utente esistente. Prima dell'importazione: `npm run backup`.
 
 ## Da decidere o fare per Leonardo
 
+- Approvare (o no) la proposta sull'accesso: iscrizioni chiuse, conferma email accesa, indirizzi di reindirizzamento. Le modifiche online le fai tu dal pannello (oppure con un `config push` approvato da te).
 - Backup settimanale dei dati (docs/backup.md)
 - Approvare (o no) il merge di `claude/database` su `main`.
 - Creare gli account tuoi e di Raina in `gym-app` (o dirmi come vuoi farlo), prima del passo 3.
