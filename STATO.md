@@ -4,19 +4,29 @@ Aggiornato: 2026-11-06 (Claude)
 
 ## Branch
 
-Branch attuale: `claude/database` (passo 2, finito). Non è su `main`: il merge lo approva Leonardo.
+Branch attuale: `claude/database` (passo 2 finito + sistema di backup). Non è su `main`: il merge lo approva Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
-| `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` |
+| `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
 | `codex/handoff-2026-11-05` | Copia dell'app attuale Google Apps Script + `HANDOFF.md` (commit 02d342f). Già tutto dentro `claude/database` |
 | `handoff/codex-2026-11-05` | Versione precedente dello stesso handoff (commit 0816122). Già tutto dentro `claude/database` |
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (passo 2 — Database)
+## Fatto in questa sessione (backup dei dati)
+
+- Script `scripts/backup.ps1`, si lancia con `npm run backup`. Legge solo `gym-app` (ref scritto nello script, mai altri progetti) con l'accesso già fatto della CLI: nessuna password in nessun file.
+- Salva 2 file con la data (`gym-app_AAAA-MM-GG_struttura.sql` e `..._dati.sql`) in `C:\Users\Leonardo Valentini\Documents\gym-app-backup`, fuori dal repository. Tiene gli ultimi 8 backup e scrive quando ne cancella uno; tocca solo i file con quel nome esatto. Alla fine stampa cartella, dimensioni e righe per tabella principale.
+- Dati salvati: tabelle di gym-app (`public`) e utenti (`auth`). Storage escluso (gym-app non lo usa e le sue tabelle interne non si possono ripristinare). Lo script aggiunge alla struttura ciò che `pg_dump` non salva: il trigger che crea il profilo su `auth.users`, l'azzeramento dei permessi di base di Supabase (altrimenti un progetto nuovo darebbe più permessi di gym-app) e l'elenco delle migrazioni applicate.
+- Protezioni: lo script si rifiuta di salvare dentro un repository git; `.gitignore` blocca i nomi dei file di backup anche se finissero qui per sbaglio.
+- Prove: primo backup online riuscito (19 muscoli, 5 tipi di serie, 8 migrazioni). Backup del database locale con i dati finti, ripristinato in un secondo database locale pulito: 52 tabelle con le stesse righe prima e dopo (84 = 84), contenuto identico riga per riga, stessi permessi e regole; 106 prove automatiche verdi sul database ripristinato. Anche il backup online, ripristinato in locale, è identico a `gym-app`. Pulizia degli 8 backup provata con file finti.
+- Guida in `docs/backup.md` (comando, cartella, ripristino passo per passo, ogni quanto, cosa non fare).
+- Durante le prove ho cancellato 2 coppie di file di backup che avevo creato io stanotte con versioni intermedie dello script (non si sarebbero ripristinate bene). Nessun file tuo toccato.
+
+## Passo 2 — Database (finito, sessione precedente dello stesso giorno)
 
 - Schema in `supabase/migrations/` (8 file: base, persone, libreria, piano, log, corpo, permessi, permessi di `rls_auto_enable`). 26 tabelle, tutte con regole di accesso (RLS) e permessi (GRANT) espliciti tabella per tabella.
 - Dati finti per lo sviluppo in `supabase/seed.sql` (nessun dato vero, nessuna password). Mai applicati online.
@@ -38,13 +48,15 @@ Branch attuale: `claude/database` (passo 2, finito). Non è su `main`: il merge 
 - Docker Desktop e WSL (servono per il database di prova in locale).
 - Database locale di prova con i dati finti (`npx supabase db start`).
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
+- **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Oggi c'è 1 backup (2026-11-06, quasi vuoto: 19 muscoli e 5 tipi di serie). I backup non vanno mai su GitHub né online.
 
 ## Prossimo passo
 
-Passo 3: trasferire PIANO e STORICO di Leonardo e Raina nel database, con controllo serie per serie. Prima servono gli account di Leonardo e Raina nel progetto `gym-app`: ogni dato importato deve essere legato a un utente esistente.
+Passo 3: trasferire PIANO e STORICO di Leonardo e Raina nel database, con controllo serie per serie. Prima servono gli account di Leonardo e Raina nel progetto `gym-app`: ogni dato importato deve essere legato a un utente esistente. Prima dell'importazione: `npm run backup`.
 
 ## Da decidere o fare per Leonardo
 
+- Backup settimanale dei dati (docs/backup.md)
 - Approvare (o no) il merge di `claude/database` su `main`.
 - Creare gli account tuoi e di Raina in `gym-app` (o dirmi come vuoi farlo), prima del passo 3.
 - Dire se i branch vecchi (`claude/fondamenta`, `codex/handoff-2026-11-05`, `handoff/codex-2026-11-05`, `claude/nota-funzioni`, `claude/nota-funzioni-main`) si possono cancellare: il loro contenuto è già in `main` o in `claude/database`.

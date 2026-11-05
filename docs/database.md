@@ -64,6 +64,10 @@ npx supabase db advisors --remote         # controllo di sicurezza e prestazioni
 
 Online la CLI entra come `cli_login_postgres`, che non ha i permessi sullo schema `extensions` (dove sta pgTAP): per questo ogni file di prova inizia con `set local role postgres`.
 
+## Backup
+
+Backup e ripristino: vedi `docs/backup.md` (comando: `npm run backup`).
+
 ## Prove automatiche (`supabase/tests/database/`)
 
 | File | Controlla |

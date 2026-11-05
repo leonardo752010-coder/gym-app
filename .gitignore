@@ -4,3 +4,15 @@ supabase/.branches/
 supabase/.temp/
 .env
 .env.*
+
+# Backup del database: contengono dati personali, mai su GitHub.
+# Lo script li salva fuori dal repository (Documenti\gym-app-backup);
+# queste righe servono se per sbaglio un backup finisce qui dentro.
+gym-app-backup/
+gym-app_*_struttura.sql
+gym-app_*_dati.sql
+gym-app-LOCALE_*_struttura.sql
+gym-app-LOCALE_*_dati.sql
+*.sql.parziale
+*.dump
+*.backup
