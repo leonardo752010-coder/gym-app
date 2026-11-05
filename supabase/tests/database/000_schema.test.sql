@@ -2,7 +2,7 @@
 -- dati di riferimento presenti, profilo creato all'iscrizione.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(15);
 
 select tables_are('public', array[
   'profiles', 'coach_links', 'import_batches',
@@ -30,6 +30,24 @@ select is(
      and (has_table_privilege('anon', c.oid, 'select') or has_table_privilege('anon', c.oid, 'insert')
        or has_table_privilege('anon', c.oid, 'update') or has_table_privilege('anon', c.oid, 'delete'))),
   0, 'Chi non ha fatto l''accesso (anon) non ha permessi sulle tabelle');
+
+select is(
+  (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r'
+     and not has_table_privilege('authenticated', c.oid, 'select')),
+  0, 'Ogni tabella ha il GRANT esplicito di lettura per gli utenti dell''app');
+
+select is(
+  (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r'
+     and not (has_table_privilege('service_role', c.oid, 'select') and has_table_privilege('service_role', c.oid, 'insert')
+          and has_table_privilege('service_role', c.oid, 'update') and has_table_privilege('service_role', c.oid, 'delete'))),
+  0, 'Il servizio (importazioni) ha i GRANT espliciti su ogni tabella');
+
+select is(
+  (select count(*)::int from unnest(array['public.sessions', 'public.session_supersets', 'public.session_exercises', 'public.sets']) t
+   where has_table_privilege('authenticated', t, 'delete')),
+  0, 'L''app non ha il permesso DELETE su sedute ed esercizi della seduta e serie (cancellazione morbida)');
 
 select ok(
   not has_function_privilege('anon', 'private.can_read_user(uuid)', 'execute'),

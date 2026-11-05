@@ -57,8 +57,7 @@ select throws_ok(
 select is((select input_weight || ' ' || input_unit from public.sets), '100.00 lb', 'Si conserva il peso come scritto (100 lb)');
 
 -- Dall'app non si cancella davvero.
-with d as (delete from public.sets returning 1)
-select is(count(*)::int, 0, 'Cancellazione vera non permessa all''app') from d;
+select throws_ok($$ delete from public.sets $$, '42501', null, 'Cancellazione vera non permessa all''app');
 select is((select count(*)::int from public.sets), 1, 'La serie è ancora lì');
 
 -- Cancellazione morbida, poi si può rifare la serie 1.
