@@ -16,3 +16,11 @@ gym-app-LOCALE_*_dati.sql
 *.sql.parziale
 *.dump
 *.backup
+
+# Import dai fogli (passo 3): file veri, collegamenti e resoconti stanno
+# fuori dal repository (Documenti\gym-app-import); queste righe servono
+# se per sbaglio finiscono qui dentro.
+gym-app-import/
+*.xlsx
+collegamenti-*.json
+resoconto-import-*.md

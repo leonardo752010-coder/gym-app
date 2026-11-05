@@ -53,3 +53,22 @@ Approvate da Leonardo sul piano del database. Dettagli in `docs/database.md`.
 | Volume per muscolo | 1 per il muscolo principale, 0,5 per i secondari, con il peso salvato per ogni coppia esercizio-muscolo |
 | Libreria pubblica (provvisorio) | Finché non si decide sulle macchine degli utenti: gli utenti creano solo elementi privati e non verificati; quelli pubblici li crea solo l'importazione/manutenzione |
 | Strumenti | Supabase CLI nel progetto (`package.json`), prove pgTAP in `supabase/tests/database`, Docker Desktop per provare in locale |
+
+## 2026-11-06 — Import dai fogli (passo 3)
+
+Decise da Leonardo sul piano del passo 3, poi corrette nello scopo (stesso giorno). Dettagli in `docs/import.md`.
+
+| Tema | Decisione |
+| --- | --- |
+| Cosa si importa | Di Leonardo solo il piano attuale e le sedute dal 2026-10-30 al 2026-11-06. Nessuna seduta nel periodo → ci si ferma |
+| Raina | Niente import: né storico né piano |
+| Tetto | Al massimo 3 mesi di storico per ogni import futuro |
+| Lettura | Fogli scaricati in .xlsx in `Documenti\gym-app-import` (fuori dal repository), letti con `exceljs` (solo sviluppo) |
+| Esercizi e macchine | Elenco corto: solo i nomi che servono. Ogni nome → un esercizio + una scheda macchina minima (marca, modello, codice della macchina). Stesso movimento su macchine diverse = un esercizio con più macchine. Tipo di macchina "altro" quando non è chiaro |
+| Righe del piano con 0 serie | Non si importano |
+| Note | "personal notes" → nota della serie; la nota del piano copiata nello STORICO non si importa |
+| Sedute importate | Senza legame al piano |
+| Fuori dall'import | Peso, kcal e misure (MacroFactor); altre schede dei fogli |
+| Palestra | Si crea solo la palestra attuale, privata di Leonardo e principale, con le macchine usate; nel piano ogni esercizio con macchina è legato a quella palestra e le sedute importate sono in quella palestra. La vecchia palestra non si crea. Il nome sta solo nel file dei collegamenti (fuori dal repository) |
+| Ultima seduta di ogni esercizio | Non si importa. Idea futura: per un esercizio fatto di rado, importare la sua ultima seduta anche se più vecchia, così la "volta scorsa" c'è sempre |
+| Collegamento all'import | Controllato a fine transazione (migrazione 9): così un account con dati importati si può cancellare |

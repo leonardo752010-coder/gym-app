@@ -6,7 +6,9 @@ set local role postgres;
 create extension if not exists pgtap with schema extensions;
 -- pgTAP sta nello schema extensions.
 set local search_path = public, extensions;
-select plan(9);
+select plan(13);
+-- Il collegamento al proprio import si controlla a fine transazione (migrazione 09): qui lo si controlla subito.
+set constraints all immediate;
 
 create schema tests;
 grant usage on schema tests to anon, authenticated;
@@ -64,6 +66,25 @@ delete from public.sessions where import_id = '55555555-1000-4000-8000-000000000
 update public.import_batches set status = 'rolled-back', finished_at = now() where id = '55555555-1000-4000-8000-00000000000a';
 select is((select count(*)::int from public.sessions where user_id = '55555555-0000-4000-8000-00000000000a'), 0,
           'Un''importazione si annulla tutta insieme');
+
+-- Un import con ancora dati non si cancella (controllo forzato subito: di base avviene a fine transazione).
+insert into public.import_batches (id, user_id, source, kind) values
+  ('55555555-1000-4000-8000-00000000000c', '55555555-0000-4000-8000-00000000000a', 'sheet-gym', 'training');
+insert into public.sessions (id, user_id, session_date, import_id) values
+  ('55555555-5000-4000-8000-00000000000c', '55555555-0000-4000-8000-00000000000a', '2026-07-02', '55555555-1000-4000-8000-00000000000c');
+select throws_ok(
+  $$ delete from public.import_batches where id = '55555555-1000-4000-8000-00000000000c' $$,
+  '23503', null, 'Un import che ha ancora sedute non si può cancellare');
+
+-- Un account con dati importati si può cancellare: sparisce tutto, import compreso.
+-- (controllo a fine transazione, come di base; "set constraints all immediate" lo fa subito)
+set constraints all deferred;
+select lives_ok($$ delete from auth.users where id = '55555555-0000-4000-8000-00000000000a' $$,
+  'Si può cancellare un account che ha dati importati');
+select lives_ok($$ set constraints all immediate $$, 'Dopo la cancellazione nessun collegamento rotto');
+select is((select count(*)::int from public.import_batches where user_id = '55555555-0000-4000-8000-00000000000a')
+        + (select count(*)::int from public.sessions where user_id = '55555555-0000-4000-8000-00000000000a'), 0,
+          'Cancellato l''account non restano né import né sedute');
 
 select * from finish();
 rollback;

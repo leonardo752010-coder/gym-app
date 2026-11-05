@@ -24,7 +24,7 @@ Mai modifiche a mano dal pannello.
 - **Tipi di serie**: normale, riscaldamento, drop, rest-pause, myo-reps (di sistema) + quelli creati dall'utente. Drop, rest-pause e myo-reps hanno parti (`set_parts`): la parte 1 è la serie stessa.
 - **Volume per muscolo**: `exercise_muscles.weight` dice quanto conta una serie per ogni muscolo (di base 1 principale, 0,5 secondario), salvato per esercizio-muscolo.
 - **Club**: condivisi come le macchine, possono appartenere a una catena (`club_chains`). Ogni utente si collega ai club che frequenta (`user_clubs`, uno può essere il principale). Nel piano, per ogni esercizio: una macchina per club e una alternativa.
-- **Importazioni**: ogni importazione (`import_batches`) appartiene a un utente che esiste in Supabase Auth. Ogni riga importata ha `import_id` + `user_id` e il database controlla che siano della stessa persona. Per annullare un'importazione si cancellano le righe con quell'`import_id`.
+- **Importazioni**: ogni importazione (`import_batches`) appartiene a un utente che esiste in Supabase Auth. Ogni riga importata ha `import_id` + `user_id` e il database controlla che siano della stessa persona. Per annullare un'importazione si cancellano le righe con quell'`import_id`. Il controllo del collegamento all'import avviene a fine transazione (migrazione 9), così un account con dati importati si può cancellare. Import dai fogli Google: vedi `docs/import.md`.
 
 ## Chi vede e chi modifica (regole di accesso, RLS)
 
@@ -77,5 +77,5 @@ Backup e ripristino: vedi `docs/backup.md` (comando: `npm run backup`).
 | 020_offline_sync | invio doppio = una riga, niente doppioni, cancellazione morbida |
 | 030_coach | invito/conferma, permessi del coach, collegamento chiuso |
 | 040_library_clubs | libreria pubblica/privata, codici fissi, pesi per muscolo, catene e club |
-| 050_imports | importazioni legate a utenti esistenti e alla persona giusta |
+| 050_imports | importazioni legate a utenti esistenti e alla persona giusta; account con dati importati cancellabile |
 | 060_plan_log | superserie, piano attivo unico, piano che cambia senza toccare lo storico, drop set |

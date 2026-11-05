@@ -8,9 +8,12 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:lint": "supabase db lint --level warning",
-    "backup": "powershell -NoProfile -File scripts/backup.ps1"
+    "backup": "powershell -NoProfile -File scripts/backup.ps1",
+    "import": "node scripts/import/import.mjs",
+    "import:prova": "node scripts/import/prova-locale.mjs"
   },
   "devDependencies": {
+    "exceljs": "^4.4.0",
     "supabase": "^3.0.0"
   }
 }
