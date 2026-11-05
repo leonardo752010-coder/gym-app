@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f2ef" media="(prefers-color-scheme: light)">
+<title>Gym</title>
+<!-- niente manifest: su iPhone "Aggiungi a Home" deve ricordare il link completo con la chiave -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gym">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<style>
+  html,body{margin:0;height:100%;background:#0b0b0d;color:#f5f5f7;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:transparent}
+  .splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0b0b0d;z-index:2;transition:opacity .3s}
+  .splash.gone{opacity:0;pointer-events:none}
+  .logo{width:132px;height:132px;border-radius:50%;box-shadow:0 0 40px rgba(224,68,43,.45)}
+  .spin{width:26px;height:26px;border-radius:50%;border:3px solid #272b33;border-top-color:#ff2a2a;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .help{display:none;max-width:320px;text-align:center;padding:0 24px;color:#9097a3;font-size:14px;line-height:1.5}
+  .help b{color:#f3f4f6}
+  .help button{display:block;width:100%;height:50px;margin-top:12px;border:0;border-radius:14px;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+  .p{background:#ff2a2a;color:#fff}.s{background:#272b33;color:#f3f4f6}
+  .slow .help{display:block}.slow .spin{display:none}
+  @media (prefers-color-scheme: light){html,body,.splash{background:#f3f2ef;color:#141416}.help b{color:#141416}.spin{border-color:#e2e0db;border-top-color:#e3121b}.s{background:#e2e0db;color:#141416}}
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <img class="logo" src="../icon-192.png" alt="Gym">
+  <div class="spin"></div>
+  <div class="help">
+    <b id="hT">The app didn't open.</b><br><span id="hB">Check your connection, then tap Retry.</span>
+    <button class="s" id="retry">Retry</button>
+  </div>
+</div>
+<iframe id="app" title="Gym" allow="vibrate; clipboard-write"></iframe>
+<script>
+  // Versione con chiave personale (link pubblico "Chiunque"): la chiave arriva nel link (?k=...) e NON sta nel repository.
+  const BASE_URL = 'https://script.google.com/macros/s/AKfycbyoQYTTFf5aihSQHMhpI1J_a1952Ffm4xWptfzgDa4zpwVU2CBpM6jlg1mIPTkcF_9mQQ/exec';
+  let KEY = (new URLSearchParams(location.search).get('k') || '').replace(/[^A-Za-z0-9_-]/g, '');
+  try { if (KEY) localStorage.setItem('gym.k', KEY); else KEY = localStorage.getItem('gym.k') || ''; } catch (e) {}
+  const APP_URL = BASE_URL + '?k=' + KEY;
+  const splash = document.getElementById('splash'), frame = document.getElementById('app');
+  let ready = false, slowT;
+
+  function start() {
+    if (!KEY) { splash.classList.add('slow'); document.getElementById('hT').textContent = 'Personal link missing.'; document.getElementById('hB').textContent = 'Open the link Leonardo sent you.'; return; }
+    ready = false;
+    splash.classList.remove('gone', 'slow');
+    frame.src = APP_URL + '&t=' + Date.now();
+    clearTimeout(slowT);
+    slowT = setTimeout(() => { if (!ready) splash.classList.add('slow'); }, 15000);
+  }
+  // la pagina dell'app avvisa quando è pronta
+  window.addEventListener('message', ev => {
+    if (!/\.googleusercontent\.com$|\.google\.com$/.test(new URL(ev.origin).hostname)) return;
+    if (ev.data && ev.data.gymApp === 'ready') { ready = true; clearTimeout(slowT); splash.classList.add('gone'); }
+  });
+  document.getElementById('retry').onclick = start;
+
+  start();
+</script>
+</body>
+</html>
