@@ -1,5 +1,6 @@
 # Pubblica l'app su GitHub Pages a ogni modifica.
-# Le icone vengono disegnate qui (rombo rosso su fondo scuro), così nel repository c'è solo testo.
+# Le icone vengono create qui dal logo (logo.b64, testo), così nel repository c'è solo testo.
+# r/ = pagina per l'iPhone di lei (la chiave personale sta solo nel suo link, non qui).
 name: pages
 on:
   push:
@@ -23,31 +24,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Prepara i file e disegna le icone
+      - name: Prepara i file e crea le icone dal logo
         run: |
           pip install pillow
-          mkdir -p _site
+          mkdir -p _site/r
           cp index.html manifest.webmanifest sw.js _site/
+          cp r/index.html _site/r/
           python - <<'PY'
-          from PIL import Image, ImageDraw
-          def icon(size, path, maskable=False):
-              S = size * 4
-              im = Image.new('RGBA', (S, S), (0, 0, 0, 0))
-              d = ImageDraw.Draw(im)
-              if maskable:
-                  d.rectangle([0, 0, S, S], fill=(13, 14, 17, 255))
-              else:
-                  d.rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=(13, 14, 17, 255))
-              c = S / 2
-              r = S * (0.17 if maskable else 0.22) * 1.35
-              d.polygon([(c, c - r), (c + r, c), (c, c + r), (c - r, c)], fill=(255, 42, 42, 255))
-              im.resize((size, size), Image.LANCZOS).save('_site/' + path)
-          icon(192, 'icon-192.png')
-          icon(512, 'icon-512.png')
-          icon(512, 'icon-maskable-512.png', True)
-          icon(180, 'apple-touch-icon.png', True)
+          import base64, io
+          from PIL import Image
+          # logo.b64 = logo rotondo (512x512, angoli trasparenti) salvato come testo
+          badge = Image.open(io.BytesIO(base64.b64decode(open('logo.b64').read()))).convert('RGBA')
+          BG = (22, 19, 14, 255)                       # stesso fondo scuro del logo
+          def plain(size, name):                       # icona rotonda, angoli trasparenti
+              badge.resize((size, size), Image.LANCZOS).save('_site/' + name)
+          def tile(size, name, scale):                 # logo rotondo su fondo scuro (per Android e iPhone)
+              t = Image.new('RGBA', (size, size), BG)
+              s = int(size * scale)
+              b = badge.resize((s, s), Image.LANCZOS)
+              t.paste(b, ((size - s) // 2, (size - s) // 2), b)
+              t.convert('RGB').save('_site/' + name)
+          plain(192, 'icon-192.png')
+          plain(512, 'icon-512.png')
+          tile(512, 'icon-maskable-512.png', 0.80)
+          tile(180, 'apple-touch-icon.png', 0.92)
           PY
-          ls -la _site
+          ls -la _site _site/r
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
