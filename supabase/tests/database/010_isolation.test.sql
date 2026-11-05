@@ -1,6 +1,10 @@
 -- Prova 010 · Ognuno vede e modifica solo i suoi dati.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(16);
 
 -- Aiuto per le prove: "entra" come un utente.
@@ -37,7 +41,7 @@ insert into public.plans (id, user_id, name, created_by) values
 select is((select count(*)::int from public.sets), 1, 'A vede la sua serie');
 
 -- B non vede nulla di A.
-reset role;
+set local role postgres;
 select tests.login('11111111-0000-4000-8000-00000000000b');
 select is((select count(*)::int from public.sessions), 0, 'B non vede le sedute di A');
 select is((select count(*)::int from public.session_exercises), 0, 'B non vede gli esercizi della seduta di A');
@@ -70,7 +74,7 @@ with u as (update public.profiles set display_name = 'hack' where id = '11111111
 select is(count(*)::int, 0, 'B non può modificare il profilo di A') from u;
 
 -- A può cambiare il proprio profilo.
-reset role;
+set local role postgres;
 select tests.login('11111111-0000-4000-8000-00000000000a');
 update public.profiles set locale = 'it', weight_unit = 'lb' where id = '11111111-0000-4000-8000-00000000000a';
 select is((select locale || weight_unit from public.profiles where id = '11111111-0000-4000-8000-00000000000a'),
@@ -80,11 +84,11 @@ select throws_ok(
   '23514', null, 'Lingua non prevista: rifiutata');
 
 -- Chi non ha fatto l'accesso non legge nulla.
-reset role;
+set local role postgres;
 select set_config('role', 'anon', true);
 select throws_ok($$ select count(*) from public.sets $$, '42501', null, 'anon: niente accesso alle serie');
 select throws_ok($$ select count(*) from public.exercises $$, '42501', null, 'anon: niente accesso alla libreria');
-reset role;
+set local role postgres;
 
 select * from finish();
 rollback;

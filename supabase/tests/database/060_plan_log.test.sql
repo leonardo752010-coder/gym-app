@@ -1,7 +1,11 @@
 -- Prova 060 · Piano e log: superserie come gruppo di esercizi, piano attivo
 -- unico, cambiare il piano non tocca lo storico, serie in più parti.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(12);
 
 create schema tests;
@@ -103,6 +107,6 @@ select is((select count(*)::int from public.sets where id = '66666666-5300-4000-
 select is((select coalesce(plan_id::text, 'vuoto') || ' ' || day_name from public.sessions where id = '66666666-5000-4000-8000-000000000001'),
           'vuoto Upper A', 'La seduta perde il legame col piano ma conserva il nome del giorno');
 
-reset role;
+set local role postgres;
 select * from finish();
 rollback;

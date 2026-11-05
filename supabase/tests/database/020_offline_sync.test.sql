@@ -1,6 +1,10 @@
 -- Prova 020 · Coda offline, niente doppioni, cancellazione morbida.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(10);
 
 create schema tests;
@@ -68,6 +72,6 @@ select lives_ok(
   'Dopo la cancellazione morbida si può registrare di nuovo la serie 1');
 select is((select count(*)::int from public.sets where deleted_at is null), 1, 'Una sola serie 1 attiva');
 
-reset role;
+set local role postgres;
 select * from finish();
 rollback;

@@ -1,7 +1,11 @@
 -- Prova 050 · Importazioni: ogni dato importato è legato a un utente che
 -- esiste in auth, e l'importazione e i dati appartengono alla stessa persona.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(9);
 
 create schema tests;
@@ -46,7 +50,7 @@ select throws_ok(
   $$ insert into public.import_batches (user_id, source, kind, created_by)
      values ('55555555-0000-4000-8000-00000000000a', 'csv', 'body', '55555555-0000-4000-8000-00000000000b') $$,
   '42501', null, 'B non può creare importazioni a nome di A');
-reset role;
+set local role postgres;
 select tests.login('55555555-0000-4000-8000-00000000000a');
 select is((select count(*)::int from public.import_batches), 1, 'A vede la sua importazione');
 select lives_ok(
@@ -55,7 +59,7 @@ select lives_ok(
   'A può importare un suo file dall''app');
 
 -- Annullare un'importazione (servizio): via le righe, registro segnato.
-reset role;
+set local role postgres;
 delete from public.sessions where import_id = '55555555-1000-4000-8000-00000000000a';
 update public.import_batches set status = 'rolled-back', finished_at = now() where id = '55555555-1000-4000-8000-00000000000a';
 select is((select count(*)::int from public.sessions where user_id = '55555555-0000-4000-8000-00000000000a'), 0,

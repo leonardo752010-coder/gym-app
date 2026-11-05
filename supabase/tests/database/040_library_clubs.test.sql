@@ -1,7 +1,11 @@
 -- Prova 040 · Libreria condivisa: esercizi, pesi per muscolo, tipi di serie,
 -- catene, club, macchine dei club, club frequentati.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(24);
 
 create schema tests;
@@ -83,7 +87,7 @@ select lives_ok(
   'Un utente crea un suo tipo di serie');
 
 -- ---------- B non vede né usa le cose private di A ----------
-reset role;
+set local role postgres;
 select tests.login('44444444-0000-4000-8000-00000000000b');
 select is((select count(*)::int from public.exercises where code like 'test-lib-%'), 1, 'B vede l''esercizio pubblico ma non quello privato di A');
 select is((select count(*)::int from public.set_types where code = 'u-cluster-a'), 0, 'B non vede il tipo di serie di A');
@@ -95,7 +99,7 @@ select throws_ok(
   '42501', null, 'B non può usare l''esercizio privato di A');
 
 -- ---------- Club ----------
-reset role;
+set local role postgres;
 select tests.login('44444444-0000-4000-8000-00000000000a');
 select lives_ok(
   $$ insert into public.user_clubs (user_id, club_id, is_home) values
@@ -122,7 +126,7 @@ select lives_ok(
        ('44444444-c100-4000-8000-00000000000a', '44444444-d000-4000-8000-00000000000a', '44444444-0000-4000-8000-00000000000a') $$,
   'Nel proprio club privato si mette la propria macchina');
 
-reset role;
+set local role postgres;
 select tests.login('44444444-0000-4000-8000-00000000000b');
 select is((select count(*)::int from public.clubs where id = '44444444-c100-4000-8000-00000000000a'), 0, 'B non vede il club privato di A');
 select throws_ok(
@@ -134,6 +138,6 @@ select throws_ok(
        ('44444444-c100-4000-8000-000000000002', '44444444-d000-4000-8000-000000000001', '44444444-0000-4000-8000-00000000000b') $$,
   '42501', null, 'Chi non frequenta il club non ne modifica le macchine');
 
-reset role;
+set local role postgres;
 select * from finish();
 rollback;

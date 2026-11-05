@@ -1,7 +1,11 @@
 -- Prova 000 · Struttura: tutte le tabelle protette, anon senza accesso,
 -- dati di riferimento presenti, profilo creato all'iscrizione.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(15);
 
 select tables_are('public', array[

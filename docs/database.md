@@ -51,6 +51,19 @@ npx supabase db reset      # ricomincia da zero
 
 `supabase/seed.sql` contiene solo dati finti (utenti senza password), mai dati veri.
 
+## Progetto online (`gym-app`, Sydney)
+
+Solo con l'ok di Leonardo. Serve `npx supabase login` (lo fa Leonardo nel terminale) e il collegamento al progetto (`npx supabase link --project-ref kclgcqwmvqqkogkhycgb`).
+
+```bash
+npx supabase db push --remote --dry-run   # mostra cosa verrebbe applicato
+npx supabase db push --remote             # applica le migrazioni (mai --include-seed)
+npx supabase test db --remote             # prove online: tutto dentro transazioni annullate
+npx supabase db advisors --remote         # controllo di sicurezza e prestazioni
+```
+
+Online la CLI entra come `cli_login_postgres`, che non ha i permessi sullo schema `extensions` (dove sta pgTAP): per questo ogni file di prova inizia con `set local role postgres`.
+
 ## Prove automatiche (`supabase/tests/database/`)
 
 | File | Controlla |

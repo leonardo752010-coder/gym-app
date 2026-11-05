@@ -1,7 +1,11 @@
 -- Prova 030 · Coach: vede solo i suoi atleti, solo dopo la conferma,
 -- modifica il piano solo col permesso dell'atleta, lo storico mai.
 begin;
+-- Online la CLI entra come cli_login_postgres (membro di postgres, senza i suoi permessi): si lavora come postgres, solo dentro questa prova.
+set local role postgres;
 create extension if not exists pgtap with schema extensions;
+-- pgTAP sta nello schema extensions.
+set local search_path = public, extensions;
 select plan(19);
 
 create schema tests;
@@ -44,14 +48,14 @@ select throws_ok(
 select is((select count(*)::int from public.sessions), 0, 'Invito in attesa: il coach non vede ancora nulla');
 
 -- D accetta.
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000d');
 update public.coach_links set status = 'active' where id = '33333333-c000-4000-8000-000000000001';
 select isnt((select activated_at from public.coach_links where id = '33333333-c000-4000-8000-000000000001'), null,
             'L''atleta accetta: collegamento attivo');
 
 -- Ora C vede i dati di D, ma non quelli di E.
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000c');
 select is((select count(*)::int from public.sessions where user_id = '33333333-0000-4000-8000-00000000000d'), 1, 'Il coach vede le sedute dell''atleta');
 select is((select count(*)::int from public.sets), 1, 'Il coach vede le serie dell''atleta');
@@ -77,10 +81,10 @@ select throws_ok(
   'P0001', null, 'Il coach non può darsi il permesso da solo');
 
 -- D dà il permesso: ora sì.
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000d');
 update public.coach_links set can_edit_plan = true where id = '33333333-c000-4000-8000-000000000001';
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000c');
 select lives_ok(
   $$ insert into public.plan_days (plan_id, user_id, position, name)
@@ -92,16 +96,16 @@ select throws_ok(
   '42501', null, 'Il coach non crea piani per chi non segue');
 
 -- E non vede il profilo del coach né quello di D.
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000e');
 select is((select count(*)::int from public.profiles), 1, 'Chi non è collegato vede solo il proprio profilo');
 select is((select count(*)::int from public.coach_links), 0, 'Chi non è coinvolto non vede il collegamento');
 
 -- D chiude il collegamento: il coach non vede più nulla, e non si riapre.
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000d');
 update public.coach_links set status = 'ended' where id = '33333333-c000-4000-8000-000000000001';
-reset role;
+set local role postgres;
 select tests.login('33333333-0000-4000-8000-00000000000c');
 select is((select count(*)::int from public.sessions), 0, 'Collegamento chiuso: il coach non vede più le sedute');
 select throws_ok(
@@ -112,6 +116,6 @@ select throws_ok(
      values ('33333333-0000-4000-8000-00000000000c', '33333333-0000-4000-8000-00000000000e', '33333333-0000-4000-8000-00000000000c', 'active') $$,
   'P0001', null, 'Un nuovo collegamento parte sempre "in attesa"');
 
-reset role;
+set local role postgres;
 select * from finish();
 rollback;

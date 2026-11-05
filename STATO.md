@@ -11,15 +11,26 @@ Aggiornato: 2026-11-06 (Claude)
 
 ## Passo 2 — Database: fatto
 
-- Schema in `supabase/migrations/` (7 file: base, persone, libreria, piano, log, corpo, permessi). 26 tabelle, tutte con regole di accesso (RLS).
-- Dati finti per lo sviluppo in `supabase/seed.sql` (nessun dato vero, nessuna password).
-- 102 prove automatiche in `supabase/tests/database/`: passano tutte in locale. Controllo dello schema (`db lint`): nessun errore.
+- Schema in `supabase/migrations/` (7 file: base, persone, libreria, piano, log, corpo, permessi). 26 tabelle, tutte con regole di accesso (RLS) e permessi (GRANT) espliciti tabella per tabella.
+- Dati finti per lo sviluppo in `supabase/seed.sql` (nessun dato vero, nessuna password). Mai applicati online.
+- 105 prove automatiche in `supabase/tests/database/`: passano tutte in locale e online. Controllo dello schema (`db lint`): nessun errore.
 - Spiegazione in `docs/database.md`; decisioni in `DECISIONI.md` (2026-11-06).
-- Sul PC di Leonardo: Docker Desktop + WSL installati; Supabase CLI nel progetto (`npm install`).
+- Sul PC di Leonardo: Docker Desktop + WSL installati; Supabase CLI nel progetto (`npm install`), collegata a `gym-app`.
+
+## Progetto online `gym-app`
+
+- Organizzazione Gym App, piano free, regione Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`. Creato da Leonardo il 2026-11-05.
+- Impostazioni di Leonardo: "Automatically expose new tables" spento, "automatic RLS" acceso. In locale `auto_expose_new_tables = false` per provare nelle stesse condizioni.
+- 2026-11-06: applicate le 7 migrazioni (`npx supabase db push --remote`), senza dati finti.
+- 105 prove online passate (`npx supabase test db --remote`). Dopo le prove il progetto è identico a prima: 0 utenti, 19 muscoli, 5 tipi di serie, nessun'altra riga, nessuno schema di prova, pgTAP non installata.
+- RLS, permessi e numero di regole delle 26 tabelle: identici online e in locale.
+- Controllo di sicurezza (`npx supabase db advisors --remote`): nessun problema sulle nostre tabelle e funzioni; nessun avviso di prestazioni. 2 avvisi WARN sulla funzione `public.rls_auto_enable()`, creata da Supabase per "automatic RLS" (eseguibile da anon e authenticated). Rischio pratico nullo (è una funzione di event trigger e non si può chiamare direttamente). Correzione proposta, in attesa dell'ok di Leonardo: una migrazione che toglie il permesso di esecuzione.
+- Le prove online girano come `cli_login_postgres`: per questo ogni file di prova passa a `postgres` solo dentro la sua transazione.
 
 ## Passo 2 — Manca
 
-- Progetto Supabase online `gym-app` (Sydney): creazione dopo l'ok di Leonardo sul costo, poi migrazioni applicate e prove rilanciate.
+- Decidere sulla correzione dell'avviso `rls_auto_enable` (sopra).
+- Merge su `main`: lo approva Leonardo.
 
 ## Roadmap (passo attuale in grassetto)
 
