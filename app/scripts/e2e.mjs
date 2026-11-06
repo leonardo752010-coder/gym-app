@@ -67,6 +67,10 @@ try {
   await page.waitForSelector('#starterScr', { timeout: 15000 });
   check('il server dice "vuoto": schermata a tutto schermo', (await page.textContent('#starterScr h1')) === 'CHOOSE YOUR STARTER' && !(await page.$('#wrap')));
   check('tre carte, Conferma spenta finché non si tocca', (await page.$$('[data-pick]')).length === 3 && (await page.isDisabled('#starterOk')));
+  { await page.waitForFunction(() => [...document.querySelectorAll('.stCard img')].every((i) => i.complete && i.naturalWidth > 0));
+    const imgs = await page.$$eval('.stCard img', (els) => els.map((i) => ({ src: i.getAttribute('src'), nw: i.naturalWidth, nh: i.naturalHeight, fit: getComputedStyle(i).objectFit, w: i.clientWidth })));
+    check('mascotte PNG caricate, proporzioni intatte (object-fit: contain)', imgs.length === 3 && imgs.every((i) => /\/assets\/(gorilla|lion|tiger)-[^/]+\.png$/.test(i.src) && i.nh === 480 && i.fit === 'contain' && i.w >= 80),
+      imgs.map((i) => i.nw + 'x' + i.nh + ' ' + i.w + 'px').join(', ')); }
   await page.screenshot({ path: path.join(out, '11-starter.png'), fullPage: true });
   await ctx.setOffline(true);
   await page.click('[data-pick=lion]');
@@ -186,7 +190,8 @@ try {
 
   console.log('8. Uscita');
   await page.click('#logo');
-  check('menu: piccola immagine dello starter accanto ad Account', (await page.getAttribute('#menuStarter', 'alt')) === 'Leone' && /\/assets\/lion-/.test(await page.getAttribute('#menuStarter', 'src')));
+  check('menu: piccola immagine dello starter accanto ad Account', (await page.getAttribute('#menuStarter', 'alt')) === 'Leone' && /\/assets\/lion-[^/]+\.png$/.test(await page.getAttribute('#menuStarter', 'src')) &&
+    (await page.$eval('#menuStarter', (i) => i.complete && i.naturalWidth > 0 && getComputedStyle(i).objectFit === 'contain')));
   await page.screenshot({ path: path.join(out, '12-menu-starter.png') });
   await page.click('#mOut');
   await page.waitForSelector('#loginForm');

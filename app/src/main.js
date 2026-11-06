@@ -14,15 +14,15 @@ import { flush } from './sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
 import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
 import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from './starter.js';
-import gorillaImg from './assets/starters/gorilla.svg';
-import lionImg from './assets/starters/lion.svg';
-import tigerImg from './assets/starters/tiger.svg';
+import gorillaImg from './assets/starters/gorilla.png';
+import lionImg from './assets/starters/lion.png';
+import tigerImg from './assets/starters/tiger.png';
 import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
 
-// Immagini segnaposto: per le illustrazioni vere basta sostituire i tre file (stesso nome).
+// Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
 const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 const $ = (id) => document.getElementById(id);

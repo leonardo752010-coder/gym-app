@@ -70,8 +70,13 @@ di iPhone e Android. Nessuno store, nessun costo. Grafica e flusso copiati da `a
   Una sola riga di profilo per utente: nessun doppione possibile.
 - "Esci" resta bloccato finché la scelta non è online.
 - Nel menu (toccando il logo), accanto all'email dell'account, c'è la piccola immagine dello starter.
-- Le immagini sono **segnaposto** (cerchio con l'iniziale: antracite, rosso, crema) in `app/src/assets/starters/`.
-  Per le illustrazioni vere basta sostituire i tre file con lo stesso nome; la build le mette da sola nella cache offline.
+- Le immagini sono le tre mascotte rétro (`gorilla.png`, `lion.png`, `tiger.png` in `app/src/assets/starters/`,
+  480 px di altezza, sfondo trasparente, 128–138 KB l'una). Sono ritagliate dall'originale
+  `docs/immagini/Vintage Trio Gym Mascots.png` (2172 × 724, tre mascotte in fila): tagli nelle colonne vuote tra una
+  mascotte e l'altra, 8 px di margine, stessa fascia di righe per tutte e tre (stessa scala); tolti solo il velo quasi
+  invisibile attorno (alfa ≤ 16) e un puntino isolato di 1 pixel. Si vedono sempre con le proporzioni giuste
+  (`object-fit: contain`). La build le mette da sola nella cache offline. Per cambiarle basta sostituire i tre file
+  (stesso nome).
 
 Fuori dalla v1: analisi, mesocicli, tecniche di intensità, Apple Salute / Health Connect, area coach, import per utenti.
 
@@ -102,7 +107,7 @@ Una serie ancora da inviare ha il segno ⟳.
 | `app/src/session.js` | salva / modifica / elimina una serie |
 | `app/src/api.js` | letture e invii a Supabase |
 | `app/src/starter.js` | CHOOSE YOUR STARTER: scelta sul telefono, invio senza doppioni |
-| `app/src/assets/starters/` | le tre immagini dello starter (segnaposto) |
+| `app/src/assets/starters/` | le tre mascotte dello starter (PNG); originale in `docs/immagini/` |
 | `app/src/config.js` | indirizzo di gym-app e **solo la chiave pubblica** |
 | `app/vite.config.js` | build e service worker (l'app si apre anche senza rete) |
 | `app/scripts/` | icone dal logo, dati finti locali, prova nel browser |

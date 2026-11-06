@@ -114,4 +114,5 @@ Leonardo ha chiesto a Claude di scegliere e giustificare tecnologia e hosting. D
 | Offline e doppioni | Scelta salvata sul telefono (IndexedDB `starter:<id>`), inviata appena c'è rete con un update che scrive solo se online è ancora vuoto: reinvio innocuo, vince la prima scelta arrivata. "Esci" bloccato finché non è inviata |
 | Lettura | Richiesta separata da quella del piano: un suo errore non blocca la seduta. Così l'app nuova funziona anche se va online prima della migrazione |
 | Immagine | Piccola immagine nel menu accanto all'account (Leonardo). Program e Progress non esistono ancora |
-| Immagini | Segnaposto SVG (cerchio con iniziale: antracite, rosso `#d4412c`, crema `#f6e6c4`) in `app/src/assets/starters/`, da sostituire con le illustrazioni vere |
+| Immagini | Prima segnaposto SVG; sostituiti (stessa sera) dalle mascotte vere, vedi sotto |
+| Mascotte vere (Leonardo, 2026-11-06) | Tre PNG trasparenti da 480 px (`gorilla.png`, `lion.png`, `tiger.png`), ritagliati da `docs/immagini/Vintage Trio Gym Mascots.png` (originale nel repository, così non si perde). Tagli trovati con le colonne vuote, non a occhio; stessa scala per tutte e tre; colori pieni (non a palette) perché già sotto i 150 KB. Nell'app sempre `object-fit: contain` (mai deformate); nel menu senza ritaglio a cerchio |
