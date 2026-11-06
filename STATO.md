@@ -1,14 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER con le mascotte vere, solo in locale (Claude)
+Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER pubblicato su GitHub (push), non ancora online nell'app (Claude)
 
 ## Branch
 
-Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit nuovi su `claude/app-v1` (`c8a2617` e quello delle mascotte vere) **solo sul computer**: niente push, niente deploy, migrazione non applicata online.
+Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Niente deploy, migrazione non applicata online.
 
 | Branch | Cosa contiene |
 | --- | --- |
-| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `d23994a`; i due commit di CHOOSE YOUR STARTER solo in locale |
+| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `701b3d9` (compresi i due commit di CHOOSE YOUR STARTER) |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
@@ -17,16 +17,16 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (CHOOSE YOUR STARTER, solo in locale)
+## Fatto in questa sessione (CHOOSE YOUR STARTER)
 
 - **Fase 1 (sola lettura)**: l'app non ha un onboarding e non ha schermate Program e Progress (solo seduta + menu). Un solo progetto Supabase: `gym-app`. Piano approvato da Leonardo con le sue decisioni (in `DECISIONI.md`).
 - **Migrazione** `supabase/migrations/20261107090000_profiles_starter.sql`: colonna `profiles.starter` (testo, null = non scelto), controllo `gorilla` / `lion` / `tiger`, commento. Nessun trigger, nessuna regola di blocco. **Applicata solo al database locale** (`npx supabase migration up`, senza reset; 4 profili prima e dopo). **Online no.**
 - **App**: schermata CHOOSE YOUR STARTER a tutto schermo (tre carte, tocco, Conferma, poi la seduta), solo dopo che il server ha detto "vuoto"; scelta salvata sul telefono e inviata appena c'è rete, senza doppioni (scrive solo se online è ancora vuoto); "Esci" bloccato finché non è inviata; piccola immagine nel menu accanto all'account. Lettura dello starter separata dal piano: se fallisce, la seduta funziona lo stesso.
 - File nuovi: `app/src/starter.js`, `app/src/assets/starters/` (immagini), `app/tests/unit/starter.test.js`. Modificati: `api.js`, `main.js`, `i18n.js`, `styles.css`, `tests/locale/supabase.test.js`, `scripts/e2e.mjs`, `docs/app.md`, `docs/database.md`, `DECISIONI.md`.
-- Commit `c8a2617` (con SVG segnaposto), poi un secondo commit con le mascotte vere (sotto). Tutti e due solo sul computer.
+- Commit `c8a2617` (con SVG segnaposto), poi `701b3d9` con le mascotte vere (sotto). Tutti e due **pubblicati su GitHub** (push con l'ok di Leonardo, senza force push; branch allineato: locale e GitHub su `701b3d9`).
 - **Mascotte vere** (fase 3): l'originale di Leonardo (nella radice si chiamava `Vintage Trio Gym Mascots.png`, con gli spazi; 2172 × 724, sfondo **già trasparente**) ora è in `docs/immagini/`. Ritagliate in `gorilla.png` (130 KB), `lion.png` (138 KB), `tiger.png` (128 KB), 480 px di altezza, tagli nelle colonne vuote (55–723, 756–1412, 1446–2129) con 8 px di margine, stessa scala; tolti solo il velo quasi invisibile (alfa ≤ 16) e 1 pixel isolato. I tre SVG segnaposto tolti (ok di Leonardo); nessun riferimento rimasto. Stili: `object-fit: contain` sulle carte e nel menu (niente deformazioni, niente ritaglio a cerchio).
 - **Prove, tutte verdi**: logica 81 (67 + 14), database locale dall'app 25 (17 + 8), browser 69 (58 + 11: starter non leggibile → niente schermata, schermata con server vuoto, mascotte PNG caricate senza deformazioni, scelta offline, "Esci" bloccato, invio al ritorno della rete, la schermata non torna, immagine nel menu), database 110 su 110, `db lint` nessun errore. Screenshot: `app/tests/out/11-starter.png`, `app/tests/out/12-menu-starter.png`.
-- Nessun dato online toccato, nessun deploy, nessun push, niente cancellato oltre ai tre SVG segnaposto (con ok). Gli atleti finti delle prove sono creati e cancellati dalle prove stesse, solo in locale.
+- Nessun dato online toccato, nessun deploy, niente cancellato oltre ai tre SVG segnaposto (con ok). Gli atleti finti delle prove sono creati e cancellati dalle prove stesse, solo in locale.
 
 ## Prima, oggi (tasto "Fine seduta" e controllo inglese)
 
@@ -148,7 +148,7 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 ## Cosa è online
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 9 migrazioni (26 tabelle) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06, 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
-- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `d23994a` (senza CHOOSE YOUR STARTER). `main` pubblica la PWA su GitHub Pages.
+- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `701b3d9` (con CHOOSE YOUR STARTER e l'originale delle mascotte in `docs/immagini/`). `main` pubblica la PWA su GitHub Pages.
 - **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **senza** CHOOSE YOUR STARTER. Si ripubblica con `npm run deploy` nella cartella `app/`.
 - **Supabase `gym-app`**: ancora 9 migrazioni. La colonna `starter` **non c'è** online.
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
@@ -157,7 +157,6 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 - Docker Desktop e WSL (servono per il database di prova in locale).
 - Database locale di prova con i dati finti (`npx supabase start`; ora girano anche accesso e API, servono all'app). Ha le 9 migrazioni di `gym-app` **più la decima** (`20261107090000_profiles_starter.sql`, solo qui). Ricreato il 2026-11-06 (vedi sopra).
-- I due commit di CHOOSE YOUR STARTER su `claude/app-v1` (non ancora su GitHub), compreso l'originale delle mascotte in `docs/immagini/`.
 - Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
@@ -165,13 +164,13 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
-CHOOSE YOUR STARTER: Leonardo guarda la schermata (screenshot `app/tests/out/11-starter.png` e `12-menu-starter.png`, oppure `npm run dev` in `app/`) e decide se e quando: push su GitHub, migrazione online su `gym-app` (prima backup e `--dry-run`), deploy. L'ordine tra migrazione e deploy non è pericoloso: senza colonna l'app apre la seduta e la schermata semplicemente non compare.
+CHOOSE YOUR STARTER: Leonardo guarda la schermata (screenshot `app/tests/out/11-starter.png` e `12-menu-starter.png`, oppure `npm run dev` in `app/`) e decide se e quando (il push è fatto): migrazione online su `gym-app` (prima backup e `--dry-run`), deploy. L'ordine tra migrazione e deploy non è pericoloso: senza colonna l'app apre la seduta e la schermata semplicemente non compare.
 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
 
-- CHOOSE YOUR STARTER: ok per push, migrazione online e deploy (tre passi, ognuno con il suo ok).
+- CHOOSE YOUR STARTER: push fatto; restano migrazione online e deploy (due passi, ognuno con il suo ok).
 - Sul tema chiaro il bordo crema delle mascotte si confonde con lo sfondo crema delle carte, e i graffi della tigre e le stelline del leone si vedono poco. Sul tema scuro va bene. Decidere se va bene così.
 
 - Dopo qualche settimana di uso vero: rivedere le 3 ore dopo mezzanotte (tenerle o toglierle).
