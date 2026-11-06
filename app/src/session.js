@@ -1,18 +1,20 @@
 // Operazioni della seduta: salvare, modificare e cancellare una serie.
 // Scrivono solo sul telefono (Local.write); l'invio a Supabase lo fa sync.js.
-import { indexRows, findSession, findSessionExercise, setsOf, nextSetNumber, unitToKg } from './logic.js';
+import { indexRows, openSessions, findSessionExercise, setsInSessions, nextSetNumber, unitToKg, lastActivity } from './logic.js';
 
 const uuid = () => crypto.randomUUID();
 
 /**
- * Salva una serie nuova. Crea, se mancano, la seduta di oggi e l'esercizio della seduta.
+ * Salva una serie nuova. Se per questo giorno del piano non c'è una seduta in corso (vedi openSessions),
+ * ne crea una nuova con la data di oggi: le sedute vecchie non si toccano e restano la "volta scorsa".
  * values = { weight (nell'unità mostrata), unit, reps, rir }
  */
 export async function saveSet(local, ctx, pe, values, now = new Date()) {
   const { userId, date, day, plan, clubId } = ctx;
   const idx = indexRows(local.list());
   const changes = [];
-  let session = findSession(idx, { date, day });
+  const open = openSessions(idx, { date, day, now });
+  let session = open[0] || null;
   if (!session) {
     session = { id: uuid(), user_id: userId, session_date: date, started_at: now.toISOString(), club_id: clubId || null,
       plan_id: plan ? plan.id : null, plan_day_id: day.id, day_name: day.name, deleted_at: null };
@@ -28,7 +30,7 @@ export async function saveSet(local, ctx, pe, values, now = new Date()) {
     changes.push({ table: 'session_exercises', data: se });
   }
   const set = {
-    id: uuid(), session_exercise_id: se.id, user_id: userId, set_number: nextSetNumber(setsOf(idx, se.id)), set_type: 'normal',
+    id: uuid(), session_exercise_id: se.id, user_id: userId, set_number: nextSetNumber(setsInSessions(idx, open, pe)), set_type: 'normal',
     ...weightFields(values), reps: values.reps, rir: values.rir ?? null, performed_at: now.toISOString(), deleted_at: null,
   };
   changes.push({ table: 'sets', data: set });
@@ -49,6 +51,33 @@ export async function deleteSet(local, setId, now = new Date()) {
   const cur = local.rows.get(setId);
   if (!cur) throw new Error('set-not-found');
   const [r] = await local.write([{ table: 'sets', data: { id: setId, deleted_at: now.toISOString() } }]);
+  return r.data;
+}
+
+/**
+ * "Fine seduta": scrive ended_at sulle sedute in corso (di solito una). Le serie non si toccano e diventano la
+ * "volta scorsa". Come ogni modifica va prima sul telefono e poi nella coda di invio (stessa riga, stesso id).
+ * Ritorna le sedute chiuse; vuoto se non c'era niente da chiudere (nessuna serie salvata = nessuna seduta).
+ */
+export async function closeSession(local, sessions, now = new Date()) {
+  const idx = indexRows(local.list());
+  const changes = [];
+  for (const s of sessions || []) {
+    const cur = s && local.rows.get(s.id);
+    if (!cur || cur.data.ended_at || cur.data.deleted_at) continue;
+    // Mai prima dell'inizio o dell'ultima serie (il database lo rifiuterebbe; capita con orologi diversi tra telefoni).
+    const end = Math.max(now.getTime(), lastActivity(idx, cur.data));
+    changes.push({ table: 'sessions', data: { id: s.id, ended_at: new Date(end).toISOString() } });
+  }
+  if (!changes.length) return [];
+  return (await local.write(changes)).map((r) => r.data);
+}
+
+/** "Riapri": toglie ended_at da una seduta chiusa. Ritorna la seduta, o null se non era chiusa. */
+export async function reopenSession(local, sessionId) {
+  const cur = local.rows.get(sessionId);
+  if (!cur || !cur.data.ended_at) return null;
+  const [r] = await local.write([{ table: 'sessions', data: { id: sessionId, ended_at: null } }]);
   return r.data;
 }
 

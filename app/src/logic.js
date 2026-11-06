@@ -39,16 +39,63 @@ export function indexRows(rows) {
   return { sessions, sesEx, setsBySe, seBySession };
 }
 
-/** La seduta di oggi per un giorno del piano (se esiste già). */
-export function findSession(idx, { date, day }) {
-  let best = null;
+/** Ore dopo l'ultima serie in cui una seduta del giorno prima resta "in corso" (allenamento a cavallo della mezzanotte). */
+export const OPEN_HOURS = 3;
+
+const ms = (t) => (t ? Date.parse(t) || 0 : 0);
+const sameDay = (s, day) => (s.plan_day_id ? s.plan_day_id === day.id : !!s.day_name && s.day_name === day.name);
+const startKey = (s) => ms(s.started_at || s.created_at);
+
+/** Momento (in ms) dell'ultima attività di una seduta: l'ultima serie salvata, altrimenti l'inizio. 0 se non si sa. */
+export function lastActivity(idx, s) {
+  let t = ms(s.started_at);
+  for (const se of idx.seBySession.get(s.id) || []) for (const x of setsOf(idx, se.id)) t = Math.max(t, ms(x.performed_at));
+  return t;
+}
+
+/**
+ * Sedute "in corso" per un giorno del piano, dalla più vecchia. Regola:
+ * - una seduta è in corso se è di OGGI (data del calendario) e non è chiusa (ended_at vuoto: il tasto "Fine seduta" lo scrive);
+ * - unica eccezione: una seduta del giorno prima, non chiusa, con l'ultima serie da meno di OPEN_HOURS ore
+ *   (allenamento iniziato prima di mezzanotte e finito dopo).
+ * Tutte le altre sono passate: le loro serie restano nel database e diventano la "volta scorsa".
+ * Di solito ce n'è al massimo una; due solo se due telefoni (o due schede) l'hanno iniziata senza rete.
+ * Aprire l'app non crea niente: la seduta nasce con la prima serie salvata (session.js).
+ */
+export function openSessions(idx, { date, day, now = new Date() }) {
+  return currentSessions(idx, { date, day, now }).filter((s) => !s.ended_at);
+}
+
+/** Sedute "di adesso" per un giorno del piano (di oggi, o di ieri entro OPEN_HOURS), chiuse o no, dalla più vecchia. */
+function currentSessions(idx, { date, day, now = new Date() }) {
+  const out = [];
+  const nowMs = now.getTime(), yesterday = addDays(date, -1);
   for (const s of idx.sessions.values()) {
-    if (s.session_date !== date) continue;
-    const same = s.plan_day_id ? s.plan_day_id === day.id : (s.day_name && s.day_name === day.name);
-    if (!same) continue;
-    if (!best || String(s.created_at || s.started_at || '') < String(best.created_at || best.started_at || '')) best = s;
+    if (!sameDay(s, day)) continue;
+    if (s.session_date === date) out.push(s);
+    else if (s.session_date === yesterday) {
+      const t = lastActivity(idx, s);
+      if (t && nowMs - t < OPEN_HOURS * 3600e3) out.push(s);
+    }
   }
+  return out.sort((a, b) => startKey(a) - startKey(b) || String(a.id).localeCompare(String(b.id)));
+}
+
+/**
+ * Seduta chiusa con il tasto "Fine seduta" che si può ancora riaprire (rimedio al tocco per sbaglio):
+ * l'ultima chiusa tra quelle "di adesso", solo se nel frattempo non è iniziata una seduta nuova. Altrimenti null.
+ */
+export function reopenable(idx, opts) {
+  const cur = currentSessions(idx, opts);
+  if (cur.some((s) => !s.ended_at)) return null;
+  let best = null;
+  for (const s of cur) if (!best || ms(s.ended_at) > ms(best.ended_at)) best = s;
   return best;
+}
+
+/** La seduta in corso per un giorno del piano (quella dove vanno le serie nuove), o null. */
+export function findSession(idx, opts) {
+  return openSessions(idx, opts)[0] || null;
 }
 
 const machineOf = (pe) => (pe.machine ? pe.machine.id : null);
@@ -64,20 +111,30 @@ export function setsOf(idx, seId) {
   return seId ? (idx.setsBySe.get(seId) || []) : [];
 }
 
+/** Serie di un esercizio del piano nelle sedute in corso (di solito una sola seduta), in ordine. */
+export function setsInSessions(idx, sessions, pe) {
+  const out = [];
+  for (const s of sessions) { const se = findSessionExercise(idx, s.id, pe); if (se) out.push(...setsOf(idx, se.id)); }
+  if (sessions.length > 1) out.sort((a, b) => ms(a.performed_at) - ms(b.performed_at) || a.set_number - b.set_number);
+  return out;
+}
+
 const isWorking = (s) => s.set_type !== 'warmup';
 
 /**
- * "Volta scorsa": l'ultima seduta (diversa da quella di oggi) in cui l'esercizio è stato fatto,
+ * "Volta scorsa": l'ultima seduta (diversa da quelle in corso) in cui l'esercizio è stato fatto,
  * sulla stessa macchina se il piano ne indica una. Solo serie non cancellate e non di riscaldamento.
+ * excludeSessionId: un id o una lista di id (le sedute in corso).
  */
 export function lastPerformance(idx, pe, { excludeSessionId = null, onOrBefore = null } = {}) {
   const mac = machineOf(pe);
+  const excl = new Set([].concat(excludeSessionId ?? []));
   let best = null;
   for (const se of idx.sesEx.values()) {
     if (se.exercise_id !== pe.exercise_id) continue;
     if (mac && se.machine_id !== mac) continue;
     const s = idx.sessions.get(se.session_id);
-    if (!s || s.id === excludeSessionId) continue;
+    if (!s || excl.has(s.id)) continue;
     if (onOrBefore && s.session_date > onOrBefore) continue;
     const sets = setsOf(idx, se.id).filter(isWorking);
     if (!sets.length) continue;
@@ -175,21 +232,29 @@ export function nextSetNumber(sets) {
 }
 
 /**
- * Giorno da proporre: quello con una seduta già iniziata oggi; altrimenti il giorno dopo
- * l'ultimo fatto (rotazione per allenamenti fatti); altrimenti il primo.
+ * Giorno da proporre: quello con una seduta in corso (vedi openSessions; se più d'una, la più recente);
+ * altrimenti il giorno dopo l'ultimo fatto (rotazione per allenamenti fatti, anche se lasciati a metà);
+ * altrimenti il primo.
  */
-export function defaultDay(plan, idx, today) {
+export function defaultDay(plan, idx, today, now = new Date()) {
   const days = plan.days;
   if (!days.length) return null;
-  const dayOf = (s) => days.find((d) => (s.plan_day_id ? s.plan_day_id === d.id : s.day_name === d.name));
+  const hasSets = (s) => (idx.seBySession.get(s.id) || []).some((se) => setsOf(idx, se.id).length);
+  let cur = null;
+  for (const d of days) {
+    for (const s of openSessions(idx, { date: today, day: d, now })) {
+      if (!hasSets(s)) continue;
+      const t = lastActivity(idx, s);
+      if (!cur || t > cur.t) cur = { t, d };
+    }
+  }
+  if (cur) return cur.d;
+  const dayOf = (s) => days.find((d) => sameDay(s, d));
   let last = null;
   for (const s of idx.sessions.values()) {
     const d = dayOf(s);
-    if (!d) continue;
-    if (!(idx.seBySession.get(s.id) || []).some((se) => setsOf(idx, se.id).length)) continue;
-    if (s.session_date === today) return d;
-    if (s.session_date > today) continue;
-    const key = s.session_date + '|' + (s.created_at || s.started_at || '');
+    if (!d || !hasSets(s) || s.session_date > today) continue;
+    const key = s.session_date + '|' + String(startKey(s)).padStart(15, '0');
     if (!last || key > last.key) last = { key, d };
   }
   if (!last) return days[0];

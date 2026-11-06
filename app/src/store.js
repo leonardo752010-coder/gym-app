@@ -95,7 +95,7 @@ export class Local {
   async markError(id, rev, message) {
     const cur = this.rows.get(id);
     if (!cur || cur.rev !== rev) return;
-    const r = { ...cur, error: String(message || 'errore').slice(0, 300) };
+    const r = { ...cur, error: String(message || 'error').slice(0, 300) };
     await this.db.put('rows', r);
     this.rows.set(id, r);
     this.version++;

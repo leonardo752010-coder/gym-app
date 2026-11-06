@@ -7,8 +7,8 @@ import { adminClient, createFakeAthlete, deleteFakeAthlete, randomPassword } fro
 import { makeApi, HISTORY_DAYS } from '../../src/api.js';
 import { openStore, Local } from '../../src/store.js';
 import { flush } from '../../src/sync.js';
-import { saveSet, updateSet, deleteSet } from '../../src/session.js';
-import { localDate, addDays, indexRows, lastPerformance, suggest, findSession } from '../../src/logic.js';
+import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
+import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
 
 const S = localStatus();
 const admin = adminClient(S);
@@ -206,5 +206,47 @@ describe('registrare offline e sincronizzare senza doppioni', () => {
     const serverSets = await count('sets', A.userId, (q) => q.is('deleted_at', null).gte('performed_at', new Date(Date.now() - 3600000).toISOString()));
     const localSets = d.local.list().filter((r) => r.table === 'sets' && !r.data.deleted_at && r.data.performed_at >= new Date(Date.now() - 3600000).toISOString());
     expect(localSets.length).toBe(serverSets);
+  });
+});
+
+describe('Fine seduta sul database locale (regole di accesso vere)', () => {
+  const openOf = (d, snap, dayName) => openSessions(indexRows(d.local.list()), { date: today, day: snap.plan.days.find((x) => x.name === dayName), now: new Date() });
+
+  it('l\'atleta chiude la sua seduta (anche offline) e la riapre: ended_at scritto e tolto, serie intatte', async () => {
+    const d = await device(A.email, passA);
+    const snap = await pull(d);
+    const s = await saveSet(d.local, ctxFor(d, snap, 'Lower B'), pe(snap, 'Lower B', 0), { weight: 45, unit: 'kg', reps: 12, rir: 0 });
+    d.net.mode = 'off';
+    const [c] = await closeSession(d.local, openOf(d, snap, 'Lower B'));
+    expect((await flush(d.local, d.api)).offline).toBe(true);
+    d.net.mode = 'on';
+    expect((await flush(d.local, d.api)).failed).toBe(0);
+    let { data } = await admin.from('sessions').select('id, ended_at').eq('id', c.id);
+    expect(data.length).toBe(1);
+    expect(data[0].ended_at).toBeTruthy();
+    expect((await admin.from('sets').select('deleted_at').eq('id', s.id)).data[0].deleted_at).toBeNull();
+    await reopenSession(d.local, c.id);
+    expect((await flush(d.local, d.api)).failed).toBe(0);
+    ({ data } = await admin.from('sessions').select('ended_at').eq('id', c.id));
+    expect(data[0].ended_at).toBeNull();
+  });
+
+  it('un altro atleta non può chiudere la seduta di A', async () => {
+    const { data: ses } = await admin.from('sessions').select('*').eq('user_id', A.userId).eq('session_date', today).is('ended_at', null).limit(1);
+    expect(ses.length).toBe(1);
+    const b = await device(B.email, passB);
+    const upd = await b.api.sb.from('sessions').update({ ended_at: new Date().toISOString() }).eq('id', ses[0].id).select('id');
+    expect(upd.data || []).toEqual([]);   // la riga di A per B non esiste
+    const ups = await b.api.upsert('sessions', [{ ...ses[0], ended_at: new Date().toISOString(), created_at: undefined, updated_at: undefined }]);
+    expect(ups.error).toBeTruthy();
+    const { data } = await admin.from('sessions').select('ended_at').eq('id', ses[0].id);
+    expect(data[0].ended_at).toBeNull();
+  });
+
+  it('il database rifiuta una fine prima dell\'inizio (per questo l\'app non la scrive mai)', async () => {
+    const d = await device(A.email, passA);
+    const { data: ses } = await admin.from('sessions').select('id, started_at').eq('user_id', A.userId).not('started_at', 'is', null).limit(1);
+    const r = await d.api.sb.from('sessions').update({ ended_at: new Date(Date.parse(ses[0].started_at) - 60000).toISOString() }).eq('id', ses[0].id);
+    expect(r.error && r.error.code).toBe('23514');
   });
 });

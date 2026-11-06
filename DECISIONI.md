@@ -89,6 +89,9 @@ Leonardo ha chiesto a Claude di scegliere e giustificare tecnologia e hosting. D
 | Lingua | Quella del telefono; si cambia dal menu |
 | Hosting | Cloudflare Pages, piano gratuito, caricamento diretto (`npm run deploy`). GitHub Pages scartato: gratis solo con repository pubblico, e `github.io/gym-app` serve ancora l'app attuale |
 | Prove | Vitest (logica e coda), prove sul database locale, prova nel browser con Playwright. Mai dati finti online |
+| Seduta nuova (aggiunta 2026-11-06, dopo il controllo "fine seduta") | Una seduta è in corso solo se è di oggi (calendario del telefono) e senza `ended_at`; altrimenti lo stesso giorno del piano riparte vuoto e la seduta vecchia diventa la volta scorsa. Nessuna cancellazione. Eccezione: 3 ore dopo l'ultima serie per l'allenamento a cavallo della mezzanotte. Seduta a metà: nessun trattamento speciale |
+| Tasto "Fine seduta" (Leonardo, 2026-11-06) | Tasto esplicito in fondo alla seduta, lontano da Salva e Prossimo; scrive `ended_at`, non cancella niente; "Riapri" come rimedio al tocco per sbaglio (niente domanda di conferma). Nessuna migrazione: colonna, permessi e regole di accesso esistevano già. Le 3 ore dopo mezzanotte restano per ora (Leonardo): da rivedere dopo qualche settimana di uso vero |
+| Lingua (Leonardo, 2026-11-06) | Automatica dal telefono, menu per cambiarla. Italiano solo per telefoni in italiano, inglese per tutto il resto. Inglese neozelandese (program), date giorno/mese/anno, kg |
 
 ## 2026-11-06 — Pubblicazione dell'app v1
 

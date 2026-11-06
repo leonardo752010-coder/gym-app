@@ -153,6 +153,177 @@ try {
   await page.waitForSelector('#loginForm');
   check('uscita: torna all\'accesso', true);
   check('nessun errore JavaScript', errors.length === 0, errors.join(' | '));
+
+  console.log('9. Doppia apertura lo stesso giorno');
+  // Di nuovo dentro (serve la rete): oggi c'è Upper A lasciato a metà (panca 1 serie su 2).
+  await page.fill('#email', email);
+  await page.fill('#pass', password);
+  await page.click('#loginBtn');
+  await page.waitForSelector('.done', { timeout: 15000 });
+  const localSessions = (p = page) => p.evaluate(() => [...window.__gym.S.local.rows.values()].filter((r) => r.table === 'sessions' && !r.data.deleted_at).map((r) => r.data));
+  const nBefore = (await localSessions()).length;
+  check('riaperta: propone Upper A, la seduta di oggi con la sua serie', (await page.textContent('.day.on')).startsWith('Upper A') && (await page.$$('.done')).length === 1);
+  const page2 = await ctx.newPage();
+  await page2.goto(URL_APP);
+  await page2.waitForSelector('.done', { timeout: 15000 });
+  check('seconda apertura (altra scheda): stessa seduta, stessa serie', (await page2.textContent('.day.on')).startsWith('Upper A') && (await page2.$$('.done')).length === 1);
+  await page2.close();
+  check('aprire l\'app non crea sedute', (await localSessions()).length === nBefore, nBefore + ' sedute');
+
+  console.log('10. Settimana dopo, senza rete (orologio del browser + 7 giorni)');
+  // Rete bloccata fino alla fine: le serie con date future restano solo nel browser di prova (che poi si chiude).
+  await ctx.route(s.url + '/**', (r) => r.abort('internetdisconnected'));
+  await ctx.setOffline(true);
+  const [ty, tm, td] = today.split('-').map(Number);
+  const week = addDays(today, 7);
+  await page.clock.setFixedTime(new Date(ty, tm - 1, td + 7, 18, 0));
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 5000 });
+  check('l\'app vede la data della settimana dopo', (await page.evaluate(() => window.__gym.S.date)) === week);
+  check('giorno proposto = Lower A (Upper A lasciato a metà conta come fatto)', (await page.textContent('.day.on')).startsWith('Lower A'));
+  await page.click('.day:has-text("Upper A")');
+  await page.waitForSelector('#last');
+  check('Upper A la settimana dopo: schermata vuota', (await page.$$('.done')).length === 0);
+  const lastW = (await page.textContent('#last')).replace(/\s+/g, ' ');
+  check('volta scorsa = la serie della settimana prima (82,5 × 6)', /82,5 × 6/.test(lastW), lastW);
+  check('aprire non crea sedute nemmeno la settimana dopo', (await localSessions()).length === nBefore);
+  await page.click('#save');
+  await page.waitForSelector('.done');
+  let ls2 = await localSessions();
+  check('serie salvata offline in una seduta nuova con la data nuova', ls2.length === nBefore + 1 && ls2.some((x) => x.session_date === week), ls2.map((x) => x.session_date).join(','));
+  const oldSet = await page.evaluate((d) => {
+    const rows = [...window.__gym.S.local.rows.values()];
+    const ses = rows.find((r) => r.table === 'sessions' && r.data.session_date === d && r.data.plan_day_id);
+    const se = rows.filter((r) => r.table === 'session_exercises' && r.data.session_id === (ses && ses.id)).map((r) => r.id);
+    return rows.filter((r) => r.table === 'sets' && se.includes(r.data.session_exercise_id)).map((r) => [Number(r.data.weight_kg), r.data.reps, !!r.data.deleted_at]).sort((a, b) => a[2] - b[2]);
+  }, today);
+  check('seduta della settimana prima intatta (82,5 × 6 e la serie cancellata prima)', JSON.stringify(oldSet) === JSON.stringify([[82.5, 6, false], [82.5, 6, true]]), JSON.stringify(oldSet));
+
+  console.log('11. A cavallo della mezzanotte, senza rete');
+  await page.clock.setFixedTime(new Date(ty, tm - 1, td + 8, 23, 50));
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 5000 });
+  await page.click('.day:has-text("Lower B")');
+  await page.waitForSelector('#save');
+  await page.click('#save');
+  await page.waitForSelector('.done');
+  await page.clock.setFixedTime(new Date(ty, tm - 1, td + 9, 0, 20));
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 5000 });
+  check('alle 00:20 propone ancora Lower B con la serie delle 23:50', (await page.textContent('.day.on')).startsWith('Lower B') && (await page.$$('.done')).length === 1);
+  await page.click('#save');
+  await page.waitForFunction(() => document.querySelectorAll('.done').length === 2);
+  ls2 = await localSessions();
+  check('stessa seduta (nessuna seduta nuova dopo mezzanotte)', ls2.length === nBefore + 2, ls2.map((x) => x.session_date).join(','));
+  await page.clock.setFixedTime(new Date(ty, tm - 1, td + 9, 4, 0));
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 5000 });
+  check('alle 4:00 la seduta è passata: propone il giorno dopo (Upper A)', (await page.textContent('.day.on')).startsWith('Upper A'));
+  await page.click('.day:has-text("Lower B")');
+  await page.waitForSelector('#last');
+  check('alle 4:00 Lower B parte vuoto, con la volta scorsa', (await page.$$('.done')).length === 0);
+  { const fut = (await admin.from('sessions').select('id').eq('user_id', ref.userId).gt('session_date', today)).data; check('online (database locale) nessuna seduta con data futura', fut.length === 0); }
+
+  console.log('12. Fine seduta: due telefoni, online e offline (orologio vero)');
+  const phone = async () => {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'it-IT', hasTouch: true, isMobile: true });
+    const p = await c.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(URL_APP);
+    await p.fill('#email', email); await p.fill('#pass', password); await p.click('#loginBtn');
+    await p.waitForSelector('.card', { timeout: 15000 });
+    return { c, p };
+  };
+  const sync = (p) => p.waitForFunction(() => document.body.dataset.sync === 'ok', null, { timeout: 15000 });
+  const toDay = async (p, name) => { await p.click('.day:has-text("' + name + '")'); await p.waitForSelector('.card'); };
+  const upperB = async () => {
+    const day = (await admin.from('plan_days').select('id').eq('user_id', ref.userId).eq('name', 'Upper B')).data[0].id;
+    return (await admin.from('sessions').select('id, ended_at, started_at').eq('user_id', ref.userId).eq('session_date', today).eq('plan_day_id', day).order('started_at')).data;
+  };
+  const A = await phone(), B = await phone();
+  await toDay(A.p, 'Upper B');
+  check('senza serie: nessun tasto Fine seduta', !(await A.p.$('#endSession')));
+  await A.p.click('#save');
+  await A.p.waitForSelector('#endSession');
+  { const sv = await A.p.$('#save').then((e) => e.boundingBox()), nb = await A.p.$('.navrow').then((e) => e.boundingBox()), eb = await A.p.$('#endSession').then((e) => e.boundingBox());
+    check('Fine seduta in fondo, staccato da Salva e Prossimo (≥ 40 px)', eb.y - (nb.y + nb.height) >= 40 && eb.y > sv.y + sv.height + 40, Math.round(eb.y - (nb.y + nb.height)) + ' px'); }
+  { await A.p.evaluate(() => scrollTo(0, document.body.scrollHeight));
+    const r = await A.p.evaluate(() => { const e = document.getElementById('endSession').getBoundingClientRect(), t = document.getElementById('timer');
+      return { visible: !t.classList.contains('hide'), endBottom: e.bottom, timerTop: t.getBoundingClientRect().top, vh: innerHeight }; });
+    check('in fondo alla pagina Fine seduta resta ≥ 40 px sopra il timer', r.visible && r.timerTop - r.endBottom >= 40 && r.endBottom <= r.vh, JSON.stringify(r));
+    await A.p.screenshot({ path: path.join(out, '08-fine-seduta.png') }); }
+  await sync(A.p);
+  await A.p.click('#endSession');
+  await A.p.waitForSelector('#closedBar');
+  check('chiusa: schermata vuota, "Riapri" visibile, la serie è la volta scorsa', (await A.p.$$('.done')).length === 0 && await A.p.isVisible('#reopen') && /Volta scorsa/.test(await A.p.textContent('#last')));
+  await A.p.screenshot({ path: path.join(out, '09-seduta-chiusa.png'), fullPage: true });
+  await sync(A.p);
+  let ub = await upperB();
+  check('online: una seduta, chiusa (ended_at), serie non cancellata', ub.length === 1 && !!ub[0].ended_at &&
+    (await admin.from('sets').select('id').eq('user_id', ref.userId).is('deleted_at', null).gte('created_at', START)).data.length >= 1);
+  await B.p.evaluate(() => window.__gym.refresh());
+  await toDay(B.p, 'Upper B');
+  check('l\'altro telefono la vede chiusa dopo la sincronizzazione', (await B.p.$$('.done')).length === 0 && await B.p.isVisible('#closedBar'));
+  await A.p.click('#reopen');
+  await A.p.waitForSelector('.done');
+  await sync(A.p);
+  check('Riapri: serie di nuovo nella seduta; online ended_at vuoto', (await A.p.$$('.done')).length === 1 && (await upperB())[0].ended_at === null);
+  await B.p.evaluate(() => window.__gym.refresh());
+  await B.p.waitForSelector('#endSession');
+  await A.p.click('#endSession'); await B.p.click('#endSession');
+  await A.p.waitForSelector('#closedBar'); await B.p.waitForSelector('#closedBar');
+  await sync(A.p); await sync(B.p);
+  ub = await upperB();
+  check('chiusa su tutti e due i telefoni: una sola seduta, chiusa, nessun errore di invio', ub.length === 1 && !!ub[0].ended_at, JSON.stringify(ub.map((x) => !!x.ended_at)));
+  const firstEnd = ub[0].ended_at;
+  // offline: riapro, aggiungo una serie e richiudo senza rete; l'app si riapre senza rete; poi torna la rete
+  await A.c.route(s.url + '/**', (r) => r.abort('internetdisconnected'));
+  await A.c.setOffline(true);
+  await A.p.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await A.p.click('#reopen');
+  await A.p.waitForSelector('#save');
+  await A.p.click('#save');
+  await A.p.waitForFunction(() => document.querySelectorAll('.done').length === 2);
+  await A.p.click('#endSession');
+  await A.p.waitForSelector('#closedBar');
+  await A.p.reload();
+  await A.p.waitForSelector('.card', { timeout: 5000 });
+  await toDay(A.p, 'Upper B');
+  check('offline: chiusa anche dopo la riapertura dell\'app, in coda', await A.p.isVisible('#closedBar') && Number(await A.p.evaluate(() => document.body.dataset.pending)) >= 2);
+  check('offline: online non è cambiato niente', (await upperB())[0].ended_at === firstEnd);
+  await A.c.unroute(s.url + '/**');
+  await A.c.setOffline(false);
+  await A.p.evaluate(() => window.dispatchEvent(new Event('online')));
+  await sync(A.p);
+  ub = await upperB();
+  check('rete tornata: stessa seduta chiusa di nuovo, 2 serie, nessun doppione', ub.length === 1 && !!ub[0].ended_at && ub[0].ended_at !== firstEnd);
+  await A.p.click('#save');
+  await A.p.waitForSelector('#endSession');
+  await sync(A.p);
+  ub = await upperB();
+  const oldSets = (await admin.from('session_exercises').select('sets(id, deleted_at)').eq('session_id', ub[0].id)).data.flatMap((x) => x.sets);
+  check('serie dopo la chiusura: seduta nuova aperta; la vecchia resta chiusa con le sue 2 serie', ub.length === 2 && !!ub[0].ended_at && ub[1].ended_at === null &&
+    oldSets.length === 2 && oldSets.every((x) => !x.deleted_at) && !(await A.p.$('#closedBar')), ub.length + ' sedute');
+  await A.c.close(); await B.c.close();
+
+  console.log('13. Telefono in una lingua non prevista (cinese): inglese');
+  { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', hasTouch: true, isMobile: true });
+    const p = await c.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(URL_APP);
+    await p.waitForSelector('#loginForm');
+    check('accesso in inglese, pagina con lang="en"', (await p.textContent('h1')) === 'Sign in' && (await p.getAttribute('html', 'lang')) === 'en');
+    await p.fill('#email', email); await p.fill('#pass', password); await p.click('#loginBtn');
+    await p.waitForSelector('.card', { timeout: 15000 });
+    const [y, mo, d] = today.split('-').map(Number);
+    const dayTxt = new Date(y, mo - 1, d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }).toUpperCase();
+    check('seduta in inglese, data giorno-mese, kg', (await p.textContent('.btitle')) === 'WORKOUT' && (await p.textContent('#dateTxt')) === 'TODAY · ' + dayTxt &&
+      (await p.textContent('#unitSeg .on')) === 'kg', await p.textContent('#dateTxt'));
+    const body = await p.textContent('body');
+    check('nessuna parola italiana dell\'app sullo schermo', !/\b(Serie|Salva|Volta scorsa|Prossimo|Oggi|Fine seduta|Suggerito)\b/.test(body));
+    await p.screenshot({ path: path.join(out, '10-inglese.png'), fullPage: true });
+    await c.close(); }
+  check('nessun errore JavaScript (fine)', errors.length === 0, errors.join(' | '));
 } catch (e) {
   ko++; console.log('  ERRORE', e.message);
 } finally {

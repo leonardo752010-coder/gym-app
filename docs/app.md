@@ -13,6 +13,45 @@ di iPhone e Android. Nessuno store, nessun costo. Grafica e flusso copiati da `a
   (eliminazione morbida: nel database resta con `deleted_at`).
 - Giorno / notte, italiano / inglese (lingua del telefono, si cambia dal menu toccando il logo).
 
+## Quando inizia una seduta nuova (niente da cancellare a mano)
+
+- Aprire l'app non crea niente: la seduta nasce con la **prima serie salvata**.
+- Ogni giorno del piano ha la sua seduta. Una seduta è "in corso" solo se è **di oggi** (data del calendario del telefono)
+  e non è chiusa. Riaprire l'app lo stesso giorno riprende quella seduta con le sue serie.
+- Dal giorno dopo è una seduta passata: lo stesso giorno del piano riparte **vuoto** e le serie vecchie,
+  che restano nel database, diventano la **volta scorsa**.
+- Seduta lasciata a metà: non serve fare niente. Il giorno dopo è passata come le altre (le serie fatte sono la volta
+  scorsa) e il piano propone il giorno successivo; il giorno lasciato si può comunque scegliere a mano.
+- Unica eccezione: allenamento a cavallo della mezzanotte. Una seduta del giorno prima resta in corso per
+  3 ore dopo l'ultima serie (per esempio serie alle 23:50 → si continua fino alle 02:50).
+- Cambiare giorno del piano a metà: ognuno ha la sua seduta; tornando al primo si ritrovano le sue serie.
+- Due telefoni senza rete che iniziano la stessa seduta: diventano due sedute nel database (nessuna si cancella);
+  l'app le mostra insieme come la seduta di oggi.
+
+## Tasto "Fine seduta"
+
+- In fondo alla schermata della seduta, sotto "Prossimo", separato da una linea e con un aspetto diverso dai tasti
+  usati di continuo. Compare solo se c'è una seduta in corso, cioè dopo la prima serie salvata.
+- Scrive `ended_at` sulla seduta (mai prima dell'ultima serie, anche se l'orologio del telefono è indietro).
+  Le serie restano e diventano la volta scorsa. Non cancella niente.
+- Dopo la chiusura la schermata dello stesso giorno del piano è vuota, con la riga "Seduta chiusa alle HH:MM · **Riapri**".
+  "Riapri" toglie `ended_at`. La riga resta finché la seduta è "di adesso" (oggi, o entro le ore dopo mezzanotte)
+  e finché non inizia una seduta nuova di quel giorno.
+- Una serie salvata dopo la chiusura, sullo stesso giorno del piano, apre una seduta nuova.
+- Offline: la chiusura va prima sul telefono e poi nella coda di invio, come le serie. È la stessa riga della seduta
+  (stesso id): se la seduta non era ancora online, parte una volta sola, già chiusa, prima delle sue serie.
+- Su un altro telefono la seduta risulta chiusa quando scarica i dati (apertura dell'app, ritorno della rete,
+  ritorno sull'app dopo 10 minuti, "Invia ora" nel menu).
+- Dopo la chiusura il piano propone il giorno successivo.
+
+## Lingua
+
+- Quella del telefono: italiano se il telefono è in italiano, **inglese per tutte le altre lingue** (anche quelle non
+  previste, per esempio cinese). Si cambia dal menu toccando il logo.
+- Inglese con ortografia neozelandese (program, non programme). Date con il giorno prima del mese (`6 Nov`,
+  `6/11/2026`), anno mostrato se non è quello di oggi. Pesi in kg di base.
+- Pagina e manifest (nome, descrizione) in inglese, la lingua di ripiego.
+
 Fuori dalla v1: analisi, mesocicli, tecniche di intensità, Apple Salute / Health Connect, area coach, import per utenti.
 
 ## Come salva (zero dati persi, zero doppioni)

@@ -1,10 +1,10 @@
 # Stato
 
-Aggiornato: 2026-11-06, pomeriggio (Claude)
+Aggiornato: 2026-11-06, sera: tasto "Fine seduta" e controllo inglese (Claude)
 
 ## Branch
 
-Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. Codice committato e pubblicato su GitHub (`claude/app-v1`) con l'ok di Leonardo allo STOP 2, senza force push.
+Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. Codice committato e pubblicato su GitHub (`claude/app-v1`) con l'ok di Leonardo allo STOP 2, senza force push. I tre lavori della sera (regola "seduta nuova" con la mezzanotte, tasto "Fine seduta", inglese) sono in **un solo commit** su `claude/app-v1`, pubblicato su GitHub (senza force push) e online con `npm run deploy`, con l'ok di Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
@@ -17,7 +17,42 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (passo 4: app v1 come PWA)
+## Fatto in questa sessione (tasto "Fine seduta" e controllo inglese)
+
+### Tasto "Fine seduta" (decisione di Leonardo)
+
+- **Controllo (sola lettura)**: `ended_at` esiste; l'atleta può già modificare le sue sedute (permesso `update` e regola `sessions_update`); il database rifiuta una fine prima dell'inizio. La coda offline invia già le modifiche (upsert sulla stessa riga, l'ultima versione vince, sedute prima di esercizi e serie). **Nessuna migrazione, nessuna modifica online.**
+- **Fatto** (solo in locale): tasto "Fine seduta" in fondo alla seduta, sotto "Prossimo", separato e con aspetto diverso; compare solo dopo la prima serie. Scrive `ended_at` (mai prima dell'ultima serie), non cancella niente. Dopo: schermata vuota con "Seduta chiusa alle HH:MM · Riapri". Serie dopo la chiusura → seduta nuova. Funziona offline. Spazio in fondo alla pagina aumentato perché il timer di recupero non stia vicino al tasto.
+- File: `app/src/session.js` (closeSession, reopenSession), `logic.js` (reopenable), `main.js`, `styles.css`, `i18n.js`; guida in `docs/app.md`; `DECISIONI.md`.
+- Le 3 ore dopo mezzanotte: **restano per ora** (decisione di Leonardo); se ne riparla dopo qualche settimana di uso vero.
+
+### Controllo inglese (decisione di Leonardo: lingua automatica)
+
+- **Controllo (sola lettura)**: con il telefono in cinese l'app era già in inglese. Nomi nel database online (letti, nessuna scrittura): 22 esercizi, 19 muscoli, tutti con l'inglese (3 uguali in tutte e due le lingue: Hack squat, Leg extension, Leg press); 20 macchine senza nome, l'app mostra marca · modello · codice. **Nessuna modifica al database.**
+- **Corretto nel codice**: inglese neozelandese (`en-NZ`, prima `en-GB`); date con l'anno quando non è quello di oggi; versione dell'app in giorno/mese/anno; pagina con `lang="en"` di base; manifest in inglese; messaggi che erano solo in italiano (configurazione mancante, "Sync", "back", errore generico); un errore di salvataggio che diceva "Accesso non riuscito" (ora "Salvataggio non riuscito" / "Could not save").
+
+### Prove (tutte verdi)
+
+- Logica: 67 (50 + 10 "Fine seduta" in `app/tests/unit/fine-seduta.test.js` + 7 lingua in `app/tests/unit/i18n.test.js`). Sul codice dell'ultimo commit 15 delle 17 nuove falliscono; le 2 che passano controllano cose già giuste (ripiego inglese, nomi dal database).
+- Database locale (app): 17 (14 + 3: chiusura e riapertura anche offline, un altro atleta non può chiudere, fine prima dell'inizio rifiutata).
+- Browser: 58 (43 + 15: due telefoni con chiusura online, offline, Riapri, doppia chiusura, chiusa sull'altro telefono, senza serie, seduta nuova dopo la chiusura, distanza dal timer; telefono in cinese). Sul codice dell'ultimo commit la prova si ferma già alla sezione 11 (mezzanotte).
+- Database: 110 su 110. `db lint`: nessun errore.
+- Solo atleti finti nel database locale. Online solo lettura dei conteggi dei nomi.
+
+## Prima, oggi (controllo: fine seduta e seduta nuova)
+
+Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settimana dopo andavano cancellate a mano.
+
+- **Controllo (sola lettura)**: la nuova app non ha questo problema. La seduta è legata a data + giorno del piano: la settimana dopo lo stesso giorno parte vuoto e la seduta vecchia è la volta scorsa. Nessun tasto "fine seduta". Aprire l'app non crea sedute.
+- **Due problemi trovati e corretti** (solo in locale, `app/src/logic.js`, `session.js`, `main.js`):
+  1. Allenamento a cavallo della mezzanotte: dopo le 00:00 l'app cambiava giorno del piano (rotazione) e le serie finivano in una seduta nuova di un altro giorno. Ora la seduta resta in corso per 3 ore dopo l'ultima serie.
+  2. Due telefoni (o due schede) senza rete che iniziano la stessa seduta: le serie di uno dei due sparivano dalla schermata e comparivano come "volta scorsa · oggi". Ora l'app le mostra insieme; nel database restano due sedute, niente si cancella.
+- Regola scritta in `docs/app.md` ("Quando inizia una seduta nuova") e in `DECISIONI.md`.
+- **Prove nuove**: 13 prove della logica e del salvataggio (`tests/unit/seduta-nuova.test.js`: settimana dopo, doppia apertura, seduta a metà, cambio giorno, mezzanotte, seduta chiusa, offline, due telefoni) e 16 controlli nel browser (`scripts/e2e.mjs`, sezioni 9-11, con l'orologio del browser spostato e la rete spenta: nessuna data futura arriva nemmeno al database locale).
+- **Risultati**: 50 prove della logica (37 + 13), 14 sul database locale, 43 nel browser (27 + 16), 110 del database: tutte verdi.
+- Nessun dato online toccato, nessuna migrazione, nessuna cancellazione. Dati usati: solo atleti finti nel database locale (creati e cancellati dalle prove).
+
+## Sessione precedente (passo 4: app v1 come PWA)
 
 ### Dopo l'ok di Leonardo allo STOP 1
 
@@ -121,6 +156,9 @@ Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova c
 
 ## Da decidere o fare per Leonardo
 
+- Dopo qualche settimana di uso vero: rivedere le 3 ore dopo mezzanotte (tenerle o toglierle).
+- Impostazioni online in italiano o di default (email di Supabase, nome del sito, ecc.): vedi elenco dato a Leonardo il 2026-11-06; nessuna è stata toccata.
+
 - Installare l'app sul telefono e accedere (Claude non conosce e non inserisce le password).
 - Durante la prova: registrare le serie solo nella nuova app, solo nella vecchia, o in tutte e due? (Con tutte e due il foglio GYM e Supabase restano completi, ma è doppio lavoro.)
 
@@ -140,7 +178,7 @@ Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova c
 1. Fondamenta del repository — fatto; repository privato dopo lo spostamento dell'hosting.
 2. Database Supabase (Sydney): tabelle, regole di accesso, file di migrazione — fatto, in attesa del merge.
 3. Trasferimento del piano attuale e dell'ultima settimana di Leonardo, con controllo — fatto online il 2026-11-06 (Raina: niente import).
-4. **Nuova app, parte seduta** — app v1 (PWA) costruita e provata in locale; in attesa dell'ok per pubblicarla.
+4. **Nuova app, parte seduta** — app v1 (PWA) pubblicata il 2026-11-06; seduta nuova, tasto "Fine seduta" e inglese pubblicati la sera del 2026-11-06.
 5. Nuova app, parte piano.
 6. Passaggio alla nuova app.
 7. Stage 0: 4 settimane di uso vero.

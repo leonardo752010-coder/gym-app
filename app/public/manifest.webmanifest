@@ -1,7 +1,9 @@
 {
   "name": "Gym",
   "short_name": "Gym",
-  "description": "Il tuo piano, serie in un tocco.",
+  "description": "Your plan, every set in one tap.",
+  "lang": "en",
+  "dir": "ltr",
   "id": "./",
   "start_url": "./",
   "scope": "./",

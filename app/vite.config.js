@@ -43,7 +43,8 @@ self.addEventListener('fetch', (e) => {
 export default defineConfig(({ mode }) => ({
   base: './',
   envPrefix: 'VITE_',
-  define: { __APP_VERSION__: JSON.stringify(new Date().toLocaleString('sv-SE').slice(0, 16)) },   // data e ora (locali) della build
+  // data e ora (locali) della build, giorno/mese/anno
+  define: { __APP_VERSION__: JSON.stringify(new Date().toLocaleString('en-NZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).replace(',', '')) },
   build: { target: 'es2020', sourcemap: false, assetsInlineLimit: 0 },
   plugins: [serviceWorker()],
   server: { port: 5173, strictPort: true },

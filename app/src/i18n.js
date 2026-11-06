@@ -1,4 +1,6 @@
 // Testi dell'app in italiano e inglese. Ogni testo visibile passa da qui.
+// Lingua: quella del telefono; italiano solo se il telefono è in italiano, altrimenti inglese (anche per lingue non previste).
+// Inglese con ortografia neozelandese (program, non programme; colour). Date sempre giorno/mese/anno, pesi in kg di base.
 const it = {
   workout: 'ALLENAMENTO', today: 'Oggi', loading: 'Carico il piano…', locale: 'it-IT', dayNight: 'Giorno / notte',
   exOf: (i, n) => 'Esercizio ' + i + ' di ' + n, rep: 'rep', last: 'Volta scorsa', set: 'Serie', target: 'Target',
@@ -24,9 +26,14 @@ const it = {
   logout: 'Esci', logoutBlocked: 'Ci sono modifiche non ancora online. Collegati a internet e riprova.', close: 'Chiudi',
   syncNow: 'Invia ora', lastSync: 'Ultimo aggiornamento', never: 'mai', errors: 'Errori', version: 'Versione',
   install: 'Per installarla: Condividi → Aggiungi alla schermata Home (iPhone) oppure menu ⋮ → Installa app (Android).',
+  // fine seduta
+  endSession: 'Fine seduta', ended: 'Seduta chiusa', closedAt: (t) => 'Seduta chiusa alle ' + t, reopen: 'Riapri', reopened: 'Seduta riaperta',
+  // altro
+  saveErr: 'Salvataggio non riuscito: ', sync: 'Sincronizzazione', back: 'Indietro',
+  noConfig: 'Configurazione mancante: chiave pubblica di Supabase (src/config.js).',
 };
 const en = {
-  workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-GB', dayNight: 'Day / night',
+  workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
   exOf: (i, n) => 'Exercise ' + i + ' of ' + n, rep: 'reps', last: 'Last time', set: 'Set', target: 'Target',
   save: 'Save set', update: 'Update set', del: 'Delete', cancel: 'Cancel', next: 'Next',
   extra: '+ extra set', finished: 'Session done. Great work 💪', notPlan: 'Not in the plan (0 sets). You can still log an extra set.',
@@ -47,6 +54,9 @@ const en = {
   logout: 'Sign out', logoutBlocked: 'Some changes are not online yet. Connect to the internet and try again.', close: 'Close',
   syncNow: 'Send now', lastSync: 'Last update', never: 'never', errors: 'Errors', version: 'Version',
   install: 'To install: Share → Add to Home Screen (iPhone) or menu ⋮ → Install app (Android).',
+  endSession: 'End session', ended: 'Session ended', closedAt: (t) => 'Session ended at ' + t, reopen: 'Reopen', reopened: 'Session reopened',
+  saveErr: 'Could not save: ', sync: 'Sync', back: 'Back',
+  noConfig: 'Missing configuration: Supabase public key (src/config.js).',
 };
 export const LANGS = { it, en };
 
@@ -60,4 +70,11 @@ export function tr(name, lang) {
   if (!name) return '';
   if (typeof name === 'string') return name;
   return name[lang] || name.en || name.it || Object.values(name)[0] || '';
+}
+
+/** Data 'AAAA-MM-GG' come giorno e mese, più l'anno se non è quello di oggi. Sempre il giorno prima del mese. */
+export function fmtDay(key, locale, todayKey = null) {
+  const [y, m, d] = key.split('-').map(Number);
+  const year = todayKey && Number(todayKey.slice(0, 4)) !== y ? { year: 'numeric' } : {};
+  return new Date(y, m - 1, d).toLocaleDateString(locale, { day: 'numeric', month: 'short', ...year });
 }

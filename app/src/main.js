@@ -11,11 +11,11 @@ import { supabaseConfig } from './config.js';
 import { makeApi, storedUser, HISTORY_DAYS } from './api.js';
 import { openStore, Local, getKv, setKv } from './store.js';
 import { flush } from './sync.js';
-import { saveSet, updateSet, deleteSet } from './session.js';
-import { LANGS, pickLang, tr } from './i18n.js';
+import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
+import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
 import {
-  localDate, addDays, indexRows, findSession, findSessionExercise, setsOf, lastPerformance, suggest, stepWeight,
-  restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2,
+  localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
+  restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
 
 const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
@@ -62,17 +62,14 @@ function toast(msg, bad) {
   const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
   clearTimeout(toast._t); toast._t = setTimeout(() => { t.className = 'toast' + (bad ? ' bad' : ''); }, bad ? 4500 : 2200);
 }
-function niceDate(k) {
-  const [y, m, d] = k.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(S.T.locale, { day: 'numeric', month: 'short' }).replace('.', '').toUpperCase();
-}
-function shortDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(S.T.locale, { day: 'numeric', month: 'short' }); }
+function niceDate(k) { return fmtDay(k, S.T.locale).replace('.', '').toUpperCase(); }
+function shortDate(k) { return fmtDay(k, S.T.locale, S.date); }
 
 /* ---------- avvio ---------- */
 async function boot() {
   mark('boot');
   if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('./sw.js').catch(() => {});
-  if (!api) { document.body.innerHTML = '<div class="load err">Configurazione mancante: chiave pubblica di Supabase (src/config.js).</div>'; return; }
+  if (!api) { document.body.innerHTML = '<div class="load err">' + esc(S.T.noConfig) + '</div>'; return; }
   askPersist();
   S.user = storedUser();
   if (!S.user) { renderLogin(); return; }
@@ -231,16 +228,16 @@ function dayObj() {
   const p = plan(); if (!p || !p.days.length) return null;
   return p.days.find((d) => d.id === S.dayId) || p.days[0];
 }
+// Seduta mostrata: quella in corso per il giorno scelto (vedi openSessions in logic.js).
+// Se non ce n'è una, la schermata parte vuota e le sedute passate sono la "volta scorsa".
 function view() {
   const idx = indexRows(S.local.list());
   const day = dayObj();
-  const session = day ? findSession(idx, { date: S.date, day }) : null;
-  return { idx, day, session };
+  const sessions = day ? openSessions(idx, { date: S.date, day, now: new Date() }) : [];
+  return { idx, day, sessions };
 }
 function doneOf(v, pe) {
-  if (!v.session) return [];
-  const se = findSessionExercise(v.idx, v.session.id, pe);
-  return se ? setsOf(v.idx, se.id) : [];
+  return setsInSessions(v.idx, v.sessions, pe);
 }
 const active = (pe) => pe.sets > 0;
 function firstOpenIdx(v) {
@@ -262,12 +259,11 @@ function render() {
 
   let v = view();
   if (!S.dayId || !p.days.some((d) => d.id === S.dayId)) {
-    const d = defaultDay(p, v.idx, S.date); S.dayId = d.id; v = view(); S.idx = firstOpenIdx(v); S.idxSet = true;
+    const d = defaultDay(p, v.idx, S.date, new Date()); S.dayId = d.id; v = view(); S.idx = firstOpenIdx(v); S.idxSet = true;
   }
   if (!S.idxSet) { S.idx = firstOpenIdx(v); S.idxSet = true; }   // all'apertura: primo esercizio non finito
   $('days').innerHTML = p.days.map((d) => {
-    const s = findSession(v.idx, { date: S.date, day: d });
-    const vv = { idx: v.idx, session: s };
+    const vv = { idx: v.idx, sessions: openSessions(v.idx, { date: S.date, day: d, now: new Date() }) };
     const act = d.exercises.filter(active), tot = act.reduce((a, e) => a + e.sets, 0);
     const dn = act.reduce((a, e) => a + Math.min(doneOf(vv, e).length, e.sets), 0);
     return '<button class="day' + (d.id === v.day.id ? ' on' : '') + '" data-day="' + esc(d.id) + '">' + esc(d.name) + (dn ? '<small>' + dn + '/' + tot + '</small>' : '') + '</button>';
@@ -287,7 +283,22 @@ function render() {
     return '<button class="' + cls + '" data-idx="' + i + '"><span class="n">' + (pr >= 1 ? '✓' : i + 1) + '</span><span class="t"><b>' +
       esc(exName(x)) + '</b><span>' + esc(sub) + '</span></span></button>';
   }).join('') + '</aside>';
-  $('wrap').innerHTML = list + '<section>' + card(v, pe) + navRow(v, exs) + '</section>';
+  $('wrap').innerHTML = list + '<section>' + closedBar(v) + card(v, pe) + navRow(v, exs) + endRow(v) + '</section>';
+}
+
+/** Dopo "Fine seduta": riga con l'ora di chiusura e "Riapri" (finché non inizia una seduta nuova di questo giorno). */
+function closedBar(v) {
+  if (v.sessions.length) return '';
+  const c = reopenable(v.idx, { date: S.date, day: v.day, now: new Date() });
+  if (!c) return '';
+  const t = new Date(c.ended_at).toLocaleTimeString(S.T.locale, { hour: '2-digit', minute: '2-digit' });
+  return '<div class="closed" id="closedBar"><span>' + esc(S.T.closedAt(t)) + '</span><button id="reopen" data-sid="' + esc(c.id) + '">' + S.T.reopen + '</button></div>';
+}
+
+/** "Fine seduta": solo se c'è una seduta in corso (cioè almeno una serie salvata), in fondo e separato. */
+function endRow(v) {
+  if (!v.sessions.length) return '';
+  return '<div class="endrow"><button class="endbtn" id="endSession">' + S.T.endSession + '</button></div>';
 }
 
 const exName = (pe) => tr(pe.exercise && pe.exercise.name, S.lang) || '—';
@@ -296,7 +307,7 @@ const rirTxt = (pe) => pe.rir_min == null ? '' : fmtN(pe.rir_min) + (pe.rir_max 
 
 function navRow(v, exs) {
   let h = '<div class="navrow">';
-  if (S.idx > 0) h += '<button class="back" data-go="-1" aria-label="back">‹</button>';
+  if (S.idx > 0) h += '<button class="back" data-go="-1" aria-label="' + S.T.back + '">‹</button>';
   if (S.idx < exs.length - 1) h += '<button class="next" data-go="1"><span><span>' + S.T.next + '</span><b>' + esc(exName(exs[S.idx + 1])) + '</b></span><i>→</i></button>';
   else {
     const allDone = exs.every((x) => !active(x) || doneOf(v, x).length >= x.sets);
@@ -306,7 +317,7 @@ function navRow(v, exs) {
 }
 
 function infoFor(v, pe) {
-  const last = lastPerformance(v.idx, pe, { excludeSessionId: v.session ? v.session.id : null, onOrBefore: S.date });
+  const last = lastPerformance(v.idx, pe, { excludeSessionId: v.sessions.map((s) => s.id), onOrBefore: S.date });
   return { last, sugg: suggest(pe, last, S.unit) };
 }
 
@@ -438,8 +449,34 @@ async function save(force, isUpdate) {
     syncNow();
   } catch (e) {
     S.busy = false; render();
-    toast(S.T.loginErr + (e && e.message || e), true);
+    toast(S.T.saveErr + (e && e.message || e), true);
   }
+}
+
+/* ---------- fine seduta / riapri (sul telefono subito, poi nella coda di invio) ---------- */
+async function endSession() {
+  if (S.busy) return;
+  S.busy = true;
+  try {
+    const closed = await closeSession(S.local, view().sessions);
+    if (!closed.length) return;
+    stopTimer();
+    S.drafts = {}; S.edit = null; S.extraOpen = null; S.idx = 0;
+    buzz(30); toast(S.T.ended);
+  } finally { S.busy = false; }
+  render(); scrollTo(0, 0); syncNow();
+}
+
+async function reopen(id) {
+  if (S.busy) return;
+  S.busy = true;
+  try {
+    if (!(await reopenSession(S.local, id))) return;
+    S.drafts = {}; S.edit = null; S.extraOpen = null;
+    buzz(20); toast(S.T.reopened);
+  } finally { S.busy = false; }
+  S.idx = firstOpenIdx(view());
+  render(); syncNow();
 }
 
 function sheet(title, msg, noTxt, yesTxt, onYes) {
@@ -467,7 +504,7 @@ function openMenu() {
   const last = S.snap && S.snap.fetchedAt ? new Date(S.snap.fetchedAt).toLocaleString(T.locale) : T.never;
   $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet"><h2>' + T.menu + '</h2><dl>' +
     '<dt>' + T.account + '</dt><dd>' + esc(S.user && S.user.email) + '</dd>' +
-    '<dt>Sync</dt><dd>' + esc($('sync') ? $('sync').textContent : '') + '</dd>' +
+    '<dt>' + T.sync + '</dt><dd>' + esc($('sync') ? $('sync').textContent : '') + '</dd>' +
     '<dt>' + T.lastSync + '</dt><dd>' + esc(last) + '</dd>' +
     '<dt>' + T.storage + '</dt><dd>' + (S.persisted === true ? T.persisted : S.persisted === false ? T.notPersisted : T.unknown) + '</dd>' +
     '<dt>' + T.lang + '</dt><dd><div class="seg" id="langSeg"><button data-l="it" class="' + (S.lang === 'it' ? 'on' : '') + '">IT</button><button data-l="en" class="' + (S.lang === 'en' ? 'on' : '') + '">EN</button></div></dd>' +
@@ -553,6 +590,8 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'delSet') { askDelete(); return; }
   if (b.id === 'cancelEd') { S.edit = null; render(); return; }
   if (b.id === 'extra') { S.extraOpen = S.dayId + '|' + pe.id; render(); return; }
+  if (b.id === 'endSession') { endSession(); return; }
+  if (b.id === 'reopen') { reopen(b.dataset.sid); return; }
 });
 document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.target.id === 'inReps') readInputs(); });
 
