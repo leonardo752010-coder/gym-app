@@ -1,10 +1,10 @@
 # Stato
 
-Aggiornato: 2026-11-06, notte: migrazione dello starter applicata online su gym-app; resta il deploy (Claude)
+Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER pubblicato (deploy delle 21:41) (Claude)
 
 ## Branch
 
-Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). Niente deploy: l'app online è ancora quella senza la schermata.
+Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). App con CHOOSE YOUR STARTER **pubblicata** con `npm run deploy` (2026-11-06, versione "06/11/2026 21:41"), con l'ok di Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
@@ -19,6 +19,7 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 
 ## Fatto in questa sessione (CHOOSE YOUR STARTER)
 
+- **Deploy (2026-11-06, 21:41), con l'ok di Leonardo**: git pulito e allineato con GitHub (`5f10f6d`); accesso a Cloudflare valido (`wrangler whoami`); migrazione `20261107090000` già online (controllato in sola lettura); `npm test` 81 su 81; build di produzione controllata (solo gym-app, nessuna chiave segreta, nessun indirizzo del database locale; la parola `sb_secret_` è solo un controllo dentro la libreria supabase-js). `npm run deploy`: riuscito, 7 file nuovi caricati (pagina, JS, CSS, `sw.js`, tre mascotte). Verifica online: pagina, `sw.js` e manifest rispondono 200; le tre mascotte (`gorilla`, `lion`, `tiger` .png) sono nella lista dei file per l'uso offline e rispondono 200 come `image/png`. Piano gratuito di Cloudflare: nessun costo.
 - **Migrazione online, fase B (2026-11-06, 21:36), con l'ok di Leonardo**: CLI collegata a `gym-app` (controllato); dry-run di nuovo con solo `20261107090000_profiles_starter.sql`; backup `gym-app_2026-11-06_2135` (struttura 95,5 KB, dati 86,6 KB; 333 righe, 9 migrazioni; nessun backup cancellato, ora sono 6); `npx supabase db push --remote=<ref di gym-app> --yes`: **applicata**, nessun errore. Verifica in sola lettura: colonna `profiles.starter` presente (testo, controllo gorilla/lion/tiger), migrazione registrata; 2 profili, tutti e 2 con starter vuoto (null). Nessun dato toccato.
 - **Migrazione online, fase A (2026-11-06, 20:39)**: CLI collegata a `gym-app` (controllato). File della migrazione controllato: solo colonna, controllo dei valori, commento. Backup `gym-app_2026-11-06_2039` (struttura 95,5 KB, dati 86,4 KB; 332 righe, 9 migrazioni; nessun backup cancellato, ora sono 5). Dry-run (`npx supabase db push --remote=<ref di gym-app> --dry-run`): verrebbe applicata **solo** `20261107090000_profiles_starter.sql`. **Niente applicato online**, niente commit.
 
@@ -152,8 +153,8 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 10 migrazioni (26 tabelle; la decima, del 2026-11-06 sera, aggiunge `profiles.starter`) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06 (al backup delle 20:39: 7 sedute e 75 serie in tutto, Leonardo ha già usato l'app nuova), 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
 - **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `701b3d9` (con CHOOSE YOUR STARTER e l'originale delle mascotte in `docs/immagini/`). `main` pubblica la PWA su GitHub Pages.
-- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **senza** CHOOSE YOUR STARTER. Si ripubblica con `npm run deploy` nella cartella `app/`.
-- **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili, starter vuoto per tutti e 2). L'app online non la usa ancora (manca il deploy).
+- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER (deploy del 2026-11-06, 21:41). Si ripubblica con `npm run deploy` nella cartella `app/`.
+- **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili, starter vuoto per tutti e 2). L'app online la usa dal deploy delle 21:41.
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
@@ -167,13 +168,13 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
-CHOOSE YOUR STARTER: Leonardo guarda la schermata (screenshot `app/tests/out/11-starter.png` e `12-menu-starter.png`, oppure `npm run dev` in `app/`) e decide se e quando fare il **deploy** (`npm run deploy` in `app/`). Push e migrazione online sono fatti. Dopo il deploy, alla prima apertura dell'app nuova Leonardo e Raina vedranno la schermata una volta.
+CHOOSE YOUR STARTER è online. Leonardo e Raina: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 06/11/2026 21:41). Dopo qualche istante compare la schermata, una volta sola.
 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
 
-- CHOOSE YOUR STARTER: push e migrazione online fatti; resta solo il deploy (con il suo ok).
+- CHOOSE YOUR STARTER: tutto fatto (push, migrazione online, deploy). Da controllare sul telefono che la schermata compaia una volta a Leonardo e a Raina.
 - Sul tema chiaro il bordo crema delle mascotte si confonde con lo sfondo crema delle carte, e i graffi della tigre e le stelline del leone si vedono poco. Sul tema scuro va bene. Decidere se va bene così.
 
 - Dopo qualche settimana di uso vero: rivedere le 3 ore dopo mezzanotte (tenerle o toglierle).
@@ -198,7 +199,7 @@ Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (pr
 1. Fondamenta del repository — fatto; repository privato dopo lo spostamento dell'hosting.
 2. Database Supabase (Sydney): tabelle, regole di accesso, file di migrazione — fatto, in attesa del merge.
 3. Trasferimento del piano attuale e dell'ultima settimana di Leonardo, con controllo — fatto online il 2026-11-06 (Raina: niente import).
-4. **Nuova app, parte seduta** — app v1 (PWA) pubblicata il 2026-11-06; seduta nuova, tasto "Fine seduta" e inglese pubblicati la sera del 2026-11-06; CHOOSE YOUR STARTER su GitHub e colonna online, app non ancora pubblicata (manca il deploy).
+4. **Nuova app, parte seduta** — app v1 (PWA) pubblicata il 2026-11-06; seduta nuova, tasto "Fine seduta" e inglese pubblicati la sera del 2026-11-06; CHOOSE YOUR STARTER pubblicato la notte del 2026-11-06.
 5. Nuova app, parte piano.
 6. Passaggio alla nuova app.
 7. Stage 0: 4 settimane di uso vero.

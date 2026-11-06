@@ -139,8 +139,9 @@ fino a 20.000 file, 25 MiB per file. L'accesso a Cloudflare dal terminale (`npx 
 GitHub Pages scartato: col piano gratuito funziona solo con repository pubblici (il repository diventerà privato),
 e il vecchio indirizzo `github.io/gym-app` serve ancora l'app attuale.
 
-Dopo ogni pubblicazione l'app sul telefono si aggiorna da sola: alla prima apertura scarica la versione nuova,
-dalla seconda la usa (il menu mostra la "Versione", cioè data e ora della build).
+Dopo ogni pubblicazione l'app sul telefono si aggiorna da sola: alla prima apertura (con internet) scarica la versione nuova,
+dalla seconda la usa. Quindi: aprire, aspettare qualche secondo, chiudere del tutto (anche dall'elenco delle app aperte)
+e riaprire. Il menu mostra la "Versione", cioè data e ora della build (ultima: 06/11/2026 21:41, con CHOOSE YOUR STARTER).
 
 ## Installare l'app
 
