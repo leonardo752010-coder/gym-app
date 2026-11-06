@@ -1,6 +1,6 @@
 # Stato
 
-Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER pubblicato su GitHub (push), non ancora online nell'app (Claude)
+Aggiornato: 2026-11-06, notte: migrazione dello starter, fase A (backup e dry-run, niente applicato) (Claude)
 
 ## Branch
 
@@ -18,6 +18,8 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
 ## Fatto in questa sessione (CHOOSE YOUR STARTER)
+
+- **Migrazione online, fase A (2026-11-06, 20:39)**: CLI collegata a `gym-app` (controllato). File della migrazione controllato: solo colonna, controllo dei valori, commento. Backup `gym-app_2026-11-06_2039` (struttura 95,5 KB, dati 86,4 KB; 332 righe, 9 migrazioni; nessun backup cancellato, ora sono 5). Dry-run (`npx supabase db push --remote=<ref di gym-app> --dry-run`): verrebbe applicata **solo** `20261107090000_profiles_starter.sql`. **Niente applicato online**, niente commit.
 
 - **Fase 1 (sola lettura)**: l'app non ha un onboarding e non ha schermate Program e Progress (solo seduta + menu). Un solo progetto Supabase: `gym-app`. Piano approvato da Leonardo con le sue decisioni (in `DECISIONI.md`).
 - **Migrazione** `supabase/migrations/20261107090000_profiles_starter.sql`: colonna `profiles.starter` (testo, null = non scelto), controllo `gorilla` / `lion` / `tiger`, commento. Nessun trigger, nessuna regola di blocco. **Applicata solo al database locale** (`npx supabase migration up`, senza reset; 4 profili prima e dopo). **Online no.**
@@ -147,7 +149,7 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Cosa è online
 
-- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 9 migrazioni (26 tabelle) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06, 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
+- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 9 migrazioni (26 tabelle) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06 (al backup delle 20:39: 7 sedute e 75 serie in tutto, Leonardo ha già usato l'app nuova), 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
 - **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `701b3d9` (con CHOOSE YOUR STARTER e l'originale delle mascotte in `docs/immagini/`). `main` pubblica la PWA su GitHub Pages.
 - **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **senza** CHOOSE YOUR STARTER. Si ripubblica con `npm run deploy` nella cartella `app/`.
 - **Supabase `gym-app`**: ancora 9 migrazioni. La colonna `starter` **non c'è** online.
@@ -160,7 +162,7 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 - Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
-- **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Oggi ci sono 3 backup del 2026-11-06; l'ultimo (`1218`) è quello dopo l'import. I backup non vanno mai su GitHub né online.
+- **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Oggi ci sono 5 backup del 2026-11-06; `1218` è quello dopo l'import, `2039` quello prima della migrazione dello starter. I backup non vanno mai su GitHub né online.
 
 ## Prossimo passo
 
