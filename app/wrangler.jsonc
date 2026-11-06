@@ -1,0 +1,12 @@
+// Pubblicazione su Cloudflare (Pages, ora parte di Workers: "static assets").
+// Solo file statici: nessun codice gira sui server di Cloudflare. Le richieste ai file sono gratuite e illimitate.
+{
+  "name": "gym-app",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "none"
+  },
+  "workers_dev": true,
+  "preview_urls": false
+}

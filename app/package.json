@@ -1,0 +1,32 @@
+{
+  "name": "gym-app-pwa",
+  "private": true,
+  "type": "module",
+  "description": "App v1 (PWA): seduta di oggi, serie salvate prima sul telefono e poi su Supabase.",
+  "scripts": {
+    "icons": "node scripts/icons.mjs",
+    "dev": "npm run icons && vite --mode locale",
+    "build": "npm run icons && vite build",
+    "build:locale": "npm run icons && vite build --mode locale",
+    "preview": "vite preview --port 4173 --strictPort",
+    "dati-finti": "node scripts/dati-finti.mjs",
+    "test": "vitest run tests/unit",
+    "test:locale": "vitest run tests/locale",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:tutto": "npm test && npm run test:locale && npm run test:e2e",
+    "deploy": "npm run build && npx wrangler@4 deploy"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "idb": "^8.0.4"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.7",
+    "playwright": "^1.65.0",
+    "sharp": "^0.35.5",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

@@ -72,3 +72,28 @@ Decise da Leonardo sul piano del passo 3, poi corrette nello scopo (stesso giorn
 | Palestra | Si crea solo la palestra attuale, privata di Leonardo e principale, con le macchine usate; nel piano ogni esercizio con macchina è legato a quella palestra e le sedute importate sono in quella palestra. La vecchia palestra non si crea. Il nome sta solo nel file dei collegamenti (fuori dal repository) |
 | Ultima seduta di ogni esercizio | Non si importa. Idea futura: per un esercizio fatto di rado, importare la sua ultima seduta anche se più vecchia, così la "volta scorsa" c'è sempre |
 | Collegamento all'import | Controllato a fine transazione (migrazione 9): così un account con dati importati si può cancellare |
+
+## 2026-11-06 — App v1 come PWA (passo 4)
+
+Leonardo ha chiesto a Claude di scegliere e giustificare tecnologia e hosting. Dettagli in `docs/app.md`.
+
+| Tema | Decisione |
+| --- | --- |
+| Forma | PWA (sito installabile), niente store. Cartella `app/` |
+| Tecnologia | JavaScript semplice + Vite (build) + `supabase-js`. Niente framework: la pagina approvata (`web-app.html`) è già in JavaScript semplice, l'app resta piccola e si apre in fretta |
+| Dati sul telefono | IndexedDB (libreria `idb`) con coda di invio; id creati dal telefono; upsert sull'id; una riga esce dalla coda solo quando Supabase conferma quella versione |
+| Offline | Service worker con tutti i file dell'app in cache; richiesta di memoria persistente al browser |
+| Volta scorsa | Ultima seduta con lo stesso esercizio **sulla stessa macchina** (se il piano indica una macchina), serie cancellate e di riscaldamento escluse. Storico scaricato: ultimi 120 giorni |
+| Suggerimento | Doppia progressione di base: range chiuso in tutte le serie → un salto di peso (passo o lista pesi della macchina, altrimenti 2,5 kg / 5 lb) e rep al minimo; altrimenti stesso peso e una rep in più |
+| Palestra | Nella v1 si usa la palestra principale dell'utente (nessuna scelta a inizio seduta) |
+| Lingua | Quella del telefono; si cambia dal menu |
+| Hosting | Cloudflare Pages, piano gratuito, caricamento diretto (`npm run deploy`). GitHub Pages scartato: gratis solo con repository pubblico, e `github.io/gym-app` serve ancora l'app attuale |
+| Prove | Vitest (logica e coda), prove sul database locale, prova nel browser con Playwright. Mai dati finti online |
+
+## 2026-11-06 — Pubblicazione dell'app v1
+
+| Tema | Decisione |
+| --- | --- |
+| Hosting | Cloudflare "static assets" (la nuova versione di Pages, dentro Workers): wrangler 4.158 manda già i comandi "pages" lì. Indirizzo `https://gym-app.gym-app-pwa.workers.dev`. Gratis, solo file statici. Il vecchio Pages (`--force`) non si usa |
+| Chiave | Nell'app solo la chiave pubblica `sb_publishable_` di gym-app (non la vecchia chiave "anon") |
+| Cancellazioni | Regola di Leonardo (in `CLAUDE.md`): nessuna cancellazione di database o file, anche locali, senza il suo ok; mai `--no-backup` |

@@ -15,3 +15,10 @@ Deve sempre contenere, in italiano semplice:
 - Cose che devo decidere o fare io.
 Se STATO.md e' vecchio o non vero, correggilo subito, anche se non te
 l'ho chiesto. Mostrami le modifiche prima del commit.
+
+## Niente cancellazioni senza il mio ok
+Nessuna cancellazione di database o di file, nemmeno locali (anche il
+database locale di prova), senza il mio ok esplicito.
+- Mai `--no-backup` (per esempio `supabase stop --no-backup`).
+- Mai `supabase db reset` senza il mio ok.
+- Prima di cancellare qualcosa: dimmi cosa, dove e perche', e aspetta.

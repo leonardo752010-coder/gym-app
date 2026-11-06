@@ -1,13 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-06 (Claude)
+Aggiornato: 2026-11-06, pomeriggio (Claude)
 
 ## Branch
 
-Branch attuale: `claude/database` (passo 2 finito + sistema di backup + passo 3: import fatto online, script committato e pubblicato su GitHub). Non è su `main`: il merge lo approva Leonardo.
+Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. Codice committato e pubblicato su GitHub (`claude/app-v1`) con l'ok di Leonardo allo STOP 2, senza force push.
 
 | Branch | Cosa contiene |
 | --- | --- |
+| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub dal 2026-11-06 |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
@@ -16,7 +17,29 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup + passo 3:
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (passo 3: import del piano e dell'ultima settimana)
+## Fatto in questa sessione (passo 4: app v1 come PWA)
+
+### Dopo l'ok di Leonardo allo STOP 1
+
+1. Backup `gym-app_2026-11-06_1258` (299 righe, 9 migrazioni; nessun backup cancellato, ora sono 4).
+2. Chiave **pubblica** (`sb_publishable_`) di gym-app in `app/src/config.js`, letta con lo strumento Supabase che dà solo le chiavi pubbliche. Prova sulle chiavi: verde. Nel build pubblicato: nessuna chiave segreta, solo gym-app.
+3. Regola nuova in `CLAUDE.md`: niente cancellazioni di database o file, anche locali, senza ok; mai `--no-backup`.
+4. Accesso a Cloudflare controllato (`wrangler whoami`: valido). Wrangler 4.158 manda i comandi "pages" alla nuova versione di Pages dentro Workers: aggiunto `app/wrangler.jsonc`, pubblicata con `npm run deploy` su **https://gym-app.gym-app-pwa.workers.dev**. Il primo tentativo (`pages project create`) non ha creato niente.
+5. Verifica online in sola lettura (nessun accesso con account): il certificato HTTPS del nuovo indirizzo è arrivato dopo circa 2 minuti; pagina di accesso, service worker attivo e file in cache, intestazioni di sicurezza attive; senza accesso Supabase rifiuta la lettura (401), come deve.
+6. Nessun dato scritto online, nessuna modifica al database.
+
+### Fino allo STOP 1
+
+- Nuovo branch `claude/app-v1`. App in `app/` (guida: `docs/app.md`; scelte: `DECISIONI.md`, 2026-11-06 "App v1").
+- **Tecnologia**: JavaScript semplice + Vite + `supabase-js`; serie salvate prima sul telefono (IndexedDB) con coda di invio; service worker per aprirsi senza rete. Grafica di `web-app.html` (logo, giorni, giorno/notte, modifica serie, timer), più: suggerimento in grande, volta scorsa piccola, macchina e salti di peso, stato del salvataggio sotto "ALLENAMENTO", menu toccando il logo (account, memoria del telefono, lingua, invia ora, esci).
+- **Hosting scelto: Cloudflare** (gratis; limiti verificati oggi sulle pagine ufficiali). GitHub Pages scartato (gratis solo con repository pubblico; e `github.io/gym-app` serve ancora l'app attuale).
+- **Prove, tutte verdi**: 37 prove della logica e della coda (`npm test`), 14 prove sul database locale (`npm run test:locale`: accesso, isolamento tra atleti, iscrizioni chiuse, volta scorsa, offline, risposta persa, due telefoni), 27 controlli nel browser (`npm run test:e2e`: accesso, suggerimento, salvataggio in 15 ms, riapertura senza rete in circa 25 ms, modifica offline, sincronizzazione senza doppioni, eliminazione morbida). Le 110 prove del database: ancora 110 su 110.
+- Problemi trovati con le prove e corretti: file dell'app non trovati nella cache senza rete; invio non ripartito subito al ritorno della rete; richieste appese con poco segnale (ora tempo massimo 15 secondi).
+- **Database locale ricreato**: fermando i servizi locali ho usato per sbaglio `--no-backup`, che cancella il database **locale** di prova. Conteneva solo migrazioni e dati finti; ricreato identico con `npx supabase start` (9 migrazioni + `seed.sql`), 110 prove verdi. Online nessun effetto.
+- Nel database locale c'è un atleta finto per provare a mano (`npm run dati-finti`; email e password in `app/.env.locale`, ignorato da git). Le prove automatiche creano e cancellano i loro utenti finti.
+- Nessuna modifica al database (nessuna migrazione nuova). Nessun dato finto online. Nel repository solo la chiave **pubblica** di gym-app (in `app/src/config.js`, aggiunta dopo l'ok).
+
+## Sessione precedente (passo 3: import del piano e dell'ultima settimana)
 
 - Piano del passo 3 scritto e approvato da Leonardo, con le sue decisioni (in `DECISIONI.md`, 2026-11-06 "Import"): storico di Leonardo solo dal 2026-10-30 al 2026-11-06; tetto di 3 mesi per import futuri.
 - **Correzione di scopo (Leonardo, dopo):** Raina **niente import** (né storico né piano). Di Leonardo solo il piano attuale e la settimana 30 ottobre - 6 novembre. Palestra: solo quella attuale, privata di Leonardo (il nome sta solo nel file dei collegamenti, fuori dal repository). Righe del piano con 0 serie: saltate. "Ultima seduta di ogni esercizio": non si fa, resta un'idea futura (in `DECISIONI.md`).
@@ -79,32 +102,37 @@ Branch attuale: `claude/database` (passo 2 finito + sistema di backup + passo 3:
 ## Cosa è online
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 9 migrazioni (26 tabelle) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06, 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
-- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra. `main` pubblica la PWA su GitHub Pages.
+- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1`. `main` pubblica la PWA su GitHub Pages.
+- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici). Si ripubblica con `npm run deploy` nella cartella `app/`.
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
 
 - Docker Desktop e WSL (servono per il database di prova in locale).
-- Database locale di prova con i dati finti (`npx supabase db start`). Ha le stesse 9 migrazioni di `gym-app`.
+- Database locale di prova con i dati finti (`npx supabase start`; ora girano anche accesso e API, servono all'app). Ha le stesse 9 migrazioni di `gym-app`. Ricreato il 2026-11-06 (vedi sopra).
+- Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
 - **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Oggi ci sono 3 backup del 2026-11-06; l'ultimo (`1218`) è quello dopo l'import. I backup non vanno mai su GitHub né online.
 
 ## Prossimo passo
 
-Passo 4, nuova app (parte seduta), in una sessione separata.
+Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
 
+- Installare l'app sul telefono e accedere (Claude non conosce e non inserisce le password).
+- Durante la prova: registrare le serie solo nella nuova app, solo nella vecchia, o in tutte e due? (Con tutte e due il foglio GYM e Supabase restano completi, ma è doppio lavoro.)
+
 - Avviso di sicurezza: "Leaked password protection" spenta (Authentication → impostazioni delle password). Decidere se accenderla.
 
-- Quando la nuova app avrà un indirizzo vero (Cloudflare Pages o Vercel): aggiungerlo come indirizzo del sito e di reindirizzamento, online e in locale.
+- Aggiungere l'indirizzo https://gym-app.gym-app-pwa.workers.dev come indirizzo del sito e di reindirizzamento in gym-app (serve solo per le email, per esempio il reset della password; l'accesso con password funziona anche senza).
 - Reset della password per Raina: il servizio email gratuito di Supabase manda poche email e solo agli indirizzi del team del progetto. Se serve, configurare un servizio email proprio (SMTP).
 - Backup settimanale dei dati (docs/backup.md)
 - Approvare (o no) il merge di `claude/database` su `main`.
 - Account di Raina in `gym-app`: non serve per l'import (per Raina niente import); solo quando userà la nuova app.
 - Dire se i branch vecchi (`claude/fondamenta`, `codex/handoff-2026-11-05`, `handoff/codex-2026-11-05`, `claude/nota-funzioni`, `claude/nota-funzioni-main`) si possono cancellare: il loro contenuto è già in `main` o in `claude/database`.
-- Rendere privato il repository solo dopo lo spostamento dell'hosting.
+- Rendere privato il repository: la nuova app non dipende più da GitHub Pages, ma la vecchia app (`github.io/gym-app`) sì, finché è in uso.
 - Mai copiare chiavi o password del progetto Supabase nel repository.
 
 ## Roadmap (passo attuale in grassetto)
@@ -112,7 +140,7 @@ Passo 4, nuova app (parte seduta), in una sessione separata.
 1. Fondamenta del repository — fatto; repository privato dopo lo spostamento dell'hosting.
 2. Database Supabase (Sydney): tabelle, regole di accesso, file di migrazione — fatto, in attesa del merge.
 3. Trasferimento del piano attuale e dell'ultima settimana di Leonardo, con controllo — fatto online il 2026-11-06 (Raina: niente import).
-4. **Nuova app, parte seduta.**
+4. **Nuova app, parte seduta** — app v1 (PWA) costruita e provata in locale; in attesa dell'ok per pubblicarla.
 5. Nuova app, parte piano.
 6. Passaggio alla nuova app.
 7. Stage 0: 4 settimane di uso vero.
