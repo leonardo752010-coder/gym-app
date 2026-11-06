@@ -52,6 +52,27 @@ di iPhone e Android. Nessuno store, nessun costo. Grafica e flusso copiati da `a
   `6/11/2026`), anno mostrato se non è quello di oggi. Pesi in kg di base.
 - Pagina e manifest (nome, descrizione) in inglese, la lingua di ripiego.
 
+## CHOOSE YOUR STARTER (una volta sola)
+
+- Schermata a tutto schermo con il titolo **CHOOSE YOUR STARTER** (in inglese anche con l'app in italiano), tre carte
+  (gorilla, leone, tigre), un tocco per scegliere e **Conferma**. Poi si va alla seduta.
+- Compare **solo quando il server ha risposto "vuoto"** (`profiles.starter` = null). Mai per una copia vecchia sul
+  telefono, mai se lo starter non si riesce a leggere (per esempio offline, o se online la colonna non c'è ancora):
+  in quei casi l'app apre la seduta come sempre. Per un utente che c'era già (Leonardo, Raina) la schermata compare
+  una volta, al primo aggiornamento dopo l'accesso; per qualche istante si vede la seduta, poi la schermata.
+- Il blocco "una sola volta" è **solo nell'app**: dopo la scelta la schermata non torna e nell'app non c'è un modo per
+  cambiarla. Nel database non c'è nessuna regola. Per far rivedere la schermata a qualcuno:
+  pannello Supabase → SQL Editor → `update public.profiles set starter = null where id = '<id utente>';`
+  La schermata ricompare al prossimo aggiornamento dell'app.
+- **Offline**: la scelta si salva subito sul telefono (IndexedDB, chiave `starter:<id utente>`) e si invia appena c'è
+  rete, come le serie (conta come "1 modifica da inviare"). L'invio scrive solo se online lo starter è ancora vuoto:
+  reinviare non cambia niente; se un altro telefono ha già scelto, vince la scelta arrivata prima e il telefono la prende.
+  Una sola riga di profilo per utente: nessun doppione possibile.
+- "Esci" resta bloccato finché la scelta non è online.
+- Nel menu (toccando il logo), accanto all'email dell'account, c'è la piccola immagine dello starter.
+- Le immagini sono **segnaposto** (cerchio con l'iniziale: antracite, rosso, crema) in `app/src/assets/starters/`.
+  Per le illustrazioni vere basta sostituire i tre file con lo stesso nome; la build le mette da sola nella cache offline.
+
 Fuori dalla v1: analisi, mesocicli, tecniche di intensità, Apple Salute / Health Connect, area coach, import per utenti.
 
 ## Come salva (zero dati persi, zero doppioni)
@@ -80,6 +101,8 @@ Una serie ancora da inviare ha il segno ⟳.
 | `app/src/sync.js` | invio della coda a Supabase |
 | `app/src/session.js` | salva / modifica / elimina una serie |
 | `app/src/api.js` | letture e invii a Supabase |
+| `app/src/starter.js` | CHOOSE YOUR STARTER: scelta sul telefono, invio senza doppioni |
+| `app/src/assets/starters/` | le tre immagini dello starter (segnaposto) |
 | `app/src/config.js` | indirizzo di gym-app e **solo la chiave pubblica** |
 | `app/vite.config.js` | build e service worker (l'app si apre anche senza rete) |
 | `app/scripts/` | icone dal logo, dati finti locali, prova nel browser |

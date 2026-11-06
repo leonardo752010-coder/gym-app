@@ -86,6 +86,26 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       return { data: { profile: prof.data, homeClubId: homeClub, plan: shapePlan(plans.data[0] || null, homeClub) } };
     },
 
+    /**
+     * Starter del profilo (CHOOSE YOUR STARTER). Richiesta separata da snapshot: se fallisce
+     * (per esempio la colonna non c'è ancora online) il piano e la seduta funzionano lo stesso.
+     * data: 'gorilla' | 'lion' | 'tiger' | null.
+     */
+    async getStarter(userId) {
+      const r = await wrap(sb.from('profiles').select('starter').eq('id', userId).maybeSingle());
+      if (r.error) return r;
+      if (!r.data) return { error: { code: 'no-profile', message: 'profile not found' } };
+      return { data: r.data.starter ?? null };
+    },
+
+    /**
+     * Scrive lo starter solo se sul server è ancora vuoto: un secondo invio (risposta persa,
+     * altro telefono) non cambia niente. data: righe scritte ([] = c'era già uno starter).
+     */
+    setStarter(userId, value) {
+      return wrap(sb.from('profiles').update({ starter: value }).eq('id', userId).is('starter', null).select('starter'));
+    },
+
     /** Sedute degli ultimi HISTORY_DAYS giorni con esercizi e serie (anche quelle cancellate, per allineare il telefono). */
     async history(userId, fromDate) {
       const r = await wrap(sb.from('sessions').select(`id, user_id, session_date, started_at, ended_at, club_id, plan_id, plan_day_id, day_name, notes, deleted_at, created_at,

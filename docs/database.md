@@ -7,7 +7,7 @@ Mai modifiche a mano dal pannello.
 
 | Area | Tabelle | A cosa serve |
 |---|---|---|
-| Persone | `profiles`, `coach_links`, `import_batches` | profilo (lingua, kg/lb, fuso), chi segue chi, registro delle importazioni |
+| Persone | `profiles`, `coach_links`, `import_batches` | profilo (lingua, kg/lb, fuso, starter), chi segue chi, registro delle importazioni |
 | Libreria | `muscles`, `exercises`, `exercise_muscles`, `set_types`, `club_chains`, `clubs`, `machines`, `machine_exercises`, `club_machines`, `user_clubs` | esercizi, macchine, palestre, condivisi tra utenti |
 | Piano (cosa fare) | `plans`, `plan_weeks`, `plan_days`, `plan_supersets`, `plan_exercises`, `plan_exercise_machines` | il piano: giorni a rotazione, mesociclo, esercizi, macchina per club |
 | Log (cosa hai fatto) | `sessions`, `session_supersets`, `session_exercises`, `sets`, `set_parts` | le sedute e le serie |
@@ -25,6 +25,8 @@ Mai modifiche a mano dal pannello.
 - **Volume per muscolo**: `exercise_muscles.weight` dice quanto conta una serie per ogni muscolo (di base 1 principale, 0,5 secondario), salvato per esercizio-muscolo.
 - **Club**: condivisi come le macchine, possono appartenere a una catena (`club_chains`). Ogni utente si collega ai club che frequenta (`user_clubs`, uno può essere il principale). Nel piano, per ogni esercizio: una macchina per club e una alternativa.
 - **Importazioni**: ogni importazione (`import_batches`) appartiene a un utente che esiste in Supabase Auth. Ogni riga importata ha `import_id` + `user_id` e il database controlla che siano della stessa persona. Per annullare un'importazione si cancellano le righe con quell'`import_id`. Il controllo del collegamento all'import avviene a fine transazione (migrazione 9), così un account con dati importati si può cancellare. Import dai fogli Google: vedi `docs/import.md`.
+
+- **Starter** (migrazione 10, `20261107090000_profiles_starter.sql`): `profiles.starter`, testo, solo `gorilla`, `lion` o `tiger`; vuoto (null) = non ancora scelto, e l'app mostra la schermata CHOOSE YOUR STARTER. Nessun trigger e nessuna regola di blocco: "una volta sola" lo decide l'app. Permessi invariati (ognuno modifica solo il proprio profilo). Azzerarlo a mano (è un dato, non la struttura): SQL Editor → `update public.profiles set starter = null where id = '<id utente>';`. **Applicata solo al database locale** (2026-11-06); online non ancora.
 
 ## Chi vede e chi modifica (regole di accesso, RLS)
 

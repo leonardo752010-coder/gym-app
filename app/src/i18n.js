@@ -29,6 +29,9 @@ const it = {
   // fine seduta
   endSession: 'Fine seduta', ended: 'Seduta chiusa', closedAt: (t) => 'Seduta chiusa alle ' + t, reopen: 'Riapri', reopened: 'Seduta riaperta',
   // altro
+  // CHOOSE YOUR STARTER (il titolo resta in inglese anche in italiano: è scritto in main.js)
+  starterHint: 'Scegli il tuo compagno. Si sceglie una volta sola.', starterOk: 'Conferma',
+  starterNames: { gorilla: 'Gorilla', lion: 'Leone', tiger: 'Tigre' }, starterSaved: (n) => 'Hai scelto: ' + n,
   saveErr: 'Salvataggio non riuscito: ', sync: 'Sincronizzazione', back: 'Indietro',
   noConfig: 'Configurazione mancante: chiave pubblica di Supabase (src/config.js).',
 };
@@ -55,6 +58,8 @@ const en = {
   syncNow: 'Send now', lastSync: 'Last update', never: 'never', errors: 'Errors', version: 'Version',
   install: 'To install: Share → Add to Home Screen (iPhone) or menu ⋮ → Install app (Android).',
   endSession: 'End session', ended: 'Session ended', closedAt: (t) => 'Session ended at ' + t, reopen: 'Reopen', reopened: 'Session reopened',
+  starterHint: 'Pick your partner. You only choose once.', starterOk: 'Confirm',
+  starterNames: { gorilla: 'Gorilla', lion: 'Lion', tiger: 'Tiger' }, starterSaved: (n) => 'You chose: ' + n,
   saveErr: 'Could not save: ', sync: 'Sync', back: 'Back',
   noConfig: 'Missing configuration: Supabase public key (src/config.js).',
 };

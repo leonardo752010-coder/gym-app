@@ -100,3 +100,18 @@ Leonardo ha chiesto a Claude di scegliere e giustificare tecnologia e hosting. D
 | Hosting | Cloudflare "static assets" (la nuova versione di Pages, dentro Workers): wrangler 4.158 manda già i comandi "pages" lì. Indirizzo `https://gym-app.gym-app-pwa.workers.dev`. Gratis, solo file statici. Il vecchio Pages (`--force`) non si usa |
 | Chiave | Nell'app solo la chiave pubblica `sb_publishable_` di gym-app (non la vecchia chiave "anon") |
 | Cancellazioni | Regola di Leonardo (in `CLAUDE.md`): nessuna cancellazione di database o file, anche locali, senza il suo ok; mai `--no-backup` |
+
+## 2026-11-06 — CHOOSE YOUR STARTER
+
+| Tema | Decisione |
+| --- | --- |
+| Richiesta | Di Leonardo, esplicita (fuori dalla nota funzioni v1, scelta sua) |
+| Dove | Non c'è un onboarding: schermata a tutto schermo dopo l'accesso, prima della seduta, solo se il server dice che lo starter è vuoto |
+| Titolo | "CHOOSE YOUR STARTER" anche in italiano (Leonardo). Nomi delle carte e testi tradotti |
+| Campo | `profiles.starter`: `gorilla`, `lion`, `tiger`; null = non scelto. Migrazione `20261107090000_profiles_starter.sql`: solo colonna, controllo dei valori e commento |
+| Blocco "una sola volta" | Solo nell'app (Leonardo): nessun trigger o regola nel database. Si azzera a mano con `starter = null` |
+| Copia vecchia sul telefono | La schermata compare solo dopo una risposta del server "vuoto"; se lo starter non si legge (offline, colonna non ancora online) l'app apre la seduta |
+| Offline e doppioni | Scelta salvata sul telefono (IndexedDB `starter:<id>`), inviata appena c'è rete con un update che scrive solo se online è ancora vuoto: reinvio innocuo, vince la prima scelta arrivata. "Esci" bloccato finché non è inviata |
+| Lettura | Richiesta separata da quella del piano: un suo errore non blocca la seduta. Così l'app nuova funziona anche se va online prima della migrazione |
+| Immagine | Piccola immagine nel menu accanto all'account (Leonardo). Program e Progress non esistono ancora |
+| Immagini | Segnaposto SVG (cerchio con iniziale: antracite, rosso `#d4412c`, crema `#f6e6c4`) in `app/src/assets/starters/`, da sostituire con le illustrazioni vere |

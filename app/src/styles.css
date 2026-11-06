@@ -194,3 +194,16 @@ input{font:inherit;color:inherit}
 .sheet .stack button.p{background:var(--ac);color:var(--acTx)}
 .sheet .seg{height:36px}
 .sheet .errs{font-size:12px;color:var(--ac);max-height:90px;overflow:auto;margin:0 0 12px}
+
+/* CHOOSE YOUR STARTER (a tutto schermo, una sola volta) */
+.starter{max-width:520px;margin:0 auto;min-height:100vh;padding:calc(40px + env(safe-area-inset-top)) 20px calc(30px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
+.starter h1{font-family:'Barlow Condensed',Inter,sans-serif;font-style:italic;font-weight:900;font-size:44px;line-height:.95;letter-spacing:.01em;text-transform:uppercase;margin:0;text-align:center}
+.starter p{margin:0;color:var(--mu);font-size:15px;line-height:1.45;text-align:center}
+.stCards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.stCard{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 6px 14px;border-radius:18px;background:var(--card);border:2px solid var(--line);color:var(--tx)}
+.stCard img{width:100%;max-width:96px;aspect-ratio:1;display:block}
+.stCard b{font-size:15px;font-weight:800}
+.stCard.on{border-color:var(--ac);background:var(--acSoft);box-shadow:var(--glow)}
+.starter .save:disabled{opacity:.45;box-shadow:none}
+.sheet dd.acc{display:flex;align-items:center;gap:8px}
+.stMini{width:24px;height:24px;flex:none;border-radius:50%}

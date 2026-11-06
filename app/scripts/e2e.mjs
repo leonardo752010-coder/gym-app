@@ -47,10 +47,47 @@ try {
   await page.click('#loginBtn');
   await page.waitForFunction(() => document.getElementById('loginMsg').textContent.length > 0);
   check('password sbagliata rifiutata', /sbagliat/i.test(await page.textContent('#loginMsg')));
+  // Lettura dello starter bloccata (come se online la colonna non ci fosse ancora): la seduta deve funzionare lo stesso.
+  const starterRead = (u) => /\/rest\/v1\/profiles\?/.test(u.toString()) && /select=starter/.test(u.toString());
+  await ctx.route(starterRead, (r) => r.abort('failed'));
   await page.fill('#pass', password);
   await page.click('#loginBtn');
   await page.waitForSelector('.card', { timeout: 15000 });
   check('dentro: seduta di oggi', true);
+  await page.waitForFunction(() => window.__gym.S.lastRefresh > 0, null, { timeout: 15000 });
+  check('starter non leggibile: niente schermata, seduta normale', !(await page.$('#starterScr')) && !!(await page.$('.card')));
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 15000 });
+  await page.waitForFunction(() => window.__gym.S.lastRefresh > 0, null, { timeout: 15000 });
+  check('copia sul telefono senza risposta del server sullo starter: niente schermata', !(await page.$('#starterScr')));
+  await ctx.unroute(starterRead);
+
+  console.log('1b. CHOOSE YOUR STARTER (una volta sola, scelta offline)');
+  await page.reload();
+  await page.waitForSelector('#starterScr', { timeout: 15000 });
+  check('il server dice "vuoto": schermata a tutto schermo', (await page.textContent('#starterScr h1')) === 'CHOOSE YOUR STARTER' && !(await page.$('#wrap')));
+  check('tre carte, Conferma spenta finché non si tocca', (await page.$$('[data-pick]')).length === 3 && (await page.isDisabled('#starterOk')));
+  await page.screenshot({ path: path.join(out, '11-starter.png'), fullPage: true });
+  await ctx.setOffline(true);
+  await page.click('[data-pick=lion]');
+  check('tocco: carta scelta, Conferma accesa', (await page.getAttribute('[data-pick=lion]', 'aria-pressed')) === 'true' && !(await page.isDisabled('#starterOk')));
+  await page.click('#starterOk');
+  await page.waitForSelector('.card');
+  const st = () => page.evaluate(() => window.__gym.S.starter);
+  const srvStarter = async () => (await admin.from('profiles').select('starter').eq('id', ref.userId).single()).data.starter;
+  check('offline: scelta salvata sul telefono, in attesa di invio', (await st()).value === 'lion' && (await st()).pending === true && (await srvStarter()) === null);
+  await page.click('#logo');
+  await page.click('#mOut');
+  await page.waitForTimeout(300);
+  check('"Esci" bloccato finché la scelta non è inviata', !(await page.$('#loginForm')) && /internet/i.test(await page.textContent('#toast')));
+  await page.click('#mClose');
+  await ctx.setOffline(false);
+  await waitSync('ok');
+  check('rete tornata: starter scritto online (lion), telefono allineato', (await srvStarter()) === 'lion' && (await st()).pending === false);
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 15000 });
+  await page.waitForFunction(() => window.__gym.S.lastRefresh > 0, null, { timeout: 15000 });
+  check('riaperta: la schermata non torna', !(await page.$('#starterScr')));
   check('giorno proposto = Upper B (dopo Lower A di ieri)', (await page.textContent('.day.on')).startsWith('Upper B'));
   await page.screenshot({ path: path.join(out, '02-seduta-notte.png'), fullPage: true });
 
@@ -149,6 +186,8 @@ try {
 
   console.log('8. Uscita');
   await page.click('#logo');
+  check('menu: piccola immagine dello starter accanto ad Account', (await page.getAttribute('#menuStarter', 'alt')) === 'Leone' && /\/assets\/lion-/.test(await page.getAttribute('#menuStarter', 'src')));
+  await page.screenshot({ path: path.join(out, '12-menu-starter.png') });
   await page.click('#mOut');
   await page.waitForSelector('#loginForm');
   check('uscita: torna all\'accesso', true);

@@ -13,11 +13,17 @@ import { openStore, Local, getKv, setKv } from './store.js';
 import { flush } from './sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
 import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
+import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from './starter.js';
+import gorillaImg from './assets/starters/gorilla.svg';
+import lionImg from './assets/starters/lion.svg';
+import tigerImg from './assets/starters/tiger.svg';
 import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
 
+// Immagini segnaposto: per le illustrazioni vere basta sostituire i tre file (stesso nome).
+const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
 const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -43,6 +49,7 @@ const S = {
   lang: pickLang(ls.get('lang')), T: null, unit: ls.get('unit') || null, user: null, store: null, local: null, snap: null,
   date: localDate(), dayId: savedDay(), idx: 0, drafts: {}, edit: null, extraOpen: null, busy: false, openNotes: false,
   sync: { state: 'ok', pending: 0, failed: 0 }, lastRefresh: 0, persisted: null, pendingRender: false,
+  starter: null, pick: null,   // starter: record sul telefono (vedi starter.js); pick: carta toccata, non ancora confermata
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -90,6 +97,7 @@ async function openLocal() {
   S.store = S.store || await openStore();
   S.local = await new Local(S.store, S.user.id).load();
   S.snap = (await getKv(S.store, 'snap:' + S.user.id)) || null;
+  S.starter = await loadStarter(S.store, S.user.id);
   if (S.snap && !S.unit) S.unit = (S.snap.profile && S.snap.profile.weight_unit) || 'kg';
   if (!S.unit) S.unit = 'kg';
   updateSyncInfo();
@@ -105,8 +113,11 @@ async function refresh() {
   try {
     await syncNow(true);
     const uid = S.user.id;
-    const [snap, hist] = await Promise.all([api.snapshot(uid), api.history(uid, addDays(localDate(), -HISTORY_DAYS))]);
+    const [snap, hist, st] = await Promise.all([api.snapshot(uid), api.history(uid, addDays(localDate(), -HISTORY_DAYS)), api.getStarter(uid)]);
     if (!S.user || S.user.id !== uid) return;
+    // Starter: un errore qui (anche "colonna che non c'è") non blocca piano e seduta; la schermata semplicemente non compare.
+    if (!st.error) S.starter = await mergeServerStarter(S.store, uid, st.data);
+    else log('starter-read', st.error.code || '', st.error.message || '');
     if (snap.error || hist.error) {
       const e = snap.error || hist.error;
       if (!S.snap) renderLoading(e.offline ? S.T.firstLoad : S.T.loginErr + e.message, true);
@@ -123,29 +134,44 @@ async function refresh() {
   } finally { refresh.busy = false; if (refresh.again) refresh(); }
 }
 
+const starterPending = () => !!(S.starter && S.starter.pending);
+const pendingCount = () => (S.local ? S.local.dirtyRows().length : 0) + (starterPending() ? 1 : 0);
+
 async function syncNow(force = false) {
   if (!S.local) return;
-  if (!S.local.dirtyRows().length) { updateSyncInfo(); setSync(); return; }
+  if (!pendingCount()) { updateSyncInfo(); setSync(); return; }
   // Senza rete non si prova (si riprova all'evento "online"); "force" quando la rete è appena tornata o lo chiede l'utente,
   // perché navigator.onLine a volte resta indietro.
   if (!force && !navigator.onLine) { S.sync.offline = true; setSync(); return; }
   S.sync.state = 'syncing'; setSync();
   log('sync', S.local.dirtyRows().length);
-  const r = await flush(S.local, api);
-  log('sync-end', JSON.stringify(r));
-  S.sync.offline = r.offline;
+  let offline = false, sent = 0;
+  if (S.local.dirtyRows().length) {
+    const r = await flush(S.local, api);
+    log('sync-end', JSON.stringify(r));
+    offline = r.offline; sent += r.sent;
+  }
+  if (!offline && starterPending() && S.user) {
+    const uid = S.user.id;
+    const r = await flushStarter(S.store, uid, api);
+    log('starter-sync', JSON.stringify(r));
+    if (S.user && S.user.id === uid) S.starter = await loadStarter(S.store, uid);
+    offline = !!r.offline; if (r.sent) sent++;
+  }
+  S.sync.offline = offline;
   updateSyncInfo();
   setSync();
-  if (r.sent) safeRender();
+  if (sent) safeRender();
 }
 
 function updateSyncInfo() {
   const d = S.local ? S.local.dirtyRows() : [];
-  S.sync.pending = d.length;
-  S.sync.failed = d.filter((r) => r.error).length;
-  S.sync.state = !d.length ? 'ok' : S.sync.failed ? 'err' : (S.sync.offline || !navigator.onLine) ? 'offline' : 'pending';
+  const sp = starterPending(), se = sp && S.starter.error ? 1 : 0;
+  S.sync.pending = d.length + (sp ? 1 : 0);
+  S.sync.failed = d.filter((r) => r.error).length + se;
+  S.sync.state = !S.sync.pending ? 'ok' : S.sync.failed ? 'err' : (S.sync.offline || !navigator.onLine) ? 'offline' : 'pending';
   document.body.dataset.sync = S.sync.state;
-  document.body.dataset.pending = String(d.length);
+  document.body.dataset.pending = String(S.sync.pending);
 }
 
 function setSync() {
@@ -196,6 +222,35 @@ function renderLoading(msg, retry) {
   $('wrap').innerHTML = '<div class="load" style="grid-column:1/-1">' + (msg ? '<div class="err">' + esc(msg) + '</div>' : '<div class="spin"></div>') +
     '<span>' + (msg ? '' : S.T.loading) + '</span>' + (retry ? '<button class="pill" id="retry">↻</button>' : '') + '</div>';
   if (retry) $('retry').onclick = () => { renderLoading(); refresh(); };
+}
+
+/* ---------- CHOOSE YOUR STARTER (una sola volta; vedi starter.js) ---------- */
+// Compare solo quando il server ha detto "vuoto" (needsStarter): mai per una copia vecchia sul telefono.
+function renderStarter() {
+  const T = S.T;
+  document.body.innerHTML = '<main class="starter" id="starterScr"><h1>CHOOSE YOUR STARTER</h1><p>' + esc(T.starterHint) + '</p>' +
+    '<div class="stCards">' + STARTERS.map((k) => '<button class="stCard' + (S.pick === k ? ' on' : '') + '" data-pick="' + k + '" aria-pressed="' + (S.pick === k) + '">' +
+      '<img src="' + STARTER_IMG[k] + '" alt=""><b>' + esc(T.starterNames[k]) + '</b></button>').join('') + '</div>' +
+    '<button class="save" id="starterOk"' + (S.pick ? '' : ' disabled') + '>' + esc(T.starterOk) + '</button></main><div class="toast" id="toast"></div>';
+  document.querySelectorAll('[data-pick]').forEach((b) => {
+    b.onclick = () => {
+      S.pick = b.dataset.pick; buzz(8);
+      document.querySelectorAll('[data-pick]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      $('starterOk').disabled = false;
+    };
+  });
+  $('starterOk').onclick = async () => {
+    if (!S.pick || S.busy) return;
+    S.busy = true; $('starterOk').disabled = true;
+    const pick = S.pick;
+    try { S.starter = await chooseStarter(S.store, S.user.id, pick); }
+    catch (e) { S.busy = false; $('starterOk').disabled = false; toast(T.saveErr + (e && e.message || e), true); return; }
+    S.busy = false; S.pick = null;
+    buzz(30);
+    document.body.innerHTML = ''; render(); scrollTo(0, 0);
+    toast(T.starterSaved(T.starterNames[S.starter.value] || pick));
+    syncNow();
+  };
 }
 
 /* ---------- struttura della pagina ---------- */
@@ -249,6 +304,7 @@ function firstOpenIdx(v) {
 function render() {
   const today = localDate();
   if (today !== S.date) { S.date = today; S.drafts = {}; S.edit = null; S.dayId = null; }
+  if (needsStarter(S.starter)) { renderStarter(); return; }
   shell();
   setSync();
   const T = S.T;
@@ -501,9 +557,12 @@ function askDelete() {
 function openMenu() {
   const T = S.T;
   const errs = S.local ? S.local.dirtyRows().filter((r) => r.error) : [];
+  if (starterPending() && S.starter.error) errs.push({ error: 'starter: ' + S.starter.error });
   const last = S.snap && S.snap.fetchedAt ? new Date(S.snap.fetchedAt).toLocaleString(T.locale) : T.never;
   $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet"><h2>' + T.menu + '</h2><dl>' +
-    '<dt>' + T.account + '</dt><dd>' + esc(S.user && S.user.email) + '</dd>' +
+    '<dt>' + T.account + '</dt><dd class="acc">' + (S.starter && S.starter.value && STARTER_IMG[S.starter.value]
+      ? '<img class="stMini" id="menuStarter" src="' + STARTER_IMG[S.starter.value] + '" alt="' + esc(T.starterNames[S.starter.value]) + '" title="' + esc(T.starterNames[S.starter.value]) + '">' : '') +
+      '<span>' + esc(S.user && S.user.email) + '</span></dd>' +
     '<dt>' + T.sync + '</dt><dd>' + esc($('sync') ? $('sync').textContent : '') + '</dd>' +
     '<dt>' + T.lastSync + '</dt><dd>' + esc(last) + '</dd>' +
     '<dt>' + T.storage + '</dt><dd>' + (S.persisted === true ? T.persisted : S.persisted === false ? T.notPersisted : T.unknown) + '</dd>' +
@@ -521,12 +580,13 @@ function openMenu() {
     document.body.innerHTML = ''; render();
   };
   $('mOut').onclick = async () => {
-    if (S.local.dirtyRows().length) { await syncNow(); }
-    if (S.local.dirtyRows().length) { toast(T.logoutBlocked, true); return; }
+    // Serie e scelta dello starter: si esce solo quando sono tutte online.
+    if (pendingCount()) { await syncNow(); }
+    if (pendingCount()) { toast(T.logoutBlocked, true); return; }
     await api.signOut();
     await S.local.clear();
     await S.store.delete('kv', 'snap:' + S.user.id);
-    S.user = null; S.local = null; S.snap = null; S.dayId = null; ls.set('day', null);
+    S.user = null; S.local = null; S.snap = null; S.starter = null; S.pick = null; S.dayId = null; ls.set('day', null);
     stopTimer(); renderLogin();
   };
 }
@@ -599,7 +659,7 @@ document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.t
 let sx = null, sy = null;
 document.addEventListener('touchstart', (ev) => { if (ev.target.closest('input,.days,.bar,.sheet')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
 document.addEventListener('touchend', (ev) => {
-  if (sx === null || !S.snap || innerWidth >= 700 || !dayObj()) return;
+  if (sx === null || !S.snap || !$('wrap') || innerWidth >= 700 || !dayObj()) return;
   const dx = ev.changedTouches[0].clientX - sx, dy = ev.changedTouches[0].clientY - sy;
   if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) {
     const n = dayObj().exercises.length, ni = S.idx + (dx < 0 ? 1 : -1);
@@ -616,7 +676,7 @@ document.addEventListener('visibilitychange', () => {
   if (S.date !== localDate()) safeRender();
   if (Date.now() - S.lastRefresh > 10 * 60000) refresh(); else syncNow();
 });
-setInterval(() => { if (S.local && S.local.dirtyRows().length && navigator.onLine) syncNow(); }, 20000);
+setInterval(() => { if (S.local && pendingCount() && navigator.onLine) syncNow(); }, 20000);
 
 window.__gym = { S, syncNow, refresh, LOG };
 boot();

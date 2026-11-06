@@ -1,14 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-06, sera: tasto "Fine seduta" e controllo inglese (Claude)
+Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER, solo in locale (Claude)
 
 ## Branch
 
-Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. Codice committato e pubblicato su GitHub (`claude/app-v1`) con l'ok di Leonardo allo STOP 2, senza force push. I tre lavori della sera (regola "seduta nuova" con la mezzanotte, tasto "Fine seduta", inglese) sono in **un solo commit** su `claude/app-v1`, pubblicato su GitHub (senza force push) e online con `npm run deploy`, con l'ok di Leonardo.
+Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in un commit nuovo su `claude/app-v1` **solo sul computer**: niente push, niente deploy, migrazione non applicata online.
 
 | Branch | Cosa contiene |
 | --- | --- |
-| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub dal 2026-11-06 |
+| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `d23994a`; l'ultimo commit (CHOOSE YOUR STARTER) solo in locale |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
@@ -17,7 +17,16 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (tasto "Fine seduta" e controllo inglese)
+## Fatto in questa sessione (CHOOSE YOUR STARTER, solo in locale)
+
+- **Fase 1 (sola lettura)**: l'app non ha un onboarding e non ha schermate Program e Progress (solo seduta + menu). Un solo progetto Supabase: `gym-app`. Piano approvato da Leonardo con le sue decisioni (in `DECISIONI.md`).
+- **Migrazione** `supabase/migrations/20261107090000_profiles_starter.sql`: colonna `profiles.starter` (testo, null = non scelto), controllo `gorilla` / `lion` / `tiger`, commento. Nessun trigger, nessuna regola di blocco. **Applicata solo al database locale** (`npx supabase migration up`, senza reset; 4 profili prima e dopo). **Online no.**
+- **App**: schermata CHOOSE YOUR STARTER a tutto schermo (tre carte, tocco, Conferma, poi la seduta), solo dopo che il server ha detto "vuoto"; scelta salvata sul telefono e inviata appena c'è rete, senza doppioni (scrive solo se online è ancora vuoto); "Esci" bloccato finché non è inviata; piccola immagine nel menu accanto all'account. Lettura dello starter separata dal piano: se fallisce, la seduta funziona lo stesso.
+- File nuovi: `app/src/starter.js`, `app/src/assets/starters/{gorilla,lion,tiger}.svg` (segnaposto), `app/tests/unit/starter.test.js`. Modificati: `api.js`, `main.js`, `i18n.js`, `styles.css`, `tests/locale/supabase.test.js`, `scripts/e2e.mjs`, `docs/app.md`, `docs/database.md`, `DECISIONI.md`.
+- **Prove, tutte verdi**: logica 81 (67 + 14), database locale dall'app 25 (17 + 8), browser 68 (58 + 10: starter non leggibile → niente schermata, schermata con server vuoto, scelta offline, "Esci" bloccato, invio al ritorno della rete, la schermata non torna, immagine nel menu), database 110 su 110, `db lint` nessun errore.
+- Nessun dato online toccato, nessun deploy, nessun push, niente cancellato (gli atleti finti delle prove sono creati e cancellati dalle prove stesse, solo in locale).
+
+## Prima, oggi (tasto "Fine seduta" e controllo inglese)
 
 ### Tasto "Fine seduta" (decisione di Leonardo)
 
@@ -137,14 +146,16 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 ## Cosa è online
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 9 migrazioni (26 tabelle) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06, 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
-- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1`. `main` pubblica la PWA su GitHub Pages.
-- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici). Si ripubblica con `npm run deploy` nella cartella `app/`.
+- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `d23994a` (senza CHOOSE YOUR STARTER). `main` pubblica la PWA su GitHub Pages.
+- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **senza** CHOOSE YOUR STARTER. Si ripubblica con `npm run deploy` nella cartella `app/`.
+- **Supabase `gym-app`**: ancora 9 migrazioni. La colonna `starter` **non c'è** online.
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
 
 - Docker Desktop e WSL (servono per il database di prova in locale).
-- Database locale di prova con i dati finti (`npx supabase start`; ora girano anche accesso e API, servono all'app). Ha le stesse 9 migrazioni di `gym-app`. Ricreato il 2026-11-06 (vedi sopra).
+- Database locale di prova con i dati finti (`npx supabase start`; ora girano anche accesso e API, servono all'app). Ha le 9 migrazioni di `gym-app` **più la decima** (`20261107090000_profiles_starter.sql`, solo qui). Ricreato il 2026-11-06 (vedi sopra).
+- Il commit di CHOOSE YOUR STARTER su `claude/app-v1` (non ancora su GitHub).
 - Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
@@ -152,9 +163,14 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
-Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
+CHOOSE YOUR STARTER: Leonardo guarda la schermata (screenshot `app/tests/out/11-starter.png` e `12-menu-starter.png`, oppure `npm run dev` in `app/`) e decide se e quando: push su GitHub, migrazione online su `gym-app` (prima backup e `--dry-run`), deploy. L'ordine tra migrazione e deploy non è pericoloso: senza colonna l'app apre la seduta e la schermata semplicemente non compare.
+
+Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- CHOOSE YOUR STARTER: ok per push, migrazione online e deploy (tre passi, ognuno con il suo ok).
+- Illustrazioni vere di gorilla, leone e tigre (sostituiscono i tre SVG segnaposto, stesso nome file). Il gorilla segnaposto (antracite) su fondo scuro si vede poco.
 
 - Dopo qualche settimana di uso vero: rivedere le 3 ore dopo mezzanotte (tenerle o toglierle).
 - Impostazioni online in italiano o di default (email di Supabase, nome del sito, ecc.): vedi elenco dato a Leonardo il 2026-11-06; nessuna è stata toccata.
@@ -178,7 +194,7 @@ Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova c
 1. Fondamenta del repository — fatto; repository privato dopo lo spostamento dell'hosting.
 2. Database Supabase (Sydney): tabelle, regole di accesso, file di migrazione — fatto, in attesa del merge.
 3. Trasferimento del piano attuale e dell'ultima settimana di Leonardo, con controllo — fatto online il 2026-11-06 (Raina: niente import).
-4. **Nuova app, parte seduta** — app v1 (PWA) pubblicata il 2026-11-06; seduta nuova, tasto "Fine seduta" e inglese pubblicati la sera del 2026-11-06.
+4. **Nuova app, parte seduta** — app v1 (PWA) pubblicata il 2026-11-06; seduta nuova, tasto "Fine seduta" e inglese pubblicati la sera del 2026-11-06; CHOOSE YOUR STARTER pronto in locale (non pubblicato).
 5. Nuova app, parte piano.
 6. Passaggio alla nuova app.
 7. Stage 0: 4 settimane di uso vero.

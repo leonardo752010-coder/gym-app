@@ -9,6 +9,7 @@ import { openStore, Local } from '../../src/store.js';
 import { flush } from '../../src/sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
 import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
+import { loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from '../../src/starter.js';
 
 const S = localStatus();
 const admin = adminClient(S);
@@ -23,6 +24,7 @@ function net() {
     if (n.mode === 'off') throw new TypeError('Failed to fetch');
     const res = await fetch(url, opts);
     if (n.mode === 'lose' && /\/rest\/v1\//.test(String(url)) && opts && opts.method === 'POST') { n.mode = 'on'; throw new TypeError('Load failed'); }
+    if (n.mode === 'losePatch' && /\/rest\/v1\//.test(String(url)) && opts && opts.method === 'PATCH') { n.mode = 'on'; throw new TypeError('Load failed'); }
     return res;
   };
   return n;
@@ -248,5 +250,89 @@ describe('Fine seduta sul database locale (regole di accesso vere)', () => {
     const { data: ses } = await admin.from('sessions').select('id, started_at').eq('user_id', A.userId).not('started_at', 'is', null).limit(1);
     const r = await d.api.sb.from('sessions').update({ ended_at: new Date(Date.parse(ses[0].started_at) - 60000).toISOString() }).eq('id', ses[0].id);
     expect(r.error && r.error.code).toBe('23514');
+  });
+});
+
+describe('CHOOSE YOUR STARTER sul database locale (regole di accesso vere)', () => {
+  const starterOf = async (id) => (await admin.from('profiles').select('starter').eq('id', id).single()).data.starter;
+  const profileRows = async (id) => (await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('id', id)).count;
+
+  it('atleta nuovo: starter vuoto; il telefono mostra la schermata solo dopo la risposta del server', async () => {
+    const d = await device(A.email, passA);
+    expect(needsStarter(await loadStarter(d.local.db, A.userId))).toBe(false);   // prima della risposta: no
+    const g = await d.api.getStarter(A.userId);
+    expect(g).toEqual({ data: null });
+    expect(needsStarter(await mergeServerStarter(d.local.db, A.userId, g.data))).toBe(true);
+  });
+
+  it('il database accetta solo gorilla, lion, tiger', async () => {
+    const d = await device(B.email, passB);
+    const r = await d.api.sb.from('profiles').update({ starter: 'panda' }).eq('id', B.userId);
+    expect(r.error && r.error.code).toBe('23514');
+    expect(await starterOf(B.userId)).toBeNull();
+  });
+
+  it('offline: scelta sul telefono; con la rete: scritta una volta, una sola riga di profilo', async () => {
+    const d = await device(A.email, passA);
+    const db = d.local.db;
+    await mergeServerStarter(db, A.userId, (await d.api.getStarter(A.userId)).data);
+    await chooseStarter(db, A.userId, 'lion');
+    d.net.mode = 'off';
+    expect((await flushStarter(db, A.userId, d.api)).offline).toBe(true);
+    expect(await starterOf(A.userId)).toBeNull();
+    d.net.mode = 'on';
+    expect((await flushStarter(db, A.userId, d.api)).sent).toBe(true);
+    expect(await starterOf(A.userId)).toBe('lion');
+    expect(await profileRows(A.userId)).toBe(1);
+    expect(await loadStarter(db, A.userId)).toMatchObject({ value: 'lion', pending: false });
+  });
+
+  it('a starter già scelto, un altro invio (altro telefono) non lo cambia', async () => {
+    const d2 = await device(A.email, passA);
+    const w = await d2.api.setStarter(A.userId, 'tiger');
+    expect(w.error).toBeUndefined();
+    expect(w.data).toEqual([]);
+    await mergeServerStarter(d2.local.db, A.userId, null);
+    await chooseStarter(d2.local.db, A.userId, 'tiger');
+    expect(await flushStarter(d2.local.db, A.userId, d2.api)).toMatchObject({ sent: true, adopted: 'lion' });
+    expect(await starterOf(A.userId)).toBe('lion');
+  });
+
+  it('un altro atleta non può scrivere né leggere lo starter di A', async () => {
+    await admin.from('profiles').update({ starter: null }).eq('id', A.userId);
+    const b = await device(B.email, passB);
+    const r = await b.api.setStarter(A.userId, 'gorilla');
+    expect(r.data || []).toEqual([]);
+    expect(await starterOf(A.userId)).toBeNull();
+    const g = await b.api.getStarter(A.userId);
+    expect(g.error && g.error.code).toBe('no-profile');   // per B il profilo di A non esiste
+  });
+
+  it('risposta persa al primo invio: il reinvio non scrive di nuovo e il telefono si allinea', async () => {
+    await admin.from('profiles').update({ starter: null }).eq('id', A.userId);
+    const d = await device(A.email, passA);
+    await mergeServerStarter(d.local.db, A.userId, null);
+    await chooseStarter(d.local.db, A.userId, 'gorilla');
+    d.net.mode = 'losePatch';
+    expect((await flushStarter(d.local.db, A.userId, d.api)).offline).toBe(true);
+    expect(await starterOf(A.userId)).toBe('gorilla');
+    expect((await loadStarter(d.local.db, A.userId)).pending).toBe(true);
+    expect(await flushStarter(d.local.db, A.userId, d.api)).toMatchObject({ sent: true, adopted: null });
+    expect(await loadStarter(d.local.db, A.userId)).toMatchObject({ value: 'gorilla', pending: false });
+  });
+
+  it('azzerato a mano nel database (null): al prossimo aggiornamento la schermata ricompare', async () => {
+    const d = await device(A.email, passA);
+    await mergeServerStarter(d.local.db, A.userId, 'gorilla');
+    await admin.from('profiles').update({ starter: null }).eq('id', A.userId);
+    const g = await d.api.getStarter(A.userId);
+    expect(needsStarter(await mergeServerStarter(d.local.db, A.userId, g.data))).toBe(true);
+  });
+
+  it('la lettura di piano e profilo (snapshot) non dipende dallo starter', async () => {
+    const d = await device(A.email, passA);
+    const snap = await d.api.snapshot(A.userId);
+    expect(snap.error).toBeUndefined();
+    expect(snap.data.profile).not.toHaveProperty('starter');
   });
 });
