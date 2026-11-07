@@ -1,13 +1,16 @@
 # Stato
 
-Aggiornato: 2026-11-06, notte: CHOOSE YOUR STARTER pubblicato (deploy delle 21:41) (Claude)
+Aggiornato: 2026-11-08: pelle nuova (nero e viola) della schermata ALLENAMENTO, solo in locale sul branch `skin-track` (Claude)
 
 ## Branch
 
-Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). App con CHOOSE YOUR STARTER **pubblicata** con `npm run deploy` (2026-11-06, versione "06/11/2026 21:41"), con l'ok di Leonardo.
+Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): solo la pelle nuova della schermata ALLENAMENTO. **Solo sul computer**: niente push, niente deploy.
+
+`claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). App con CHOOSE YOUR STARTER **pubblicata** con `npm run deploy` (2026-11-06, versione "06/11/2026 21:41"), con l'ok di Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
+| `skin-track` | Tutto `claude/app-v1` + pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte. **Solo locale** (mai su GitHub) |
 | `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `701b3d9` (compresi i due commit di CHOOSE YOUR STARTER) |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
@@ -17,7 +20,16 @@ Branch attuale: `claude/app-v1` (nato da `claude/database`): app v1 come PWA nel
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (CHOOSE YOUR STARTER)
+## Fatto in questa sessione (2026-11-08: pelle della schermata ALLENAMENTO)
+
+- La "schermata Track" del brief è la schermata **ALLENAMENTO** (l'unica con serie, Kg/Rep/RIR, timer e volta scorsa). Scelte di Leonardo: pelle **solo col tema notte** (il tema giorno resta com'era) e **solo colori e forme** (niente si sposta: "Volta scorsa" resta sopra le caselle, "Salva serie" resta nella carta, il timer resta in basso).
+- Un solo file toccato: `app/src/styles.css` (il file del tema che c'era già). In fondo una sezione "PELLE TRACK" con i token (sfondo #0B0B0F, carte #17171D, viola #8B6CF0 / #5B45B8, verde #3DDC97 solo per lo stato "tutto salvato", testo bianco e grigio #9A9AA8, angoli 18/12 px, numeri a 46 px) e le regole. Vale solo se la pagina è la seduta e il tema è notte: accesso e CHOOSE YOUR STARTER non cambiano.
+- Cosa cambia: serie fatte = riga grigia con cerchio viola e spunta (prima riga verde); serie da fare con cerchio vuoto; caselle Kg/Rep scure e arrotondate; RIR scelto in viola; suggerimento di carico (c'era già, `suggest()` in `logic.js`) in viola e più grande; volta scorsa in carta grigia con bordo; "Salva serie" unico tasto grande viola (il giorno scelto ora è contornato di viola, non pieno); barra del timer viola. Errori ed "Elimina" restano rossi.
+- Nessun testo, nessuna funzione, nessun dato, salvataggio, sync o database toccato.
+- **Prove**: `npm test` 81 su 81 prima e dopo; build riuscita prima e dopo (fatta in una cartella temporanea, `app/dist` non toccata). Prova nel browser senza rete, con dati finti solo nel browser di prova (ogni richiesta verso internet bloccata), sulla versione di prima e su quella nuova: 9 controlli su 9 per tutte e due (seduta aperta, suggerimento, volta scorsa, serie salvata sul telefono e in coda, timer, serie ancora lì dopo la riapertura, modifica al tocco, tema giorno uguale a prima, nessun errore).
+- **Non lanciate**: `npm run test:locale` e `npm run test:e2e` (servono il database locale e creano/cancellano un atleta finto: per le regole serve l'ok di Leonardo).
+
+## Prima (CHOOSE YOUR STARTER)
 
 - **Deploy (2026-11-06, 21:41), con l'ok di Leonardo**: git pulito e allineato con GitHub (`5f10f6d`); accesso a Cloudflare valido (`wrangler whoami`); migrazione `20261107090000` già online (controllato in sola lettura); `npm test` 81 su 81; build di produzione controllata (solo gym-app, nessuna chiave segreta, nessun indirizzo del database locale; la parola `sb_secret_` è solo un controllo dentro la libreria supabase-js). `npm run deploy`: riuscito, 7 file nuovi caricati (pagina, JS, CSS, `sw.js`, tre mascotte). Verifica online: pagina, `sw.js` e manifest rispondono 200; le tre mascotte (`gorilla`, `lion`, `tiger` .png) sono nella lista dei file per l'uso offline e rispondono 200 come `image/png`. Piano gratuito di Cloudflare: nessun costo.
 - **Migrazione online, fase B (2026-11-06, 21:36), con l'ok di Leonardo**: CLI collegata a `gym-app` (controllato); dry-run di nuovo con solo `20261107090000_profiles_starter.sql`; backup `gym-app_2026-11-06_2135` (struttura 95,5 KB, dati 86,6 KB; 333 righe, 9 migrazioni; nessun backup cancellato, ora sono 6); `npx supabase db push --remote=<ref di gym-app> --yes`: **applicata**, nessun errore. Verifica in sola lettura: colonna `profiles.starter` presente (testo, controllo gorilla/lion/tiger), migrazione registrata; 2 profili, tutti e 2 con starter vuoto (null). Nessun dato toccato.
@@ -168,11 +180,15 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
+Pelle ALLENAMENTO (branch `skin-track`, solo locale): Leonardo la guarda in locale (`npm run dev` nella cartella `app/`, tema notte) e decide se tenerla. Poi, con il suo ok: `test:e2e`, push e deploy.
+
 CHOOSE YOUR STARTER è online. Leonardo e Raina: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 06/11/2026 21:41). Dopo qualche istante compare la schermata, una volta sola.
 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- Pelle ALLENAMENTO (`skin-track`): guardarla e dire se va bene. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
 
 - CHOOSE YOUR STARTER: tutto fatto (push, migrazione online, deploy). Da controllare sul telefono che la schermata compaia una volta a Leonardo e a Raina.
 - Sul tema chiaro il bordo crema delle mascotte si confonde con lo sfondo crema delle carte, e i graffi della tigre e le stelline del leone si vedono poco. Sul tema scuro va bene. Decidere se va bene così.

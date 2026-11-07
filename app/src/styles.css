@@ -207,3 +207,88 @@ input{font:inherit;color:inherit}
 .starter .save:disabled{opacity:.45;box-shadow:none}
 .sheet dd.acc{display:flex;align-items:center;gap:8px}
 .stMini{width:30px;height:30px;flex:none;object-fit:contain}
+
+/* =====================================================================
+   PELLE "TRACK" (solo aspetto): schermata ALLENAMENTO, solo tema notte.
+   Vale quando la pagina ha #wrap (seduta) e il tema è "dark"; accesso,
+   CHOOSE YOUR STARTER e tema giorno restano come sopra.
+   Qui ci sono solo colori, angoli e misure: nessun testo, nessuna logica.
+   ===================================================================== */
+:root[data-theme="dark"]:has(#wrap){
+  /* token della pelle */
+  --sk-bg:#0B0B0F;          /* sfondo, nero quasi puro */
+  --sk-card:#17171D;        /* carte e righe */
+  --sk-card2:#1D1D25;       /* carte dentro le carte (volta scorsa, editor) */
+  --sk-chip:#24242D;        /* tasti piccoli e pastiglie */
+  --sk-line:#2B2B36;        /* bordo sottile, un po' più chiaro */
+  --sk-ac:#8B6CF0;          /* viola principale */
+  --sk-acDark:#5B45B8;      /* viola scuro */
+  --sk-acSoft:rgba(139,108,240,.14);
+  --sk-ok:#3DDC97;          /* verde: solo cose positive */
+  --sk-bad:#d4412c;         /* errori ed elimina: restano rossi come prima */
+  --sk-tx:#FFFFFF;          /* testo principale */
+  --sk-mu:#9A9AA8;          /* testo secondario */
+  --sk-mu2:#666674;
+  --sk-r-card:18px;         /* angoli delle carte */
+  --sk-r-box:12px;          /* angoli delle caselle */
+  --sk-num:46px;            /* numeri nelle caselle Kg / Rep */
+
+  /* i colori dell'app prendono quelli della pelle */
+  --bg:var(--sk-bg); --card:var(--sk-card); --card2:var(--sk-card2); --chip:var(--sk-chip); --line:var(--sk-line);
+  --tx:var(--sk-tx); --mu:var(--sk-mu); --mu2:var(--sk-mu2);
+  --ac:var(--sk-ac); --acTx:#FFFFFF; --acSoft:var(--sk-acSoft); --glow:0 10px 26px rgba(139,108,240,.30);
+  --cream:var(--sk-ac); --creamTx:#FFFFFF;
+  --ok:var(--sk-card2); --okTx:var(--sk-tx); --okIc:var(--sk-ok);
+  --shadow:0 12px 40px rgba(0,0,0,.6);
+}
+/* testata */
+:root[data-theme="dark"]:has(#wrap) .blogo{box-shadow:0 6px 22px rgba(139,108,240,.22)}
+:root[data-theme="dark"]:has(#wrap) .day{border:1px solid var(--sk-line);background:var(--sk-card)}
+:root[data-theme="dark"]:has(#wrap) .day.on{background:var(--sk-acSoft);border-color:var(--sk-ac);color:var(--sk-tx);box-shadow:none}   /* un solo tasto grande viola: Salva */
+:root[data-theme="dark"]:has(#wrap) .bar button.full{background:var(--sk-acDark);opacity:1}
+:root[data-theme="dark"]:has(#wrap) .li.cur{background:var(--sk-card)}
+:root[data-theme="dark"]:has(#wrap) .li.full .n{background:var(--sk-acDark);color:#fff}
+/* carta dell'esercizio */
+:root[data-theme="dark"]:has(#wrap) .card{border-radius:var(--sk-r-card);border:1px solid var(--sk-line);box-shadow:none}
+:root[data-theme="dark"]:has(#wrap) .chips span{border-radius:10px}
+/* suggerimento di carico: viola e grande (già calcolato dall'app, vedi suggest() in logic.js) */
+:root[data-theme="dark"]:has(#wrap) .sugg{border-radius:16px;border:1px solid rgba(139,108,240,.35);padding:12px 14px}
+:root[data-theme="dark"]:has(#wrap) .sugg b{color:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .sugg .sv{color:var(--sk-ac);font-size:40px;line-height:1.05}
+/* volta scorsa: carta grigia */
+:root[data-theme="dark"]:has(#wrap) .last{border-radius:16px;border:1px solid var(--sk-line)}
+/* serie fatte: riga grigia con cerchio viola e spunta */
+:root[data-theme="dark"]:has(#wrap) .done{background:var(--sk-card2);border:1px solid var(--sk-line);border-radius:var(--sk-r-box)}
+:root[data-theme="dark"]:has(#wrap) .done .ck{width:26px;height:26px;flex:none;border-radius:50%;background:var(--sk-ac);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:900}
+:root[data-theme="dark"]:has(#wrap) .done .sv small{color:var(--sk-mu);opacity:1}
+:root[data-theme="dark"]:has(#wrap) .done.editing{outline:2px solid var(--sk-ac);outline-offset:-1px}
+/* serie da fare: stessa riga, cerchio vuoto */
+:root[data-theme="dark"]:has(#wrap) .todo{background:transparent;border:1px solid var(--sk-line);border-radius:var(--sk-r-box);align-items:center}
+:root[data-theme="dark"]:has(#wrap) .todo span:first-child{display:flex;align-items:center;gap:10px}
+:root[data-theme="dark"]:has(#wrap) .todo span:first-child::before{content:"";width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--sk-line)}
+/* serie in corso: caselle scure arrotondate, numeri grandi */
+:root[data-theme="dark"]:has(#wrap) .ed{border:1px solid var(--sk-line);border-radius:16px}
+:root[data-theme="dark"]:has(#wrap) .box{background:var(--sk-bg);border:1px solid var(--sk-line);border-radius:var(--sk-r-box)}
+:root[data-theme="dark"]:has(#wrap) .box:focus-within{border-color:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .box .lbl{color:var(--sk-mu)}
+:root[data-theme="dark"]:has(#wrap) .box input{font-size:var(--sk-num);color:var(--sk-tx)}
+:root[data-theme="dark"]:has(#wrap) .pm button{border-radius:10px}
+:root[data-theme="dark"]:has(#wrap) .r5 button{height:46px;border-radius:var(--sk-r-box);font-size:19px}
+:root[data-theme="dark"]:has(#wrap) .r5 button.on{background:var(--sk-ac);color:#fff}
+/* il tasto grande viola */
+:root[data-theme="dark"]:has(#wrap) .save{height:58px;border-radius:16px;background:var(--sk-ac);color:#fff}
+:root[data-theme="dark"]:has(#wrap) .save:active{background:var(--sk-acDark)}
+:root[data-theme="dark"]:has(#wrap) .edbtns button{border-radius:var(--sk-r-box)}
+:root[data-theme="dark"]:has(#wrap) .edbtns .del{color:var(--sk-bad);background:rgba(212,65,44,.14)}
+:root[data-theme="dark"]:has(#wrap) .navrow .back,
+:root[data-theme="dark"]:has(#wrap) .next,
+:root[data-theme="dark"]:has(#wrap) .finish{border:1px solid var(--sk-line);border-radius:var(--sk-r-card)}
+/* timer di recupero: barra viola sottile */
+:root[data-theme="dark"]:has(#wrap) .timer{background:var(--sk-card);border-color:var(--sk-line)}
+:root[data-theme="dark"]:has(#wrap) .timer .pg{height:3px;background:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .timer button{border-radius:var(--sk-r-box)}
+/* errori: restano rossi */
+:root[data-theme="dark"]:has(#wrap) .toast.bad{background:var(--sk-bad)}
+:root[data-theme="dark"]:has(#wrap) .err,
+:root[data-theme="dark"]:has(#wrap) .sheet .errs{color:var(--sk-bad)}
+:root[data-theme="dark"]:has(#wrap) .sync.err i{background:var(--sk-bad)}
