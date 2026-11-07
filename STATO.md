@@ -1,10 +1,12 @@
 # Stato
 
-Aggiornato: 2026-11-08 (notte): barra in basso a tre pagine (Programma, Allenamento, Progressi) **su GitHub e pubblicata** su Cloudflare, versione "08/11/2026 02:04" (Claude)
+Aggiornato: 2026-11-08 (notte, dopo le 02:10): **icona nuova dell'app** (testa del gorilla con corona viola) sul branch `icona-app`, **solo sul computer**: niente commit, niente push, niente deploy (Claude)
 
 ## Branch
 
-Branch attuale: **`claude/app-v1`**. Contiene ora anche la barra in basso a tre pagine (commit `cab1d7d`, da `nav-tre-pagine`, unito con un merge "fast-forward": nessuna storia riscritta). **Su GitHub** fino a `cab1d7d` (push senza force, con l'ok di Leonardo); dopo c'è solo il commit di questo STATO.md. **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 02:04").
+Branch attuale: **`icona-app`**, messo in pari con `claude/app-v1` (`git merge --ff-only`: fast-forward da `cab1d7d` a `3d97086`, nessuna storia riscritta). Sopra ci sono le modifiche dell'icona nuova, **non ancora committate** (vedi "Fatto in questa sessione").
+
+`claude/app-v1` (uguale a GitHub, `3d97086`) contiene ora anche la barra in basso a tre pagine (commit `cab1d7d`, da `nav-tre-pagine`, unito con un merge "fast-forward": nessuna storia riscritta). **Su GitHub** fino a `cab1d7d` (push senza force, con l'ok di Leonardo); dopo c'è solo il commit di questo STATO.md. **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 02:04").
 
 Nota: il merge di `nav-tre-pagine` in `claude/app-v1` l'aveva già fatto lo script dell'icona lanciato da Leonardo (02:01, fast-forward), che ha anche creato il branch `icona-app`. Claude ha trovato `claude/app-v1` già su `cab1d7d` e ha controllato che fosse un fast-forward.
 
@@ -17,7 +19,7 @@ Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENT
 | Branch | Cosa contiene |
 | --- | --- |
 | `nav-tre-pagine` | Barra in basso (Programma / Allenamento / Progressi), commit `cab1d7d`. **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
-| `icona-app` | Creato dallo script dell'icona di Leonardo, fermo su `cab1d7d` (uguale a `claude/app-v1`). **Solo locale**. Claude non lo tocca |
+| `icona-app` | Uguale a `claude/app-v1` (`3d97086`) + icona nuova dell'app (modifiche non ancora committate). **Solo locale** |
 | `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita il 2026-11-08) + correzione dell'accesso (`92fce81`) + barra in basso a tre pagine (`cab1d7d`). Su GitHub |
 | `skin-track` | Pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
@@ -28,7 +30,21 @@ Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENT
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (2026-11-08 notte: barra a tre pagine online)
+## Fatto in questa sessione (2026-11-08 notte: icona nuova dell'app)
+
+Solo immagini e riferimenti alle immagini. Nessuna funzione cambiata; database, sync, salvataggio, offline, carico, "Esci", layout, barra e mascotte di CHOOSE YOUR STARTER non toccati.
+
+- **Originali** (in `Documents\ChatGPT\Body CHECK`, non toccati) copiati identici in `app/risorse/`: `Gym-app-icon.png` (1254×1254, PNG, senza trasparenza, fondo nero puro) e `Gym-logo-silverback-v5.png` (1254×1254, PNG, senza trasparenza).
+- **Script delle icone** `app/scripts/icons.mjs` (parte da solo con `npm run dev` e `npm run build`): ora parte da `app/risorse/Gym-app-icon.png` invece di `logo.b64`. `logo.b64` resta nella radice: serve ancora alla vecchia cornice su GitHub Pages (`main`).
+- **Icone generate** in `app/public/icons` (stessi nomi di prima, cartella ignorata da git): `icon-192.png` 6,4 KB (prima 16,8), `icon-512.png` 20,7 KB (prima 89,2), `icon-maskable-512.png` 17,9 KB (prima 64,9), `apple-touch-icon.png` 4,9 KB (prima 14,9), **nuova** `icon-maskable-192.png` 4,6 KB. Aggiunta al manifest.
+- **Maskable** (Android): disegno ridotto all'82% su tela nera, proporzioni e colori uguali. La punta della corona (il punto più lontano) arriva al 38% del lato: dentro il cerchio sicuro del 40%. Mento e orecchie ancora più dentro.
+- **Anteprime** 48, 60, 120, 180, 192 px con maschera rotonda e squircle: corona e mento interi e leggibili anche a 48 px (a 48 si perdono solo i dettagli degli occhi). File in `app/tests/out/icone/` (ignorata da git).
+- **Logo dentro l'app**: oggi c'è solo il logo tondo (accesso 120 px, in alto a sinistra 96 px), che usa `icons/icon-192.png`: ora mostra la testa nuova, intera dentro il cerchio. Il logo completo (`Gym-logo-silverback-v5.png`) **non è usato**: oggi nell'app non c'è nessun posto con un logo completo, e in un cerchio di 96-120 px il bilanciere verrebbe tagliato e la scritta non si leggerebbe.
+- **Cache offline** (`app/vite.config.js`): la versione della cache ora cambia anche quando cambiano solo icone o manifest, così le immagini nuove arrivano ai telefoni.
+- **Prove**: `npm test` 102 verdi. Build di produzione pulita (niente `:54321`, nessuna chiave segreta, solo gym-app). Prova nel browser (database locale, atleta finto già esistente, Supabase online bloccato: 0 richieste; nessuna scrittura, nessuna cancellazione): manifest, icone, apple-touch-icon e favicon rispondono 200; logo nuovo all'accesso, in alto e col menu, tema notte e giorno; icone nella cache nuova; nessun errore.
+- **Non lanciati**: `npm run test:locale` e `npm run test:e2e` (creano e cancellano un atleta finto nel database locale).
+
+## Prima, oggi (2026-11-08 notte: barra a tre pagine online)
 
 Con l'ok di Leonardo:
 - Merge di `nav-tre-pagine` in `claude/app-v1`: già fatto (fast-forward) dallo script dell'icona; controllato, nessuna storia riscritta.
@@ -270,12 +286,14 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 - Docker Desktop e WSL (servono per il database di prova in locale).
 - Database locale di prova con i dati finti (`npx supabase start`; ora girano anche accesso e API, servono all'app). Ha le stesse 10 migrazioni di `gym-app`. Ricreato il 2026-11-06 (vedi sopra).
-- Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
+- Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create da `app/risorse/Gym-app-icon.png` (`app/public/icons`, ignorata da git), modifiche dell'icona nuova sul branch `icona-app` (non committate) con anteprime in `app/tests/out/icone/` e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
 - **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Ci sono 7 backup: 6 del 2026-11-06 (`1218` dopo l'import, `2135` quello usato per il ripristino) e `gym-app_2026-11-08` (subito prima del ripristino, con l'utente nuovo vuoto). Lo script ne tiene 8: al prossimo backup non si cancella niente, a quello dopo si cancella il più vecchio. **Copia di sicurezza** dei 12 file del 6/11 in `C:\Users\Leonardo Valentini\Documents\gym-app-backup-COPIA` (lo script non la tocca). I backup non vanno mai su GitHub né online.
 
 ## Prossimo passo
+
+Icona nuova: Leonardo guarda le anteprime e le modifiche; con il suo ok, commit su `icona-app`. Poi (solo con ok) unione in `claude/app-v1`, push e deploy. Dopo il deploy: su Android l'icona sulla Home si aggiorna da sola (anche dopo qualche giorno); su iPhone bisogna togliere l'app dalla Home e aggiungerla di nuovo.
 
 Barra a tre pagine online: sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (nel menu "Versione" = 08/11/2026 02:04). Poi provare i tre tasti, il tasto indietro e che il timer non copra niente (soprattutto su iPhone, con la barra di sistema in basso).
 
@@ -288,6 +306,8 @@ Pelle ALLENAMENTO online: aprire l'app con internet, aspettare qualche secondo, 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- **Icona nuova**: ok al commit su `icona-app`? Includere anche `app/risorse/Gym-logo-silverback-v5.png` (906 KB, oggi non usato nell'app) o lasciarlo fuori? Se si vuole il logo completo da qualche parte (per esempio nella schermata di accesso, al posto del cerchio) è un cambio di layout: da decidere a parte.
 
 - **Barra a tre pagine**: online. Se non piace, rollback con il comando scritto sopra (solo con l'ok di Leonardo). Etichetta del tasto centrale: oggi "Allenamento" / "Workout" (come il titolo della pagina); se si preferisce "Track" come nel mockup, è una parola da cambiare.
 - Branch solo locali `nav-tre-pagine` e `icona-app` (uguali a `claude/app-v1`): dire se si possono cancellare (solo con l'ok di Leonardo).

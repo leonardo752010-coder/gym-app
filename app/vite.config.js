@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 // Service worker scritto alla fine della build con l'elenco esatto dei file:
 // la prima visita li mette tutti in cache, poi l'app si apre anche senza rete.
@@ -11,7 +12,9 @@ function serviceWorker() {
       const files = Object.keys(bundle).filter((f) => !f.endsWith('.map') && !f.endsWith('.woff'));
       const extra = ['manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
       const list = ['./', ...files.filter((f) => f !== 'index.html'), ...extra];
-      const version = createHash('sha256').update(files.sort().join('|') + JSON.stringify(Object.values(bundle).map((b) => b.code || b.source?.length || ''))).digest('hex').slice(0, 10);
+      // la versione cambia anche quando cambiano solo icone o manifest (sono in public/, fuori dal bundle)
+      const pub = extra.map((f) => readFileSync(new URL('./public/' + f, import.meta.url)).toString('base64')).join('|');
+      const version = createHash('sha256').update(files.sort().join('|') + JSON.stringify(Object.values(bundle).map((b) => b.code || b.source?.length || '')) + pub).digest('hex').slice(0, 10);
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: SW.replace('__VERSION__', version).replace('__FILES__', JSON.stringify(list)) });
     },
   };
