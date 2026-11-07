@@ -1,12 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-08 (notte, dopo le 02:10): **icona nuova dell'app** (testa del gorilla con corona viola) sul branch `icona-app`, **solo sul computer**: niente commit, niente push, niente deploy (Claude)
+Aggiornato: 2026-11-08 (notte): **icona nuova dell'app** (gorilla con corona) committata (`abcac6e`), **su GitHub** in `claude/app-v1` e **pubblicata** su Cloudflare, versione "08/11/2026 02:18" (Claude)
 
 ## Branch
 
-Branch attuale: **`icona-app`**, messo in pari con `claude/app-v1` (`git merge --ff-only`: fast-forward da `cab1d7d` a `3d97086`, nessuna storia riscritta). Sopra ci sono le modifiche dell'icona nuova, **non ancora committate** (vedi "Fatto in questa sessione").
+Branch attuale: **`claude/app-v1`** (`abcac6e`), uguale a GitHub. Contiene l'icona nuova: commit `abcac6e` "icona: gorilla con corona" fatto su `icona-app` e unito con `git merge --ff-only` (fast-forward `3d97086..abcac6e`), push senza force, con l'ok di Leonardo. `icona-app` è fermo anche lui su `abcac6e` (solo locale).
 
-`claude/app-v1` (uguale a GitHub, `3d97086`) contiene ora anche la barra in basso a tre pagine (commit `cab1d7d`, da `nav-tre-pagine`, unito con un merge "fast-forward": nessuna storia riscritta). **Su GitHub** fino a `cab1d7d` (push senza force, con l'ok di Leonardo); dopo c'è solo il commit di questo STATO.md. **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 02:04").
+`app/risorse/Gym-logo-silverback-v5.png` è sul computer ma **fuori dai commit** (per scelta di Leonardo): git lo mostra come file non tracciato.
+
+`claude/app-v1` contiene anche ora anche la barra in basso a tre pagine (commit `cab1d7d`, da `nav-tre-pagine`, unito con un merge "fast-forward": nessuna storia riscritta). **Su GitHub** fino a `cab1d7d` (push senza force, con l'ok di Leonardo); dopo c'è solo il commit di questo STATO.md. **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 02:04").
 
 Nota: il merge di `nav-tre-pagine` in `claude/app-v1` l'aveva già fatto lo script dell'icona lanciato da Leonardo (02:01, fast-forward), che ha anche creato il branch `icona-app`. Claude ha trovato `claude/app-v1` già su `cab1d7d` e ha controllato che fosse un fast-forward.
 
@@ -19,7 +21,7 @@ Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENT
 | Branch | Cosa contiene |
 | --- | --- |
 | `nav-tre-pagine` | Barra in basso (Programma / Allenamento / Progressi), commit `cab1d7d`. **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
-| `icona-app` | Uguale a `claude/app-v1` (`3d97086`) + icona nuova dell'app (modifiche non ancora committate). **Solo locale** |
+| `icona-app` | Icona nuova (commit `abcac6e`). **Solo locale**. Già tutto dentro `claude/app-v1` |
 | `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita il 2026-11-08) + correzione dell'accesso (`92fce81`) + barra in basso a tre pagine (`cab1d7d`). Su GitHub |
 | `skin-track` | Pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
@@ -31,6 +33,18 @@ Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENT
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
 ## Fatto in questa sessione (2026-11-08 notte: icona nuova dell'app)
+
+### Commit, push e deploy (con l'ok di Leonardo)
+
+- File del commit controllati (solo STATO.md, manifest, `icons.mjs`, `vite.config.js`, `app/risorse/Gym-app-icon.png`); STATO.md senza email, chiavi o ID utente. `npm test` 102 verdi.
+- Commit `abcac6e` "icona: gorilla con corona" (firmato come i commit prima: stesso autore preso dal commit precedente, impostazioni di git non cambiate). Fast-forward in `claude/app-v1`, push `3d97086..abcac6e`, senza force.
+- Versione Cloudflare online **prima** del deploy: `c613c230-dc05-4986-b479-2cf9447d037a` (menu "08/11/2026 02:04", cache `gym-36185a9f1c`).
+- Build di produzione controllata: niente `:54321`, nessuna chiave segreta, solo gym-app; manifest con le 2 icone maskable, 5 icone in `dist/icons`, cache nuova `gym-cec2b61761`. Versione nel menu: **"08/11/2026 02:18"**.
+- Primo tentativo di deploy bloccato dai permessi di Claude Code. Leonardo ha approvato di nuovo: **deploy riuscito** con `npx wrangler@4 deploy` (la build già controllata, senza rifarla): 9 file nuovi (pagina, JS, `sw.js`, manifest, 5 icone), 14 uguali. Versione Cloudflare nuova `d1e94790-d32f-4ba6-a8d3-896968ad9ed3`, nel menu **"08/11/2026 02:18"**. Piano gratuito: nessun costo.
+- Controllo online: pagina 200; manifest, `sw.js` e le 5 icone 200 (`image/png`); cache `gym-cec2b61761`; icona e JS online identici alla build controllata.
+- **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback c613c230-dc05-4986-b479-2cf9447d037a`.
+
+### Icona (prima parte della sessione)
 
 Solo immagini e riferimenti alle immagini. Nessuna funzione cambiata; database, sync, salvataggio, offline, carico, "Esci", layout, barra e mascotte di CHOOSE YOUR STARTER non toccati.
 
@@ -276,10 +290,10 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 ## Cosa è online
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 10 migrazioni (26 tabelle; la decima, del 2026-11-06 sera, aggiunge `profiles.starter`) e 2 account (quello di Leonardo ricreato da lui il 2026-11-07/08: ID nuovo). **Dati di Leonardo ripristinati il 2026-11-08 dal backup del 6/11 alle 21:35**: piano attivo (4 giorni, 27 esercizi), 7 sedute e 75 serie, 1 palestra privata (principale) con 20 macchine, 1 registro di import. Quello che era stato registrato dopo le 21:35 del 6/11 manca. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
-- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` (con CHOOSE YOUR STARTER, l'originale delle mascotte in `docs/immagini/`, la pelle ALLENAMENTO, la correzione dell'accesso e la barra a tre pagine). `skin-track`, `nav-tre-pagine` e `icona-app` restano solo in locale. `main` pubblica la PWA su GitHub Pages.
-- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER, la pelle ALLENAMENTO, la correzione dell'accesso e la barra a tre pagine (deploy del 2026-11-08, versione dell'app "08/11/2026 02:04", Cloudflare `c613c230`). Si ripubblica con `npm run deploy` nella cartella `app/`.
+- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` (con CHOOSE YOUR STARTER, l'originale delle mascotte in `docs/immagini/`, la pelle ALLENAMENTO, la correzione dell'accesso, la barra a tre pagine e, dal 2026-11-08 02:20, l'icona nuova `abcac6e`, pubblicata). `skin-track`, `nav-tre-pagine` e `icona-app` restano solo in locale. `main` pubblica la PWA su GitHub Pages.
+- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER, la pelle ALLENAMENTO, la correzione dell'accesso, la barra a tre pagine e l'icona nuova (deploy del 2026-11-08, versione dell'app "08/11/2026 02:18", Cloudflare `d1e94790`). Si ripubblica con `npm run deploy` nella cartella `app/`.
 - **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili; starter di Leonardo vuoto dopo la ricreazione dell'utente). L'app online la usa dal deploy delle 21:41 del 6/11.
-- **Cloudflare**: l'app online **ha** la pelle nuova, la correzione dell'accesso e la barra a tre pagine (versione "08/11/2026 02:04").
+- **Cloudflare**: l'app online **ha** la pelle nuova, la correzione dell'accesso, la barra a tre pagine e l'icona nuova (versione "08/11/2026 02:18").
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
@@ -293,7 +307,7 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
-Icona nuova: Leonardo guarda le anteprime e le modifiche; con il suo ok, commit su `icona-app`. Poi (solo con ok) unione in `claude/app-v1`, push e deploy. Dopo il deploy: su Android l'icona sulla Home si aggiorna da sola (anche dopo qualche giorno); su iPhone bisogna togliere l'app dalla Home e aggiungerla di nuovo.
+Icona nuova online: sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (nel menu "Versione" = 08/11/2026 02:18): il logo tondo mostra il gorilla con la corona. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback c613c230-dc05-4986-b479-2cf9447d037a`. Icona sulla Home: su Android l'icona sulla Home si aggiorna da sola (anche dopo qualche giorno); su iPhone bisogna togliere l'app dalla Home e aggiungerla di nuovo.
 
 Barra a tre pagine online: sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (nel menu "Versione" = 08/11/2026 02:04). Poi provare i tre tasti, il tasto indietro e che il timer non copra niente (soprattutto su iPhone, con la barra di sistema in basso).
 
@@ -307,7 +321,7 @@ Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (pr
 
 ## Da decidere o fare per Leonardo
 
-- **Icona nuova**: ok al commit su `icona-app`? Includere anche `app/risorse/Gym-logo-silverback-v5.png` (906 KB, oggi non usato nell'app) o lasciarlo fuori? Se si vuole il logo completo da qualche parte (per esempio nella schermata di accesso, al posto del cerchio) è un cambio di layout: da decidere a parte.
+- **Icona nuova**: committata, su GitHub e pubblicata. Su iPhone togliere l'app dalla Home e aggiungerla di nuovo per vedere l'icona nuova. `Gym-logo-silverback-v5.png` resta fuori dai commit, sul computer. Se si vuole il logo completo da qualche parte (per esempio nella schermata di accesso, al posto del cerchio) è un cambio di layout: da decidere a parte.
 
 - **Barra a tre pagine**: online. Se non piace, rollback con il comando scritto sopra (solo con l'ok di Leonardo). Etichetta del tasto centrale: oggi "Allenamento" / "Workout" (come il titolo della pagina); se si preferisce "Track" come nel mockup, è una parola da cambiare.
 - Branch solo locali `nav-tre-pagine` e `icona-app` (uguali a `claude/app-v1`): dire se si possono cancellare (solo con l'ok di Leonardo).
