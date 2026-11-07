@@ -17,6 +17,11 @@ import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter,
 import gorillaImg from './assets/starters/gorilla.png';
 import lionImg from './assets/starters/lion.png';
 import tigerImg from './assets/starters/tiger.png';
+// Logo dentro l'app (vedi scripts/logo.mjs): completo per accesso, caricamento e menu; solo il gorilla nel cerchio in alto.
+// L'icona con la corona serve solo come icona dell'app (Home, favicon, manifest).
+import logoFull from './assets/logo/logo-silverback.webp';
+import logoHead from './assets/logo/logo-gorilla.webp';
+const LOGO = (cls) => '<img class="' + cls + '" src="' + logoFull + '" width="720" height="668" alt="Gym · Import &amp; Track">';
 import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
@@ -212,7 +217,7 @@ async function sessionLost(code) {
 }
 
 function renderLogin(msg) {
-  document.body.innerHTML = '<main class="login"><img class="blogo" src="./icons/icon-192.png" alt="Gym"><h1>' + S.T.loginTitle + '</h1>' +
+  document.body.innerHTML = '<main class="login">' + LOGO('llogo') + '<h1>' + S.T.loginTitle + '</h1>' +
     '<form id="loginForm" autocomplete="on"><input id="email" type="email" inputmode="email" autocomplete="username" placeholder="' + S.T.email + '" required>' +
     '<input id="pass" type="password" autocomplete="current-password" placeholder="' + S.T.password + '" required>' +
     '<button class="save" id="loginBtn" type="submit">' + S.T.login + '</button></form>' +
@@ -238,7 +243,7 @@ function renderLogin(msg) {
 
 function renderLoading(msg, retry) {
   shell();
-  $('wrap').innerHTML = '<div class="load" style="grid-column:1/-1">' + (msg ? '<div class="err">' + esc(msg) + '</div>' : '<div class="spin"></div>') +
+  $('wrap').innerHTML = '<div class="load" style="grid-column:1/-1">' + LOGO('llogo') + (msg ? '<div class="err">' + esc(msg) + '</div>' : '<div class="spin"></div>') +
     '<span>' + (msg ? '' : S.T.loading) + '</span>' + (retry ? '<button class="pill" id="retry">↻</button>' : '') + '</div>';
   if (retry) $('retry').onclick = () => { renderLoading(); refresh(); };
 }
@@ -277,7 +282,7 @@ function shell() {
   if ($('wrap') && $('days')) return;
   document.body.innerHTML = `
 <header class="top"><div class="hdr"><div class="brand">
-  <img class="blogo" id="logo" src="./icons/icon-192.png" alt="Gym">
+  <img class="blogo" id="logo" src="${logoHead}" alt="Gym">
   <div class="btitle" id="btitle">${S.T.workout}</div><div class="sync" id="sync"></div></div>
   <div class="ctrls"><span class="pill static" id="dateTxt"></span>
   <button class="theme" id="themeBtn" aria-label="${S.T.dayNight}"></button>
@@ -645,7 +650,7 @@ function openMenu() {
   const errs = S.local ? S.local.dirtyRows().filter((r) => r.error) : [];
   if (starterPending() && S.starter.error) errs.push({ error: 'starter: ' + S.starter.error });
   const last = S.snap && S.snap.fetchedAt ? new Date(S.snap.fetchedAt).toLocaleString(T.locale) : T.never;
-  $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet"><h2>' + T.menu + '</h2><dl>' +
+  $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet">' + LOGO('llogo mlogo') + '<h2>' + T.menu + '</h2><dl>' +
     '<dt>' + T.account + '</dt><dd class="acc">' + (S.starter && S.starter.value && STARTER_IMG[S.starter.value]
       ? '<img class="stMini" id="menuStarter" src="' + STARTER_IMG[S.starter.value] + '" alt="' + esc(T.starterNames[S.starter.value]) + '" title="' + esc(T.starterNames[S.starter.value]) + '">' : '') +
       '<span>' + esc(S.user && S.user.email) + '</span></dd>' +

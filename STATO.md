@@ -1,6 +1,16 @@
 # Stato
 
-Aggiornato: 2026-11-08 (notte): **icona nuova dell'app** (gorilla con corona) committata (`abcac6e`), **su GitHub** in `claude/app-v1` e **pubblicata** su Cloudflare, versione "08/11/2026 02:18" (Claude)
+Aggiornato: 2026-11-08 (notte, 02:45): **logo silverback dentro l'app** sul branch `logo-interno` (commit in corso, poi unione in `claude/app-v1`, push e deploy con l'ok di Leonardo). Prima, stessa notte: icona nuova dell'app (gorilla con corona) su GitHub e pubblicata, versione "08/11/2026 02:18" (Claude)
+
+## Logo silverback dentro l'app (2026-11-08 notte, con l'ok di Leonardo)
+
+- Logo completo (gorilla con bilanciere, "Gym", "IMPORT & TRACK") in: **accesso** (240 px), **caricamento** (220 px, sopra la rotella), **menu Account** (168 px, in alto nel foglio). Fondo nero suo, angoli arrotondati, proporzioni intatte, niente tagliato.
+- **Cerchio in alto** (96 px): il logo completo non ci sta leggibile (la scritta sarebbe di 5-6 px), quindi **ritaglio quadrato del solo gorilla con bilanciere**, preso dal logo (fermato alla riga 601, dove finiscono i piedi: la "y" di "Gym" comincia alla 602), su nero, tutto dentro il cerchio. Stessa misura, stesso posto, stesso tocco (apre il menu).
+- L'icona con la corona resta **solo** icona dell'app (manifest, apple-touch, favicon: non toccati).
+- File: `app/src/assets/logo/logo-silverback.webp` (720×668, 29,5 KB) e `logo-gorilla.webp` (384×384, 10,4 KB), creati da `app/scripts/logo.mjs` (si lancia a mano) dall'originale `app/risorse/Gym-logo-silverback-v5.png` (906 KB, resta sul computer, **non** su GitHub). WebP: lo leggono tutti i browser che l'app già richiede (iPhone iOS 14+, Chrome).
+- `app/src/main.js` (4 punti: accesso, cerchio in alto, caricamento, menu) e `app/src/styles.css` (misure del logo; il riquadro del caricamento ora cresce se serve invece di avere altezza fissa).
+- Cache: i due logo entrano da soli nella lista del service worker (sono importati dal codice); versione della cache nuova.
+- Prove: `npm test` 102 verdi; build pulita (niente `:54321`, nessuna chiave segreta, solo gym-app); prova nel browser con l'atleta finto del database locale e Supabase online bloccato (0 richieste), tema notte e giorno: 30 controlli su 30 (accesso, caricamento, tre pagine, menu anche su schermo piccolo 375×667, logo nitido, logo in cache, riapertura senza rete con il logo). Screenshot in `app/tests/out/logo/` (ignorata da git). Nessuna scrittura o cancellazione nel database.
 
 ## Branch
 
