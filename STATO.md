@@ -1,16 +1,16 @@
 # Stato
 
-Aggiornato: 2026-11-08: pelle nuova (nero e viola) della schermata ALLENAMENTO, solo in locale sul branch `skin-track` (Claude)
+Aggiornato: 2026-11-08: pelle nuova (nero e viola) della schermata ALLENAMENTO committata in locale sul branch `skin-track` (Claude)
 
 ## Branch
 
-Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): solo la pelle nuova della schermata ALLENAMENTO. **Solo sul computer**: niente push, niente deploy.
+Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): solo la pelle nuova della schermata ALLENAMENTO, **committata** (`fd723c0` "skin: schermata Track", con l'ok di Leonardo). **Solo sul computer**: niente push, niente deploy. **Non ancora guardata a occhio da Leonardo** e **non ancora unita a `claude/app-v1`**.
 
 `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). App con CHOOSE YOUR STARTER **pubblicata** con `npm run deploy` (2026-11-06, versione "06/11/2026 21:41"), con l'ok di Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
-| `skin-track` | Tutto `claude/app-v1` + pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte. **Solo locale** (mai su GitHub) |
+| `skin-track` | Tutto `claude/app-v1` + pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub), non unito a `claude/app-v1` |
 | `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `701b3d9` (compresi i due commit di CHOOSE YOUR STARTER) |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
@@ -28,6 +28,7 @@ Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): 
 - Nessun testo, nessuna funzione, nessun dato, salvataggio, sync o database toccato.
 - **Prove**: `npm test` 81 su 81 prima e dopo; build riuscita prima e dopo (fatta in una cartella temporanea, `app/dist` non toccata). Prova nel browser senza rete, con dati finti solo nel browser di prova (ogni richiesta verso internet bloccata), sulla versione di prima e su quella nuova: 9 controlli su 9 per tutte e due (seduta aperta, suggerimento, volta scorsa, serie salvata sul telefono e in coda, timer, serie ancora lì dopo la riapertura, modifica al tocco, tema giorno uguale a prima, nessun errore).
 - **Non lanciate**: `npm run test:locale` e `npm run test:e2e` (servono il database locale e creano/cancellano un atleta finto: per le regole serve l'ok di Leonardo).
+- Server di prova (`npm run dev`, http://localhost:5173/, solo database **locale** 127.0.0.1:54321) acceso e poi fermato. Commit `fd723c0` "skin: schermata Track" (styles.css + STATO.md), con l'ok di Leonardo; poi un secondo commit solo per STATO.md. Nessun push.
 
 ## Prima (CHOOSE YOUR STARTER)
 
@@ -180,7 +181,7 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
-Pelle ALLENAMENTO (branch `skin-track`, solo locale): Leonardo la guarda in locale (`npm run dev` nella cartella `app/`, tema notte) e decide se tenerla. Poi, con il suo ok: `test:e2e`, push e deploy.
+Pelle ALLENAMENTO (branch `skin-track`, committata, solo locale): Leonardo la guarda in locale (`npm run dev` nella cartella `app/`, poi http://localhost:5173/, tema notte) e decide se tenerla. Poi, con il suo ok: `test:e2e`, unione in `claude/app-v1`, push e deploy.
 
 CHOOSE YOUR STARTER è online. Leonardo e Raina: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 06/11/2026 21:41). Dopo qualche istante compare la schermata, una volta sola.
 
@@ -188,7 +189,7 @@ Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (pr
 
 ## Da decidere o fare per Leonardo
 
-- Pelle ALLENAMENTO (`skin-track`): guardarla e dire se va bene. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
+- Pelle ALLENAMENTO (`skin-track`, commit `fd723c0`): guardarla a occhio e dire se va bene; poi decidere se unirla a `claude/app-v1`. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
 
 - CHOOSE YOUR STARTER: tutto fatto (push, migrazione online, deploy). Da controllare sul telefono che la schermata compaia una volta a Leonardo e a Raina.
 - Sul tema chiaro il bordo crema delle mascotte si confonde con lo sfondo crema delle carte, e i graffi della tigre e le stelline del leone si vedono poco. Sul tema scuro va bene. Decidere se va bene così.
