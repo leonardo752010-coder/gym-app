@@ -1,10 +1,10 @@
 # Stato
 
-Aggiornato: 2026-11-08: dati di Leonardo ripristinati online in `gym-app` dal backup del 6/11 alle 21:35; pelle `skin-track` unita a `claude/app-v1` solo in locale (Claude)
+Aggiornato: 2026-11-08 (notte): accesso sistemato (l'app ora torna al login quando l'accesso salvato non vale più), **su GitHub e pubblicato** su Cloudflare, versione "08/11/2026 01:31" (Claude)
 
 ## Branch
 
-Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della schermata ALLENAMENTO: `skin-track` unito il 2026-11-08 con l'ok di Leonardo (merge normale, "fast-forward": nessun conflitto, nessuna storia riscritta). **Solo sul computer**: `claude/app-v1` locale è avanti di 3 commit rispetto a GitHub (i 2 di `skin-track` + questo di STATO.md). Niente push, niente deploy: l'app online è ancora quella **senza** la pelle nuova.
+Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della schermata ALLENAMENTO: `skin-track` unito il 2026-11-08 con l'ok di Leonardo (merge normale, "fast-forward": nessun conflitto, nessuna storia riscritta). Più la correzione dell'accesso (commit `92fce81`). **Su GitHub** fino a `92fce81` (push senza force; dopo c'è solo il commit di questo STATO.md). **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 01:31").
 
 `skin-track` esiste ancora in locale, fermo a `f37c135` (tutto già dentro `claude/app-v1`).
 
@@ -12,7 +12,7 @@ Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della sch
 
 | Branch | Cosa contiene |
 | --- | --- |
-| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita in locale il 2026-11-08). Su GitHub fino a `5f10f6d`; la pelle e gli ultimi STATO.md **solo in locale** |
+| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita il 2026-11-08) + correzione dell'accesso (`92fce81`). Su GitHub |
 | `skin-track` | Pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
@@ -22,7 +22,29 @@ Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della sch
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (2026-11-08: ripristino dei dati di Leonardo e unione della pelle)
+## Fatto in questa sessione (2026-11-08 notte: login che non funzionava)
+
+### Diagnosi (solo lettura, solo `gym-app`)
+
+- Utente di Leonardo a posto: email confermata, identità email presente, nessun blocco, password presente. Impostazioni di accesso giuste (email e password attive, iscrizioni chiuse: non serve per entrare). Nessuna modifica a utenti o impostazioni.
+- Log: dopo la ricreazione dell'utente (2026-11-07 sera, ora NZ) computer e telefono avevano ancora salvato l'accesso **dell'utente vecchio** (cancellato). Il computer riceveva "rifiutato" (401) e mostrava "Accesso non riuscito ↻" senza il modulo di login; il telefono riceveva un piano vuoto. L'app non tornava mai da sola al login, e sul telefono "Esci" è bloccato dalle 2 sedute in coda. Il computer è poi entrato (dopo una ricarica) e ora vede piano e sedute.
+- Sito online: 200, indirizzo e chiave pubblica di gym-app giusti, service worker normale.
+
+### Correzione (codice dell'app)
+
+- `app/src/api.js`: nuove `checkAuth()` (chiede al server se l'accesso vale ancora), `authState()` (quali risposte vogliono dire "non vale più") e `forgetSession()` (toglie **solo** l'accesso salvato).
+- `app/src/main.js`: a ogni aggiornamento si controlla l'accesso; se il server dice che non vale più → schermata di login con il messaggio "Accesso scaduto: entra di nuovo. Le serie sul telefono restano salvate." **Serie, sedute e coda non si cancellano** (il codice di "Esci" non è cambiato). Senza rete o con il server giù non cambia niente: si continua col telefono.
+- `app/src/i18n.js`: il messaggio in italiano e inglese. Prove nuove: `app/tests/unit/accesso.test.js` (9).
+- `npm test` 90 su 90. Build controllata (nessun `:54321`, nessuna chiave segreta, solo gym-app, pelle nel CSS). Commit `92fce81`, push senza force.
+- Deploy: versione Cloudflare prima `9a516753-a63e-44cd-8f11-ae364506a114`, dopo `8233e376-5ffc-40a6-bd86-5bb726a5eeb7` (3 file nuovi: pagina, JS, `sw.js`). Piano gratuito: nessun costo. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 9a516753-a63e-44cd-8f11-ae364506a114`.
+- Verifica online: pagina, JS, CSS, `sw.js`, manifest rispondono 200; nel browser di Claude, con un accesso salvato finto e scaduto, l'app mostra il login con il messaggio e toglie l'accesso vecchio. Database in sola lettura: piano attivo 1 (4 giorni), 8 sedute, 80 serie, palestra principale 1, 2 utenti.
+- **Non fatto**: `test:locale` e `test:e2e` (usano il database locale e creano/cancellano un atleta finto). Nessuna scrittura nel database, nessun utente toccato, telefono non toccato.
+
+### Le 2 sedute in coda sul telefono
+
+Sono salvate sul telefono sotto l'utente **vecchio**. Dopo il nuovo accesso restano lì (non si vedono e non si inviano, ma non si cancellano). Per portarle online serve un lavoro a parte (spostarle sull'utente nuovo): da decidere con Leonardo.
+
+## Prima, oggi (2026-11-08: ripristino dei dati di Leonardo e unione della pelle)
 
 ### Cosa era successo
 
@@ -46,7 +68,15 @@ Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della sch
 
 - `git switch claude/app-v1` e `git merge skin-track`: fast-forward, nessun conflitto. `npm test` 81 su 81; build di produzione riuscita e controllata (solo gym-app, nessuna chiave segreta, nessun indirizzo del database locale: `localhost`/`127.0.0.1` compaiono solo nella lista interna della libreria supabase-js).
 - **Non lanciati**: `npm run test:locale` e `npm run test:e2e` (usano il database locale e creano e cancellano un atleta finto).
-- Niente push, niente deploy.
+- Commit `9a655c9` "stato: ripristino dati e skin unita" (solo STATO.md; firmato come i commit prima, impostazioni di git non cambiate).
+
+### Push e deploy (con l'ok di Leonardo)
+
+- `npm test` di nuovo 81 su 81. `git push origin claude/app-v1`: riuscito (`57f6a0a..9a655c9`), senza force.
+- Accesso a Cloudflare valido (`wrangler whoami`). Versione online prima del deploy: `3f36de84-bb6e-4d88-8b5c-b00334f7f569` (deploy del 6/11, 21:41).
+- Build di produzione, controllata **prima** di caricarla: nessun `127.0.0.1:54321` / `localhost:54321`, solo il ref di gym-app, nessuna chiave segreta (solo quella pubblica), pelle nuova nel CSS. Caricata esattamente quella con `npx wrangler@4 deploy` (il secondo pezzo di `npm run deploy`, così non si rifà la build dopo il controllo): 4 file nuovi (pagina, JS, CSS, `sw.js`), 18 uguali. Versione Cloudflare nuova: `9a516753-a63e-44cd-8f11-ae364506a114`. Piano gratuito: nessun costo.
+- Verifica online: pagina, CSS, JS e `sw.js` rispondono 200; il CSS online ha i colori della pelle (#0B0B0F, #17171D, #8B6CF0, #5B45B8, #3DDC97); `sw.js` mette in cache il CSS nuovo; versione dell'app "08/11/2026 00:49".
+- **Per tornare indietro** (solo se serve, con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 3f36de84-bb6e-4d88-8b5c-b00334f7f569`.
 
 ## Prima, oggi (pelle della schermata ALLENAMENTO)
 
@@ -193,10 +223,10 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 ## Cosa è online
 
 - **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 10 migrazioni (26 tabelle; la decima, del 2026-11-06 sera, aggiunge `profiles.starter`) e 2 account (quello di Leonardo ricreato da lui il 2026-11-07/08: ID nuovo). **Dati di Leonardo ripristinati il 2026-11-08 dal backup del 6/11 alle 21:35**: piano attivo (4 giorni, 27 esercizi), 7 sedute e 75 serie, 1 palestra privata (principale) con 20 macchine, 1 registro di import. Quello che era stato registrato dopo le 21:35 del 6/11 manca. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
-- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `701b3d9` (con CHOOSE YOUR STARTER e l'originale delle mascotte in `docs/immagini/`). `main` pubblica la PWA su GitHub Pages.
-- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER (deploy del 2026-11-06, 21:41). Si ripubblica con `npm run deploy` nella cartella `app/`.
+- **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` (con CHOOSE YOUR STARTER, l'originale delle mascotte in `docs/immagini/`, la pelle ALLENAMENTO e la correzione dell'accesso). `skin-track` resta solo in locale. `main` pubblica la PWA su GitHub Pages.
+- **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER, la pelle ALLENAMENTO e la correzione dell'accesso (deploy del 2026-11-08, versione dell'app "08/11/2026 01:31", Cloudflare `8233e376`). Si ripubblica con `npm run deploy` nella cartella `app/`.
 - **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili; starter di Leonardo vuoto dopo la ricreazione dell'utente). L'app online la usa dal deploy delle 21:41 del 6/11.
-- **Cloudflare**: l'app online **non** ha ancora la pelle nuova (unita solo in locale).
+- **Cloudflare**: l'app online **ha** la pelle nuova e la correzione dell'accesso (versione "08/11/2026 01:31").
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
@@ -210,18 +240,20 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
+Accesso: sul telefono e sul computer aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (nel menu "Versione" = 08/11/2026 01:31). Se compare "Accesso scaduto", entrare con email e password. Poi CHOOSE YOUR STARTER e il piano. **Non cancellare i dati dell'app sul telefono** (ci sono le 2 sedute in coda).
+
 Leonardo apre l'app online e controlla che piano, sedute e serie ci siano di nuovo (rifà CHOOSE YOUR STARTER) e dice se mancano sedute fatte dopo le 21:35 del 6/11.
 
-Pelle ALLENAMENTO (unita in `claude/app-v1`, solo locale): con l'ok di Leonardo, push di `claude/app-v1` su GitHub e deploy su Cloudflare (`npm run deploy` nella cartella `app/`). Prima, se Leonardo vuole, `test:e2e` (crea e cancella un atleta finto nel database locale).
-
-CHOOSE YOUR STARTER è online. Leonardo e Raina: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 06/11/2026 21:41). Dopo qualche istante compare la schermata, una volta sola.
+Pelle ALLENAMENTO online: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 08/11/2026 00:49). Poi guardare la seduta col tema notte. A Leonardo l'app chiederà di nuovo CHOOSE YOUR STARTER (profilo nuovo); a Raina solo se non l'ha ancora scelto.
 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
 
+- Le 2 sedute in coda sul telefono (sotto l'utente vecchio): decidere se spostarle sull'utente nuovo e inviarle (lavoro a parte, tocca i dati del telefono) oppure rifarle a mano.
+
 - Dopo il ripristino: controllare i dati nell'app; dire se ci sono sedute dopo le 21:35 del 6/11 da rifare a mano. **Non cancellare più utenti dal pannello**: si portano via tutti i dati.
-- Dare (o no) l'ok a push e deploy della pelle. Se si cancella il branch `skin-track` (ormai uguale a una parte di `claude/app-v1`): solo con l'ok di Leonardo.
+- Pelle online: se non piace, si torna alla versione di prima con il comando di rollback scritto sopra (solo con l'ok di Leonardo). Se si cancella il branch `skin-track` (ormai uguale a una parte di `claude/app-v1`): solo con l'ok di Leonardo.
 - Pelle ALLENAMENTO (commit `fd723c0`, ora in `claude/app-v1`): guardarla a occhio. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
 
 - CHOOSE YOUR STARTER: tutto fatto (push, migrazione online, deploy). Da controllare sul telefono che la schermata compaia una volta a Leonardo e a Raina.
