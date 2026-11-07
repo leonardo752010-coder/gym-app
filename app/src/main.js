@@ -27,12 +27,14 @@ import {
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList } from './pages.js';
+import { versionText } from './version.js';
 
 // Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
-const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Riga piccola con la versione: stessa funzione in accesso, caricamento, menu e Programma (vedi version.js).
+const VER = (id) => '<p class="ver" id="' + id + '">' + esc(versionText(S.T.version, cfg.locale)) + '</p>';
 const fmtN = (n) => (n == null || n === '' ? '' : String(round2(Number(n))).replace('.', ','));
 const parseN = (s) => { const t = String(s ?? '').trim().replace(',', '.'); const n = Number(t); return t === '' || isNaN(n) ? null : n; };
 const ls = {
@@ -83,7 +85,7 @@ function shortDate(k) { return fmtDay(k, S.T.locale, S.date); }
 async function boot() {
   mark('boot');
   if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('./sw.js').catch(() => {});
-  if (!api) { document.body.innerHTML = '<div class="load err">' + esc(S.T.noConfig) + '</div>'; return; }
+  if (!api) { document.body.innerHTML = '<div class="load err">' + esc(S.T.noConfig) + '</div>' + VER('verLoad'); return; }
   askPersist();
   S.user = storedUser();
   if (!S.user) { renderLogin(); return; }
@@ -221,7 +223,7 @@ function renderLogin(msg) {
     '<form id="loginForm" autocomplete="on"><input id="email" type="email" inputmode="email" autocomplete="username" placeholder="' + S.T.email + '" required>' +
     '<input id="pass" type="password" autocomplete="current-password" placeholder="' + S.T.password + '" required>' +
     '<button class="save" id="loginBtn" type="submit">' + S.T.login + '</button></form>' +
-    '<div class="msg" id="loginMsg">' + esc(msg || '') + '</div><div class="note">' + S.T.install + '</div></main>' +
+    '<div class="msg" id="loginMsg">' + esc(msg || '') + '</div><div class="note">' + S.T.install + '</div>' + VER('verLogin') + '</main>' +
     '<div class="toast" id="toast"></div>';
   $('loginForm').onsubmit = async (ev) => {
     ev.preventDefault();
@@ -244,7 +246,7 @@ function renderLogin(msg) {
 function renderLoading(msg, retry) {
   shell();
   $('wrap').innerHTML = '<div class="load" style="grid-column:1/-1">' + LOGO('llogo') + (msg ? '<div class="err">' + esc(msg) + '</div>' : '<div class="spin"></div>') +
-    '<span>' + (msg ? '' : S.T.loading) + '</span>' + (retry ? '<button class="pill" id="retry">↻</button>' : '') + '</div>';
+    '<span>' + (msg ? '' : S.T.loading) + '</span>' + (retry ? '<button class="pill" id="retry">↻</button>' : '') + VER('verLoad') + '</div>';
   if (retry) $('retry').onclick = () => { renderLoading(); refresh(); };
 }
 
@@ -420,7 +422,7 @@ function resetPage() {
 
 function renderProgram() {
   const T = S.T, p = plan();
-  if (!p || !p.days.length) { $('wrap').innerHTML = '<div class="load err">' + T.noPlan + '</div>'; return; }
+  if (!p || !p.days.length) { $('wrap').innerHTML = '<div class="load err">' + T.noPlan + '</div>' + VER('verProgram'); return; }
   $('wrap').innerHTML = '<h2 class="pgTitle" id="planName">' + esc(p.name || '') + '</h2>' + p.days.map((d) =>
     '<section class="pday' + (d.id === S.dayId ? ' on' : '') + '"><button class="pdayH" data-day="' + esc(d.id) + '" aria-label="' + esc(T.openDay(d.name)) + '">' +
     '<span><b>' + esc(d.name) + '</b><small>' + esc(T.exCount(d.exercises.length)) + '</small></span><i>›</i></button><ol class="pex">' +
@@ -430,7 +432,7 @@ function renderProgram() {
       return '<li class="' + (active(pe) ? '' : 'off') + '"><span class="n">' + (i + 1) + '</span><span class="t">' +
         (pe.superset_label ? '<span class="ss">SUPERSET ' + esc(pe.superset_label) + '</span>' : '') + '<b>' + esc(exName(pe)) + '</b><span>' + esc(sub) + '</span>' +
         (m ? '<span class="m">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</span>' : '') + '</span></li>';
-    }).join('') + '</ol></section>').join('');
+    }).join('') + '</ol></section>').join('') + VER('verProgram');
 }
 
 function renderProgress() {
@@ -657,10 +659,9 @@ function openMenu() {
     '<dt>' + T.sync + '</dt><dd>' + esc($('sync') ? $('sync').textContent : '') + '</dd>' +
     '<dt>' + T.lastSync + '</dt><dd>' + esc(last) + '</dd>' +
     '<dt>' + T.storage + '</dt><dd>' + (S.persisted === true ? T.persisted : S.persisted === false ? T.notPersisted : T.unknown) + '</dd>' +
-    '<dt>' + T.lang + '</dt><dd><div class="seg" id="langSeg"><button data-l="it" class="' + (S.lang === 'it' ? 'on' : '') + '">IT</button><button data-l="en" class="' + (S.lang === 'en' ? 'on' : '') + '">EN</button></div></dd>' +
-    '<dt>' + T.version + '</dt><dd>' + esc(VERSION) + (cfg.locale ? ' (locale)' : '') + '</dd></dl>' +
+    '<dt>' + T.lang + '</dt><dd><div class="seg" id="langSeg"><button data-l="it" class="' + (S.lang === 'it' ? 'on' : '') + '">IT</button><button data-l="en" class="' + (S.lang === 'en' ? 'on' : '') + '">EN</button></div></dd></dl>' +
     (errs.length ? '<div class="errs">' + T.errors + ': ' + errs.map((r) => esc(r.error)).join('<br>') + '</div>' : '') +
-    '<div class="stack"><button class="p" id="mSync">' + T.syncNow + '</button><button id="mOut">' + T.logout + '</button><button id="mClose">' + T.close + '</button></div></div></div>';
+    '<div class="stack"><button class="p" id="mSync">' + T.syncNow + '</button><button id="mOut">' + T.logout + '</button><button id="mClose">' + T.close + '</button></div>' + VER('verMenu') + '</div></div>';
   const close = () => { $('sheetHost').innerHTML = ''; };
   $('sbg').onclick = (ev) => { if (ev.target.id === 'sbg') close(); };
   $('mClose').onclick = close;
