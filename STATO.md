@@ -1,10 +1,14 @@
 # Stato
 
-Aggiornato: 2026-11-08 (notte): accesso sistemato (l'app ora torna al login quando l'accesso salvato non vale più), **su GitHub e pubblicato** su Cloudflare, versione "08/11/2026 01:31" (Claude)
+Aggiornato: 2026-11-08: barra in basso con tre pagine (Programma, Allenamento, Progressi) fatta sul branch `nav-tre-pagine`, **committata solo in locale** (commit "nav: barra a tre pagine"), niente push, niente deploy. Prove tutte verdi (Claude)
 
 ## Branch
 
-Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della schermata ALLENAMENTO: `skin-track` unito il 2026-11-08 con l'ok di Leonardo (merge normale, "fast-forward": nessun conflitto, nessuna storia riscritta). Più la correzione dell'accesso (commit `92fce81`). **Su GitHub** fino a `92fce81` (push senza force; dopo c'è solo il commit di questo STATO.md). **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 01:31").
+Branch attuale: **`nav-tre-pagine`**, nato da `claude/app-v1` (commit `5bc7ca4`). Contiene la barra in basso e le pagine Programma e Progressi, in un commit **solo locale** ("nav: barra a tre pagine (Programma, Allenamento, Progressi)"), con l'ok di Leonardo. Niente push, niente deploy.
+
+Nota: `claude/app-v1` in locale è **un commit avanti** a GitHub (`5bc7ca4`, solo STATO.md, non pushato). Il codice è uguale a GitHub.
+
+Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENTO: `skin-track` unito il 2026-11-08 con l'ok di Leonardo (merge normale, "fast-forward": nessun conflitto, nessuna storia riscritta). Più la correzione dell'accesso (commit `92fce81`). **Su GitHub** fino a `92fce81` (push senza force; dopo c'è solo il commit di questo STATO.md). **Pubblicata** su Cloudflare (deploy del 2026-11-08, versione dell'app "08/11/2026 01:31").
 
 `skin-track` esiste ancora in locale, fermo a `f37c135` (tutto già dentro `claude/app-v1`).
 
@@ -12,6 +16,7 @@ Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della sch
 
 | Branch | Cosa contiene |
 | --- | --- |
+| `nav-tre-pagine` | `claude/app-v1` + barra in basso (Programma / Allenamento / Progressi), pagine Programma e Progressi in sola lettura. Un commit sopra `5bc7ca4`. **Solo locale** (mai su GitHub) |
 | `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita il 2026-11-08) + correzione dell'accesso (`92fce81`). Su GitHub |
 | `skin-track` | Pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
@@ -22,7 +27,26 @@ Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della sch
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (2026-11-08 notte: login che non funzionava)
+## Fatto in questa sessione (2026-11-08: barra in basso a tre pagine, opzione B)
+
+Leonardo ha scelto l'opzione B. Fatto sul branch `nav-tre-pagine`. Poi, con l'ok di Leonardo, **commit solo locale**: niente push, niente deploy.
+
+- **Barra in basso** con tre tasti: Programma, Allenamento, Progressi (in inglese: Program, Workout, Progress). Pelle nero e viola nel tema notte; nel tema giorno usa i colori di sempre.
+- **Allenamento** = la schermata ALLENAMENTO di prima, uguale. È la pagina di partenza dopo l'accesso e a ogni riavvio.
+- **Programma** (sola lettura): nome del piano, giorni, esercizi con serie × rep, RIR, superserie e macchina. Toccare un giorno lo apre in Allenamento (come le schede dei giorni). Niente import, niente "Library", niente "Crea programma".
+- **Progressi** (sola lettura): sedute salvate sul telefono, dalla più recente, con esercizi, macchina e serie (peso × rep @RIR). La seduta di oggi c'è subito ("in corso"). Niente grafici, nessuna richiesta nuova al server.
+- **Tasto indietro**: da Programma o Progressi torna ad Allenamento; da Allenamento fa come prima (esce dall'app).
+- Il timer di recupero resta visibile su tutte le pagine, sopra la barra.
+- Menu dal logo e CHOOSE YOUR STARTER: come prima, fuori dalla barra.
+- Non toccati: database, migrazioni, sync, salvataggio, offline, calcolo del carico, "Esci".
+
+File: `app/src/pages.js` (nuovo), `app/src/main.js`, `app/src/i18n.js`, `app/src/styles.css`, `app/tests/unit/pagine.test.js` (nuovo), `app/scripts/e2e.mjs` (prove nuove + Supabase online bloccato), `docs/app.md`, `STATO.md`.
+
+Prove: `npm test` 102 verdi (12 nuove), `npm run test:locale` 25 verdi, `npm run test:e2e` 84 verdi (15 nuove: tre pagine, serie salvata che compare in Progressi anche senza rete, tasto indietro, riavvio, nessun dato cambiato, 0 richieste a Supabase online). Build pulita: niente `:54321`, nessuna chiave segreta, solo `gym-app`. Screenshot in `app/tests/out/13-track.png`, `14-program.png`, `15-progress.png` (cartella ignorata da git).
+
+Prima, nella stessa sessione: lettura dell'app. Allora Program e Progress non esistevano (solo ALLENAMENTO, menu, accesso, CHOOSE YOUR STARTER) e Claude si era fermato con le opzioni A, B, C.
+
+## Prima, oggi (2026-11-08 notte: login che non funzionava)
 
 ### Diagnosi (solo lettura, solo `gym-app`)
 
@@ -240,6 +264,8 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
+Barra a tre pagine: Leonardo guarda le modifiche e gli screenshot, (il commit locale c'è già). Dopo: provare la barra sul telefono vero, poi unire in `claude/app-v1`, push e deploy, ognuno solo con il suo ok.
+
 Accesso: sul telefono e sul computer aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (nel menu "Versione" = 08/11/2026 01:31). Se compare "Accesso scaduto", entrare con email e password. Poi CHOOSE YOUR STARTER e il piano. **Non cancellare i dati dell'app sul telefono** (ci sono le 2 sedute in coda).
 
 Leonardo apre l'app online e controlla che piano, sedute e serie ci siano di nuovo (rifà CHOOSE YOUR STARTER) e dice se mancano sedute fatte dopo le 21:35 del 6/11.
@@ -249,6 +275,9 @@ Pelle ALLENAMENTO online: aprire l'app con internet, aspettare qualche secondo, 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- **Barra a tre pagine**: commit locale fatto. Da decidere: unione in `claude/app-v1`, push e deploy (ognuno con il suo ok). Etichetta del tasto centrale: oggi "Allenamento" / "Workout" (come il titolo della pagina); se si preferisce "Track" come nel mockup, è una parola da cambiare.
+- `claude/app-v1`: il commit `5bc7ca4` (solo STATO.md) è in locale e non su GitHub. Push solo con l'ok di Leonardo.
 
 - Le 2 sedute in coda sul telefono (sotto l'utente vecchio): decidere se spostarle sull'utente nuovo e inviarle (lavoro a parte, tocca i dati del telefono) oppure rifarle a mano.
 

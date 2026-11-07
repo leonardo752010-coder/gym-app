@@ -35,6 +35,11 @@ const it = {
   starterNames: { gorilla: 'Gorilla', lion: 'Leone', tiger: 'Tigre' }, starterSaved: (n) => 'Hai scelto: ' + n,
   saveErr: 'Salvataggio non riuscito: ', sync: 'Sincronizzazione', back: 'Indietro',
   noConfig: 'Configurazione mancante: chiave pubblica di Supabase (src/config.js).',
+  // barra in basso (Program / Track / Progress) e le due pagine in sola lettura
+  navProgram: 'Programma', navTrack: 'Allenamento', navProgress: 'Progressi', pages: 'Pagine',
+  openDay: (d) => 'Apri ' + d + ' in Allenamento', exCount: (n) => n + (n === 1 ? ' esercizio' : ' esercizi'),
+  noHistory: 'Nessuna seduta salvata sul telefono.', historyNote: 'Sedute salvate su questo telefono.',
+  inProgress: 'in corso', setCount: (n) => n + ' serie',
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -64,6 +69,10 @@ const en = {
   starterNames: { gorilla: 'Gorilla', lion: 'Lion', tiger: 'Tiger' }, starterSaved: (n) => 'You chose: ' + n,
   saveErr: 'Could not save: ', sync: 'Sync', back: 'Back',
   noConfig: 'Missing configuration: Supabase public key (src/config.js).',
+  navProgram: 'Program', navTrack: 'Workout', navProgress: 'Progress', pages: 'Pages',
+  openDay: (d) => 'Open ' + d + ' in Workout', exCount: (n) => n + (n === 1 ? ' exercise' : ' exercises'),
+  noHistory: 'No sessions saved on this phone.', historyNote: 'Sessions saved on this phone.',
+  inProgress: 'in progress', setCount: (n) => n + (n === 1 ? ' set' : ' sets'),
 };
 export const LANGS = { it, en };
 

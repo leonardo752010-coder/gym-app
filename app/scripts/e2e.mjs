@@ -17,6 +17,10 @@ const today = localDate();
 const email = `prova.e2e.${Date.now().toString(36)}@example.test`, password = randomPassword();
 let ok = 0, ko = 0;
 let START;
+// Supabase online (gym-app) sempre bloccato: la prova usa solo il database locale. Conta i tentativi (devono essere 0).
+const ONLINE_HOST = 'https://kclgcqwmvqqkogkhycgb.supabase.co';
+let onlineHits = 0;
+const blockOnline = (c) => c.route(ONLINE_HOST + '/**', (r) => { onlineHits++; return r.abort('blockedbyclient'); });
 const check = (name, cond, extra = '') => { cond ? ok++ : ko++; console.log((cond ? '  ok   ' : '  NO   ') + name + (extra ? '  (' + extra + ')' : '')); };
 
 console.log('Build (modo locale)…');
@@ -30,6 +34,7 @@ try {
   START = new Date().toISOString();   // solo le serie create dall'app durante la prova
   browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'it-IT', hasTouch: true, isMobile: true });
+  await blockOnline(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -118,6 +123,44 @@ try {
   let sv = await serverSets();
   check('online: 1 serie', sv.length === 1 && Number(sv[0].weight_kg) === 82.5 && sv[0].reps === 6, JSON.stringify(sv.map((x) => [x.set_number, x.weight_kg, x.reps])));
 
+  console.log('3b. Barra in basso: Programma, Allenamento, Progressi (sola lettura)');
+  const localRows = () => page.evaluate(() => JSON.stringify([...window.__gym.S.local.rows.values()].sort((a, b) => (a.id < b.id ? -1 : 1))));
+  const tabOn = () => page.textContent('.tab.on');
+  const rowsBefore = await localRows(), lsBefore = await page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('gym.') && k !== 'gym.timer').sort()));
+  check('barra con tre tasti nell\'ordine giusto, Allenamento acceso', JSON.stringify(await page.$$eval('.tab', (b) => b.map((x) => x.textContent))) === '["Programma","Allenamento","Progressi"]' && (await tabOn()) === 'Allenamento');
+  check('Allenamento: stessa schermata di prima (titolo, giorni, carta)', (await page.textContent('.btitle')) === 'ALLENAMENTO' && (await page.$$('.day')).length === 4 && !!(await page.$('.card')));
+  { const r = await page.evaluate(() => ({ t: document.getElementById('timer').getBoundingClientRect().bottom, b: document.getElementById('tabs').getBoundingClientRect().top }));
+    check('timer sopra la barra, non sotto', r.t <= r.b, JSON.stringify(r)); }
+  await page.screenshot({ path: path.join(out, '13-track.png') });
+  await page.click('[data-page=program]');
+  await page.waitForSelector('#planName');
+  check('Programma: piano, 4 giorni, esercizi con macchina', (await page.$$('.pday')).length === 4 && /Marca Finta · Incline Press · MF-10/.test(await page.textContent('.pex')) && (await tabOn()) === 'Programma');
+  check('Programma: niente Importa, Library, Crea programma', !/importa|library|crea/i.test(await page.textContent('#wrap')));
+  await page.screenshot({ path: path.join(out, '14-program.png') });
+  await page.click('[data-page=progress]');
+  await page.waitForSelector('.hses');
+  const prog1 = (await page.textContent('.hses')).replace(/\s+/g, ' ');
+  check('Progressi: la serie appena salvata c\'è (82,5 kg × 6, in corso)', /82,5 kg × 6/.test(prog1) && /in corso/.test(prog1), prog1.slice(0, 120));
+  check('Progressi: anche le sedute dei giorni prima', (await page.$$('.hses')).length >= 2);
+  await page.screenshot({ path: path.join(out, '15-progress.png') });
+  await page.goBack();
+  await page.waitForSelector('.card');
+  check('tasto indietro da Progressi: torna ad Allenamento (anche se prima c\'era Programma)', (await tabOn()) === 'Allenamento' && (await page.textContent('.day.on')).startsWith('Upper A'));
+  await page.click('[data-page=program]');
+  await page.click('.pdayH:has-text("Lower A")');
+  await page.waitForSelector('.card');
+  check('tocco un giorno in Programma: si apre quel giorno in Allenamento', (await tabOn()) === 'Allenamento' && (await page.textContent('.day.on')).startsWith('Lower A'));
+  await page.click('.day:has-text("Upper A")');
+  await page.waitForSelector('.done');
+  await page.click('[data-page=progress]');
+  await page.waitForSelector('.hses');
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 15000 });
+  check('riavvio da Progressi: si riparte da Allenamento', (await tabOn()) === 'Allenamento');
+  check('girare le pagine non cambia nessun dato (telefono e impostazioni)', (await localRows()) === rowsBefore &&
+    (await page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('gym.') && k !== 'gym.timer').sort()))) === lsBefore);
+  { const n = (await serverSets()).length; check('online ancora 1 serie dopo il giro delle pagine', n === 1, n + ''); }
+
   console.log('4. Offline: registrare, riaprire l\'app, modificare');
   // Senza rete: il browser offline (la pagina deve arrivare dalla cache) e in più ogni richiesta a Supabase bloccata
   // (il browser di prova lascia passare le richieste del service worker anche offline).
@@ -129,6 +172,15 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.done').length === 2);
   check('serie 2 salvata offline', ['offline', 'pending'].includes(await syncState()), await syncState());
   check('segno "da inviare" sulla serie', (await page.$$('.done .pend')).length >= 1);
+  await page.click('[data-page=progress]');
+  await page.waitForSelector('.hses');
+  { const t = (await page.textContent('.hses')).replace(/\s+/g, ' ');
+    check('senza rete: in Progressi ci sono tutte e due le serie di oggi (82,5 × 6 e × 5)', /82,5 kg × 6.*82,5 kg × 5/.test(t), t.slice(0, 120)); }
+  await page.click('[data-page=program]');
+  await page.waitForSelector('#planName');
+  check('senza rete: Programma si apre', (await page.$$('.pday')).length === 4);
+  await page.click('[data-page=track]');
+  await page.waitForSelector('.card');
   await page.screenshot({ path: path.join(out, '03-offline.png'), fullPage: true });
   await page.reload();
   await page.waitForSelector('.card', { timeout: 5000 });
@@ -271,6 +323,7 @@ try {
   console.log('12. Fine seduta: due telefoni, online e offline (orologio vero)');
   const phone = async () => {
     const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'it-IT', hasTouch: true, isMobile: true });
+    await blockOnline(c);
     const p = await c.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
     await p.goto(URL_APP);
@@ -352,6 +405,7 @@ try {
 
   console.log('13. Telefono in una lingua non prevista (cinese): inglese');
   { const c = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'zh-CN', hasTouch: true, isMobile: true });
+    await blockOnline(c);
     const p = await c.newPage();
     p.on('pageerror', (e) => errors.push(e.message));
     await p.goto(URL_APP);
@@ -368,6 +422,7 @@ try {
     await p.screenshot({ path: path.join(out, '10-inglese.png'), fullPage: true });
     await c.close(); }
   check('nessun errore JavaScript (fine)', errors.length === 0, errors.join(' | '));
+  check('nessuna richiesta a Supabase online (gym-app) durante la prova', onlineHits === 0, onlineHits + ' tentativi');
 } catch (e) {
   ko++; console.log('  ERRORE', e.message);
 } finally {

@@ -12,6 +12,12 @@ di iPhone e Android. Nessuno store, nessun costo. Grafica e flusso copiati da `a
 - Registrare una serie in un tocco (kg o lb, rep, RIR), timer di recupero, modificare o eliminare una serie
   (eliminazione morbida: nel database resta con `deleted_at`).
 - Giorno / notte, italiano / inglese (lingua del telefono, si cambia dal menu toccando il logo).
+- **Barra in basso** con tre pagine: **Programma** (il piano: giorni, esercizi, macchine), **Allenamento** (la seduta,
+  pagina di partenza) e **Progressi** (le sedute salvate sul telefono con le serie, dalla più recente). Programma e
+  Progressi sono in sola lettura: usano solo i dati già sul telefono, funzionano senza rete, non scrivono niente.
+  Toccare un giorno in Programma lo apre in Allenamento (come le schede dei giorni). Tasto indietro: da Programma o
+  Progressi torna ad Allenamento; da Allenamento esce come prima. A ogni avvio (e dopo l'accesso) si parte da Allenamento.
+  Niente import, niente "Library", niente "Crea programma", niente grafici.
 
 ## Quando inizia una seduta nuova (niente da cancellare a mano)
 
@@ -100,7 +106,8 @@ Una serie ancora da inviare ha il segno ⟳.
 
 | File | Cosa fa |
 |---|---|
-| `app/src/main.js` | schermate e tocchi (accesso, seduta, serie, timer, menu) |
+| `app/src/main.js` | schermate e tocchi (accesso, seduta, serie, timer, menu, barra in basso e pagine Programma / Progressi) |
+| `app/src/pages.js` | barra in basso: tasto indietro e storico per Progressi (sola lettura, senza rete né schermo) |
 | `app/src/logic.js` | volta scorsa, suggerimento, salti di peso, giorno proposto (senza rete né schermo: si prova facilmente) |
 | `app/src/store.js` | salvataggio sul telefono e coda |
 | `app/src/sync.js` | invio della coda a Supabase |

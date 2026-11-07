@@ -292,3 +292,61 @@ input{font:inherit;color:inherit}
 :root[data-theme="dark"]:has(#wrap) .err,
 :root[data-theme="dark"]:has(#wrap) .sheet .errs{color:var(--sk-bad)}
 :root[data-theme="dark"]:has(#wrap) .sync.err i{background:var(--sk-bad)}
+
+/* =====================================================================
+   BARRA IN BASSO (Program / Track / Progress) e pagine in sola lettura.
+   Colori dai token di sopra: nel tema notte prendono la pelle (vedi sotto),
+   nel tema giorno restano quelli di sempre.
+   ===================================================================== */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(3,minmax(0,170px));justify-content:center;
+  height:calc(62px + env(safe-area-inset-bottom));padding:0 8px env(safe-area-inset-bottom);background:var(--card);border-top:1px solid var(--line)}
+.tabbar:empty{display:none}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--mu);font-size:11px;font-weight:800;letter-spacing:.04em}
+.tab svg{width:24px;height:24px}
+.tab.on{color:var(--ac)}
+.tab.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--ac)}
+/* con la barra: il timer sta sopra la barra e la pagina finisce più in alto (stesse distanze di prima) */
+body:has(.tabbar:not(:empty)){padding-bottom:calc(202px + env(safe-area-inset-bottom))}
+body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bottom))}
+
+.wrap.page{display:block;max-width:720px}
+.pgTitle{font-family:'Barlow Condensed',Inter,sans-serif;font-style:italic;font-weight:900;font-size:34px;line-height:1;text-transform:uppercase;margin:4px 0 12px}
+.pgNote{font-size:13px;color:var(--mu);font-weight:600;margin:4px 0 12px}
+/* Program: un riquadro per giorno */
+.pday,.hses{background:var(--card);border-radius:18px;padding:4px 14px 8px;margin-bottom:12px}
+.pdayH{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;text-align:left}
+.pdayH b{display:block;font-size:18px;font-weight:800}
+.pdayH small{font-size:12px;color:var(--mu);font-weight:700}
+.pdayH i{font-style:normal;font-size:28px;line-height:1;color:var(--mu)}
+.pday.on .pdayH b{color:var(--ac)}
+.pex{list-style:none;margin:0;padding:0}
+.pex li{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+.pex .n{width:26px;height:26px;flex:none;border-radius:8px;background:var(--chip);display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--mu)}
+.pex .t{flex:1;min-width:0}
+.pex .t b{display:block;font-size:15px;font-weight:700}
+.pex .t span{display:block;font-size:12px;color:var(--mu);font-weight:600}
+.pex .t .m{color:var(--mu2)}
+.pex .t .ss{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:.06em}
+.pex li.off{opacity:.45}
+/* Progress: un riquadro per seduta */
+.hsH{display:flex;align-items:baseline;gap:8px;padding:10px 0 6px}
+.hsH b{font-size:16px;font-weight:800}
+.hsH span{flex:1;min-width:0;color:var(--mu);font-weight:700;font-size:14px}
+.hsH small{font-size:12px;color:var(--mu);font-weight:700}
+.hsH small.live{color:var(--ac)}
+.hex{padding:8px 0;border-top:1px solid var(--line)}
+.hex b{font-size:15px;font-weight:700}
+.hex .m{display:block;font-size:12px;color:var(--mu2);font-weight:600}
+.hex .lv{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:4px;font-size:16px;font-weight:700}
+.hex .lv em{font-style:normal;color:var(--mu);font-size:12px;font-weight:600;margin-left:3px}
+
+/* pelle notte (nero e viola) per la barra e le due pagine */
+:root[data-theme="dark"]:has(#wrap) .tabbar{background:rgba(11,11,15,.94);border-top-color:var(--sk-line);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+:root[data-theme="dark"]:has(#wrap) .tab{color:var(--sk-mu)}
+:root[data-theme="dark"]:has(#wrap) .tab.on{color:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .tab.on::before{background:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .pday,
+:root[data-theme="dark"]:has(#wrap) .hses{border:1px solid var(--sk-line);border-radius:var(--sk-r-card)}
+:root[data-theme="dark"]:has(#wrap) .pday.on{border-color:var(--sk-ac)}
+:root[data-theme="dark"]:has(#wrap) .pday.on .pdayH b{color:var(--sk-tx)}
+:root[data-theme="dark"]:has(#wrap) .pex .n{background:var(--sk-chip)}

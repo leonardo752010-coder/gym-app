@@ -21,6 +21,7 @@ import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
+import { PAGES, START_PAGE, navStep, pageFromState, historyList } from './pages.js';
 
 // Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
@@ -50,6 +51,7 @@ const S = {
   date: localDate(), dayId: savedDay(), idx: 0, drafts: {}, edit: null, extraOpen: null, busy: false, openNotes: false,
   sync: { state: 'ok', pending: 0, failed: 0 }, lastRefresh: 0, persisted: null, pendingRender: false,
   starter: null, pick: null,   // starter: record sul telefono (vedi starter.js); pick: carta toccata, non ancora confermata
+  page: START_PAGE,            // pagina della barra in basso: 'program' | 'track' | 'progress' (vedi pages.js)
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -80,6 +82,7 @@ async function boot() {
   askPersist();
   S.user = storedUser();
   if (!S.user) { renderLogin(); return; }
+  resetPage();
   await openLocal();
   if (S.snap) { render(); mark('firstRender'); }
   else renderLoading();
@@ -226,6 +229,7 @@ function renderLogin(msg) {
       return;
     }
     S.user = { id: r.user.id, email: r.user.email };
+    resetPage();
     await openLocal();
     if (S.snap) render(); else renderLoading();
     refresh();
@@ -274,13 +278,14 @@ function shell() {
   document.body.innerHTML = `
 <header class="top"><div class="hdr"><div class="brand">
   <img class="blogo" id="logo" src="./icons/icon-192.png" alt="Gym">
-  <div class="btitle">${S.T.workout}</div><div class="sync" id="sync"></div></div>
+  <div class="btitle" id="btitle">${S.T.workout}</div><div class="sync" id="sync"></div></div>
   <div class="ctrls"><span class="pill static" id="dateTxt"></span>
   <button class="theme" id="themeBtn" aria-label="${S.T.dayNight}"></button>
   <div class="seg" id="unitSeg"><button data-u="kg">kg</button><button data-u="lb">lb</button></div></div></div>
   <div class="days" id="days"></div><div id="progBox"></div></header>
 <main class="wrap" id="wrap"></main>
 <div class="timer hide" id="timer"><div class="pg" id="tPg"></div><div class="tt"><span id="tLab"></span><b id="tTxt">0:00</b></div><button id="tMinus">−15</button><button id="tPlus">+15</button><button id="tStop">✕</button></div>
+<nav class="tabbar" id="tabs" aria-label="${S.T.pages}"></nav>
 <div class="toast" id="toast"></div><div id="sheetHost"></div>`;
   applyTheme(theme());
   $('themeBtn').onclick = () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; ls.set('theme', t); applyTheme(t); buzz(8); };
@@ -325,6 +330,8 @@ function render() {
   const T = S.T;
   $('dateTxt').textContent = T.today.toUpperCase() + ' · ' + niceDate(S.date);
   [...$('unitSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.u === S.unit));
+  renderTabs();
+  if (S.page !== 'track') { $('days').innerHTML = ''; $('progBox').innerHTML = ''; S.page === 'program' ? renderProgram() : renderProgress(); return; }
   const p = plan();
   if (!p || !p.days.length) { $('days').innerHTML = ''; $('progBox').innerHTML = ''; $('wrap').innerHTML = '<div class="load err" style="grid-column:1/-1">' + T.noPlan + '</div>'; return; }
 
@@ -370,6 +377,70 @@ function closedBar(v) {
 function endRow(v) {
   if (!v.sessions.length) return '';
   return '<div class="endrow"><button class="endbtn" id="endSession">' + S.T.endSession + '</button></div>';
+}
+
+/* ---------- barra in basso e pagine Program / Progress (solo lettura, solo dati sul telefono) ---------- */
+const ICON_NAV = {
+  program: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg>',
+  track: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 9v6M6.5 6.5v11M17.5 6.5v11M21 9v6M6.5 12h11"/></svg>',
+  progress: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M7 16v-4M12 16V8M17 16v-7"/></svg>',
+};
+const pageLabel = (p) => ({ program: S.T.navProgram, track: S.T.navTrack, progress: S.T.navProgress }[p]);
+
+function renderTabs() {
+  $('btitle').textContent = S.page === 'track' ? S.T.workout : pageLabel(S.page).toUpperCase();
+  $('wrap').className = 'wrap' + (S.page === 'track' ? '' : ' page');
+  $('tabs').innerHTML = PAGES.map((p) => '<button class="tab' + (p === S.page ? ' on' : '') + '" data-page="' + p + '"' + (p === S.page ? ' aria-current="page"' : '') + '>' +
+    ICON_NAV[p] + '<span>' + esc(pageLabel(p)) + '</span></button>').join('');
+}
+
+/** Cambia pagina (senza disegnare). Tasto indietro: vedi navStep in pages.js. false se la pagina è la stessa. */
+function setPage(p) {
+  if (!PAGES.includes(p) || p === S.page) return false;
+  const step = navStep(S.page, p, pageFromState(history.state) !== START_PAGE);
+  if (S.page === 'track' && curPe()) readInputs();   // i numeri scritti e non salvati restano nella bozza
+  S.page = p;
+  try {
+    if (step === 'push') history.pushState({ gymPage: p }, '');
+    else if (step === 'replace') history.replaceState({ gymPage: p }, '');
+    else if (step === 'back') history.back();
+  } catch (e) { /* niente cronologia: si cambia pagina lo stesso */ }
+  return true;
+}
+/** Dopo l'accesso e a ogni avvio: si parte da Track, senza passi vecchi nella cronologia. */
+function resetPage() {
+  S.page = START_PAGE;
+  try { if (pageFromState(history.state) !== START_PAGE) history.replaceState(null, ''); } catch (e) { /* niente */ }
+}
+
+function renderProgram() {
+  const T = S.T, p = plan();
+  if (!p || !p.days.length) { $('wrap').innerHTML = '<div class="load err">' + T.noPlan + '</div>'; return; }
+  $('wrap').innerHTML = '<h2 class="pgTitle" id="planName">' + esc(p.name || '') + '</h2>' + p.days.map((d) =>
+    '<section class="pday' + (d.id === S.dayId ? ' on' : '') + '"><button class="pdayH" data-day="' + esc(d.id) + '" aria-label="' + esc(T.openDay(d.name)) + '">' +
+    '<span><b>' + esc(d.name) + '</b><small>' + esc(T.exCount(d.exercises.length)) + '</small></span><i>›</i></button><ol class="pex">' +
+    d.exercises.map((pe, i) => {
+      const m = pe.machine;
+      const sub = !active(pe) ? T.listOff : pe.sets + ' × ' + range(pe) + ' ' + T.rep + (rirTxt(pe) ? ' · RIR ' + rirTxt(pe) : '');
+      return '<li class="' + (active(pe) ? '' : 'off') + '"><span class="n">' + (i + 1) + '</span><span class="t">' +
+        (pe.superset_label ? '<span class="ss">SUPERSET ' + esc(pe.superset_label) + '</span>' : '') + '<b>' + esc(exName(pe)) + '</b><span>' + esc(sub) + '</span>' +
+        (m ? '<span class="m">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</span>' : '') + '</span></li>';
+    }).join('') + '</ol></section>').join('');
+}
+
+function renderProgress() {
+  const T = S.T;
+  const list = historyList(indexRows(S.local.list()), plan());
+  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
+  $('wrap').innerHTML = '<p class="pgNote">' + esc(T.historyNote) + '</p>' + list.map((s) => {
+    const live = !s.ended && s.date === S.date;
+    return '<section class="hses" data-ses="' + esc(s.id) + '"><div class="hsH"><b>' + esc(shortDate(s.date)) + '</b><span>' + esc(s.dayName) + '</span>' +
+      '<small' + (live ? ' class="live"' : '') + '>' + esc(live ? T.inProgress : T.setCount(s.setCount)) + '</small></div>' +
+      s.exercises.map((e) => '<div class="hex"><b>' + esc(tr(e.name, S.lang) || '—') + '</b>' +
+        (e.machine ? '<span class="m">' + esc(machineLabel(e.machine) || tr(e.machine.name, S.lang) || e.machine.code) + '</span>' : '') +
+        '<div class="lv">' + e.sets.map((x) => '<span>' + fmtN(setWeightIn(x, S.unit)) + ' ' + S.unit + ' × ' + x.reps + (x.rir != null ? '<em>@' + fmtN(x.rir) + '</em>' : '') + '</span>').join('') +
+        '</div></div>').join('') + '</section>';
+  }).join('');
 }
 
 const exName = (pe) => tr(pe.exercise && pe.exercise.name, S.lang) || '—';
@@ -634,8 +705,10 @@ document.addEventListener('click', (ev) => {
   if (!b || !S.snap || !$('wrap')) return;
   if (b.closest('.sheet') || b.closest('.timer') || b.id === 'themeBtn') return;
   if (b.id === 'notes') { S.openNotes = !S.openNotes; b.classList.toggle('open', S.openNotes); return; }
+  if (b.dataset.page) { if (setPage(b.dataset.page)) { render(); scrollTo(0, 0); } return; }
   const pe = curPe();
-  if (b.dataset.day) { S.dayId = b.dataset.day; ls.set('day', S.date + '|' + S.dayId); S.idx = firstOpenIdx(view()); S.extraOpen = null; S.edit = null; render(); return; }
+  // giorno toccato nelle schede di Track o in Program: si apre quel giorno in Track (come le schede di sempre)
+  if (b.dataset.day) { if (setPage('track')) scrollTo(0, 0); S.dayId = b.dataset.day; ls.set('day', S.date + '|' + S.dayId); S.idx = firstOpenIdx(view()); S.extraOpen = null; S.edit = null; render(); return; }
   if (b.dataset.idx !== undefined) { goTo(Number(b.dataset.idx)); return; }
   if (b.dataset.go) { goTo(S.idx + Number(b.dataset.go)); scrollTo(0, 0); return; }
   if (b.dataset.u) {
@@ -672,9 +745,9 @@ document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.t
 
 // scorrimento orizzontale tra esercizi (telefono)
 let sx = null, sy = null;
-document.addEventListener('touchstart', (ev) => { if (ev.target.closest('input,.days,.bar,.sheet')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
+document.addEventListener('touchstart', (ev) => { if (S.page !== 'track' || ev.target.closest('input,.days,.bar,.sheet,.tabbar')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
 document.addEventListener('touchend', (ev) => {
-  if (sx === null || !S.snap || !$('wrap') || innerWidth >= 700 || !dayObj()) return;
+  if (sx === null || !S.snap || !$('wrap') || S.page !== 'track' || innerWidth >= 700 || !dayObj()) return;
   const dx = ev.changedTouches[0].clientX - sx, dy = ev.changedTouches[0].clientY - sy;
   if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) {
     const n = dayObj().exercises.length, ni = S.idx + (dx < 0 ? 1 : -1);
@@ -682,6 +755,15 @@ document.addEventListener('touchend', (ev) => {
   }
   sx = null;
 }, { passive: true });
+
+// tasto indietro (e avanti) del telefono o del browser: Program/Progress → Track; da Track come prima (esce)
+addEventListener('popstate', (ev) => {
+  if (!S.user || !S.snap || !$('wrap')) return;
+  const p = pageFromState(ev.state);
+  if (p === S.page) return;
+  if (S.page === 'track' && curPe()) readInputs();
+  S.page = p; render(); scrollTo(0, 0);
+});
 
 // rete e ritorno sull'app: si invia la coda appena possibile
 addEventListener('online', () => { log('online'); S.sync.offline = false; syncNow(true); refresh(); });
