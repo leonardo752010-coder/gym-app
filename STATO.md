@@ -1,17 +1,19 @@
 # Stato
 
-Aggiornato: 2026-11-08: pelle nuova (nero e viola) della schermata ALLENAMENTO committata in locale sul branch `skin-track` (Claude)
+Aggiornato: 2026-11-08: dati di Leonardo ripristinati online in `gym-app` dal backup del 6/11 alle 21:35; pelle `skin-track` unita a `claude/app-v1` solo in locale (Claude)
 
 ## Branch
 
-Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): solo la pelle nuova della schermata ALLENAMENTO, **committata** (`fd723c0` "skin: schermata Track", con l'ok di Leonardo). **Solo sul computer**: niente push, niente deploy. **Non ancora guardata a occhio da Leonardo** e **non ancora unita a `claude/app-v1`**.
+Branch attuale: **`claude/app-v1`**. Contiene ora anche la pelle nuova della schermata ALLENAMENTO: `skin-track` unito il 2026-11-08 con l'ok di Leonardo (merge normale, "fast-forward": nessun conflitto, nessuna storia riscritta). **Solo sul computer**: `claude/app-v1` locale è avanti di 3 commit rispetto a GitHub (i 2 di `skin-track` + questo di STATO.md). Niente push, niente deploy: l'app online è ancora quella **senza** la pelle nuova.
+
+`skin-track` esiste ancora in locale, fermo a `f37c135` (tutto già dentro `claude/app-v1`).
 
 `claude/app-v1` (nato da `claude/database`): app v1 come PWA nella cartella `app/`, **pubblicata** su https://gym-app.gym-app-pwa.workers.dev. I lavori fino al commit `d23994a` (seduta nuova, "Fine seduta", inglese) sono su GitHub e online. **CHOOSE YOUR STARTER** è in due commit su `claude/app-v1` (`c8a2617` e `701b3d9`, mascotte vere), **su GitHub** dal 2026-11-06 (push con l'ok di Leonardo, senza force push). Migrazione applicata online su `gym-app` (2026-11-06, 21:36). App con CHOOSE YOUR STARTER **pubblicata** con `npm run deploy` (2026-11-06, versione "06/11/2026 21:41"), con l'ok di Leonardo.
 
 | Branch | Cosa contiene |
 | --- | --- |
-| `skin-track` | Tutto `claude/app-v1` + pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub), non unito a `claude/app-v1` |
-| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md`. Su GitHub fino a `701b3d9` (compresi i due commit di CHOOSE YOUR STARTER) |
+| `claude/app-v1` | Tutto `claude/database` + app v1 (PWA) in `app/`, guida `docs/app.md`, decisioni in `DECISIONI.md`, regola "niente cancellazioni senza ok" in `CLAUDE.md` + pelle nuova della schermata ALLENAMENTO (da `skin-track`, unita in locale il 2026-11-08). Su GitHub fino a `5f10f6d`; la pelle e gli ultimi STATO.md **solo in locale** |
+| `skin-track` | Pelle nuova (nero e viola) della schermata ALLENAMENTO in `app/src/styles.css`, solo tema notte (commit `fd723c0`). **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `main` | Cornice PWA pubblicata su GitHub Pages + nota su funzioni e posizionamento (`docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`, `CLAUDE.md`) |
 | `claude/database` | Tutto `main` + fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`) + copia dell'app attuale (`HANDOFF.md`, `apps-script/`) + database Supabase (migrazioni, prove, `docs/database.md`) + regola "Aggiornare STATO.md" in `CLAUDE.md` + sistema di backup (`scripts/backup.ps1`, `docs/backup.md`) + accesso locale allineato (iscrizioni chiuse in `supabase/config.toml`) + import dai fogli del passo 3 (`scripts/import/`, `docs/import.md`, migrazione `20261106120000`) |
 | `claude/fondamenta` | Solo le fondamenta (`AGENTS.md`, `DECISIONI.md`, `STATO.md`). Già tutto dentro `claude/database` |
@@ -20,7 +22,33 @@ Branch attuale: **`skin-track`** (nato da `claude/app-v1` al commit `57f6a0a`): 
 | `claude/nota-funzioni` | Fondamenta + handoff + nota su funzioni. La nota è già su `main`, il resto è in `claude/database` |
 | `claude/nota-funzioni-main` | Uguale a `main` (commit 741d456) |
 
-## Fatto in questa sessione (2026-11-08: pelle della schermata ALLENAMENTO)
+## Fatto in questa sessione (2026-11-08: ripristino dei dati di Leonardo e unione della pelle)
+
+### Cosa era successo
+
+- Leonardo ha cancellato e ricreato il suo utente in `gym-app` dal pannello. Per le regole del database (ON DELETE CASCADE) con l'utente sono spariti **tutti** i suoi dati: piano, sedute, serie, palestra privata con le sue 20 macchine, registro dell'import. Nessuna riga orfana. L'utente nuovo ha un **ID nuovo** e solo un profilo vuoto, per questo l'app diceva "non hai un piano attivo".
+- Libreria pubblica (22 esercizi, 20 macchine, 5 tipi di serie, 19 muscoli) **non** toccata: nel backup non era legata a nessun utente. Raina: nel backup aveva solo il profilo, ce l'ha ancora, non ha perso niente.
+
+### Ripristino online (con l'ok di Leonardo), solo `gym-app`
+
+1. CLI collegata a `gym-app` (controllato). Copia di sicurezza di tutta la cartella dei backup in `Documents\gym-app-backup-COPIA` (12 file su 12, contenuto identico controllato con sha256).
+2. Backup nuovo **prima** di scrivere: `gym-app_2026-11-08` (struttura 95,8 KB, dati 31,6 KB; 124 righe, 10 migrazioni). Nessun backup cancellato, ora sono 7.
+3. Controlli in sola lettura: ID vecchio non esiste più; l'utente nuovo esiste una volta sola e ha solo il profilo (0 piani, 0 sedute, tutto il resto vuoto).
+4. Dal backup `gym-app_2026-11-06_2135` (file `_dati.sql`, solo lettura) prese **solo** le righe dell'ID vecchio: 198 righe (199 meno il profilo, che non si tocca: si tiene quello nuovo, che ha gli stessi valori di prima). ID vecchio sostituito con il nuovo solo nelle colonne `user_id`, `created_by`, `added_by`. Niente di `auth`, niente libreria, niente Raina. Il file SQL è fuori dal progetto (cartella temporanea di Claude).
+5. Prova generale online dentro una transazione annullata apposta: tutte le 198 righe entrate, chiavi esterne e conteggi giusti; dopo, database ancora vuoto (controllato).
+6. **Ripristino vero**: una sola transazione, controlli del database accesi (senza `session_replication_role`), email controllata prima di scrivere, conteggi controllati prima del COMMIT. Righe scritte: import_batches 1, clubs 1 (palestra privata), club_machines 20, user_clubs 1, plans 1, plan_days 4, plan_exercises 27, plan_exercise_machines 22, sessions 7, session_exercises 39, sets 75.
+7. Controllo dopo, in sola lettura: piano attivo 1, sedute 7, serie 75, esercizi del piano 27, palestra privata 1, righe orfane 0, ID vecchio da nessuna parte, libreria pubblica 22 esercizi e 20 macchine, profilo di Raina presente, 2 utenti.
+
+- **Forse perse**: le sedute e le serie registrate **dopo le 21:35 del 2026-11-06** fino alla cancellazione dell'utente. Non sono in nessun backup. Se erano ancora sul telefono in attesa di invio, potrebbero esserci ancora lì: non cancellare i dati dell'app sul telefono.
+- Lo starter (CHOOSE YOUR STARTER) del profilo nuovo è vuoto: l'app lo chiederà di nuovo.
+
+### Pelle unita in locale (con l'ok di Leonardo)
+
+- `git switch claude/app-v1` e `git merge skin-track`: fast-forward, nessun conflitto. `npm test` 81 su 81; build di produzione riuscita e controllata (solo gym-app, nessuna chiave segreta, nessun indirizzo del database locale: `localhost`/`127.0.0.1` compaiono solo nella lista interna della libreria supabase-js).
+- **Non lanciati**: `npm run test:locale` e `npm run test:e2e` (usano il database locale e creano e cancellano un atleta finto).
+- Niente push, niente deploy.
+
+## Prima, oggi (pelle della schermata ALLENAMENTO)
 
 - La "schermata Track" del brief è la schermata **ALLENAMENTO** (l'unica con serie, Kg/Rep/RIR, timer e volta scorsa). Scelte di Leonardo: pelle **solo col tema notte** (il tema giorno resta com'era) e **solo colori e forme** (niente si sposta: "Volta scorsa" resta sopra le caselle, "Salva serie" resta nella carta, il timer resta in basso).
 - Un solo file toccato: `app/src/styles.css` (il file del tema che c'era già). In fondo una sezione "PELLE TRACK" con i token (sfondo #0B0B0F, carte #17171D, viola #8B6CF0 / #5B45B8, verde #3DDC97 solo per lo stato "tutto salvato", testo bianco e grigio #9A9AA8, angoli 18/12 px, numeri a 46 px) e le regole. Vale solo se la pagina è la seduta e il tema è notte: accesso e CHOOSE YOUR STARTER non cambiano.
@@ -164,10 +192,11 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Cosa è online
 
-- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 10 migrazioni (26 tabelle; la decima, del 2026-11-06 sera, aggiunge `profiles.starter`) e 2 account creati da Leonardo dal pannello. **Dati di Leonardo importati il 2026-11-06**: piano attivo (4 giorni, 27 esercizi, 50 serie a settimana), 5 sedute e 66 serie dal 2026-10-30 al 2026-11-06 (al backup delle 20:39: 7 sedute e 75 serie in tutto, Leonardo ha già usato l'app nuova), 1 palestra privata (principale) con 20 macchine. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
+- **Supabase, progetto `gym-app`**: organizzazione Gym App, piano free, Sydney (ap-southeast-2), ref `kclgcqwmvqqkogkhycgb`, creato da Leonardo il 2026-11-05. Impostazioni: "Automatically expose new tables" spento (in locale lo stesso con `auto_expose_new_tables = false` in `supabase/config.toml`), "automatic RLS" acceso. Accesso: solo email e password, iscrizioni nuove chiuse (verificato il 2026-11-06), conferma email accesa. Contiene 10 migrazioni (26 tabelle; la decima, del 2026-11-06 sera, aggiunge `profiles.starter`) e 2 account (quello di Leonardo ricreato da lui il 2026-11-07/08: ID nuovo). **Dati di Leonardo ripristinati il 2026-11-08 dal backup del 6/11 alle 21:35**: piano attivo (4 giorni, 27 esercizi), 7 sedute e 75 serie, 1 palestra privata (principale) con 20 macchine, 1 registro di import. Quello che era stato registrato dopo le 21:35 del 6/11 manca. Libreria pubblica: 22 esercizi, 20 macchine (non verificati). Più 19 muscoli e 5 tipi di serie. Nessun dato di Raina. pgTAP non installata.
 - **GitHub** (`leonardo752010-coder/gym-app`, pubblico): tutti i branch della tabella sopra, compreso `claude/app-v1` fino a `701b3d9` (con CHOOSE YOUR STARTER e l'originale delle mascotte in `docs/immagini/`). `main` pubblica la PWA su GitHub Pages.
 - **Cloudflare** (account di Leonardo, piano gratuito): app v1 pubblicata su https://gym-app.gym-app-pwa.workers.dev (progetto `gym-app`, solo file statici), versione **con** CHOOSE YOUR STARTER (deploy del 2026-11-06, 21:41). Si ripubblica con `npm run deploy` nella cartella `app/`.
-- **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili, starter vuoto per tutti e 2). L'app online la usa dal deploy delle 21:41.
+- **Supabase `gym-app`**: 10 migrazioni, colonna `starter` presente online (2 profili; starter di Leonardo vuoto dopo la ricreazione dell'utente). L'app online la usa dal deploy delle 21:41 del 6/11.
+- **Cloudflare**: l'app online **non** ha ancora la pelle nuova (unita solo in locale).
 - **App in uso oggi**: Google Apps Script + Google Sheets (vedi `HANDOFF.md`). Resta in uso fino al passaggio alla nuova app.
 
 ## Cosa è solo sul computer di Leonardo
@@ -177,11 +206,13 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 - Per l'app v1 (il codice è su GitHub): le sue librerie (`app/node_modules`), Chromium per le prove (cartella di Playwright nel profilo utente), icone create dal logo (`app/public/icons`, ignorata da git) e `app/.env.locale` (indirizzo e chiave pubblica del database **locale** + password dell'atleta finto; ignorato da git).
 - **Cartella import**: `C:\Users\Leonardo Valentini\Documents\gym-app-import` con le copie dei due fogli (`gym-bulk2.xlsx`; `comeback.xlsx` non si usa), i collegamenti e i resoconti. Dati veri: mai su GitHub.
 - Supabase CLI (`node_modules/`, con `npm install`), con l'accesso al tuo account Supabase e il collegamento a `gym-app` (`supabase/.temp/`). Cartelle ignorate da git.
-- **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Oggi ci sono 6 backup del 2026-11-06; `1218` è quello dopo l'import, `2135` quello subito prima della migrazione dello starter. I backup non vanno mai su GitHub né online.
+- **Backup**: `C:\Users\Leonardo Valentini\Documents\gym-app-backup`. Ci sono 7 backup: 6 del 2026-11-06 (`1218` dopo l'import, `2135` quello usato per il ripristino) e `gym-app_2026-11-08` (subito prima del ripristino, con l'utente nuovo vuoto). Lo script ne tiene 8: al prossimo backup non si cancella niente, a quello dopo si cancella il più vecchio. **Copia di sicurezza** dei 12 file del 6/11 in `C:\Users\Leonardo Valentini\Documents\gym-app-backup-COPIA` (lo script non la tocca). I backup non vanno mai su GitHub né online.
 
 ## Prossimo passo
 
-Pelle ALLENAMENTO (branch `skin-track`, committata, solo locale): Leonardo la guarda in locale (`npm run dev` nella cartella `app/`, poi http://localhost:5173/, tema notte) e decide se tenerla. Poi, con il suo ok: `test:e2e`, unione in `claude/app-v1`, push e deploy.
+Leonardo apre l'app online e controlla che piano, sedute e serie ci siano di nuovo (rifà CHOOSE YOUR STARTER) e dice se mancano sedute fatte dopo le 21:35 del 6/11.
+
+Pelle ALLENAMENTO (unita in `claude/app-v1`, solo locale): con l'ok di Leonardo, push di `claude/app-v1` su GitHub e deploy su Cloudflare (`npm run deploy` nella cartella `app/`). Prima, se Leonardo vuole, `test:e2e` (crea e cancella un atleta finto nel database locale).
 
 CHOOSE YOUR STARTER è online. Leonardo e Raina: aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla (la seconda apertura usa la versione nuova: nel menu "Versione" = 06/11/2026 21:41). Dopo qualche istante compare la schermata, una volta sola.
 
@@ -189,7 +220,9 @@ Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (pr
 
 ## Da decidere o fare per Leonardo
 
-- Pelle ALLENAMENTO (`skin-track`, commit `fd723c0`): guardarla a occhio e dire se va bene; poi decidere se unirla a `claude/app-v1`. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
+- Dopo il ripristino: controllare i dati nell'app; dire se ci sono sedute dopo le 21:35 del 6/11 da rifare a mano. **Non cancellare più utenti dal pannello**: si portano via tutti i dati.
+- Dare (o no) l'ok a push e deploy della pelle. Se si cancella il branch `skin-track` (ormai uguale a una parte di `claude/app-v1`): solo con l'ok di Leonardo.
+- Pelle ALLENAMENTO (commit `fd723c0`, ora in `claude/app-v1`): guardarla a occhio. Da decidere dopo: tasto "Salva serie" fisso in basso con il timer a sinistra e "Volta scorsa" sotto le caselle (oggi non spostati, per scelta); pelle anche per il tema giorno, l'accesso e CHOOSE YOUR STARTER; colore della barra in alto del telefono (oggi resta #121110).
 
 - CHOOSE YOUR STARTER: tutto fatto (push, migrazione online, deploy). Da controllare sul telefono che la schermata compaia una volta a Leonardo e a Raina.
 - Sul tema chiaro il bordo crema delle mascotte si confonde con lo sfondo crema delle carte, e i graffi della tigre e le stelline del leone si vedono poco. Sul tema scuro va bene. Decidere se va bene così.
