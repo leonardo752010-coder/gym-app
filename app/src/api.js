@@ -55,6 +55,28 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       try { await sb.auth.signOut({ scope: 'local' }); } catch (e) { /* offline: si esce lo stesso in locale */ }
     },
 
+    /**
+     * L'accesso salvato sul telefono vale ancora? Lo chiede al server.
+     * state: 'ok' | 'offline' (rete assente o server non raggiungibile: si continua col telefono)
+     *      | 'invalid' (account ricreato, sessione chiusa o scaduta per sempre: serve un nuovo accesso).
+     */
+    async checkAuth() {
+      try {
+        const { data, error } = await sb.auth.getUser();
+        if (!error && data && data.user) return { state: 'ok', user: { id: data.user.id, email: data.user.email } };
+        return { state: authState(error), code: (error && (error.code || error.name)) || '' };
+      } catch (e) {
+        return { state: 'offline', code: 'network' };
+      }
+    },
+
+    /** Toglie dal telefono SOLO l'accesso salvato (non le serie, non la coda). */
+    async forgetSession() {
+      await this.signOut();
+      const st = storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+      try { if (st) { st.removeItem(AUTH_KEY); st.removeItem(AUTH_KEY + '-user'); } } catch (e) { /* niente */ }
+    },
+
     upsert(table, rows) {
       return wrap(sb.from(table).upsert(rows, { onConflict: 'id', defaultToNull: true }));
     },
@@ -127,6 +149,18 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       return { data: rows };
     },
   };
+}
+
+// Risposte del server che vogliono dire "questo accesso non vale più" (non cambiano riprovando).
+const DEAD = ['refresh_token_not_found', 'session_not_found', 'user_not_found', 'bad_jwt', 'session_expired', 'user_banned'];
+
+/** Errore di getUser → 'invalid' (serve un nuovo accesso) oppure 'offline' (rete, server giù: si riprova dopo). */
+export function authState(error) {
+  if (!error) return 'ok';
+  if (error.name === 'AuthSessionMissingError') return 'invalid';
+  if (DEAD.includes(error.code)) return 'invalid';
+  if (error.status === 401 || error.status === 403) return 'invalid';
+  return 'offline';
 }
 
 /** Utente salvato sul telefono dall'ultimo accesso (si legge senza rete). */

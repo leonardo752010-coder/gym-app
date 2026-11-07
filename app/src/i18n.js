@@ -16,6 +16,7 @@ const it = {
   // accesso
   loginTitle: 'Accedi', email: 'Email', password: 'Password', login: 'Entra', loggingIn: 'Entro…',
   badLogin: 'Email o password sbagliate.', needNet: 'Per il primo accesso serve internet.', loginErr: 'Accesso non riuscito: ',
+  sessionGone: 'Accesso scaduto: entra di nuovo. Le serie sul telefono restano salvate.',
   noPlan: 'Nessun piano attivo in questo account.', firstLoad: 'Serve internet per scaricare il piano la prima volta.',
   // stato
   syncOk: 'Tutto salvato online', syncPending: (n) => n + (n === 1 ? ' modifica' : ' modifiche') + ' sul telefono, da inviare',
@@ -49,6 +50,7 @@ const en = {
   listOff: 'not in plan', sets: 'sets', machine: 'Machine', alt: 'alternative', step: 'step', weights: (n) => n + ' weights',
   loginTitle: 'Sign in', email: 'Email', password: 'Password', login: 'Sign in', loggingIn: 'Signing in…',
   badLogin: 'Wrong email or password.', needNet: 'The first sign-in needs internet.', loginErr: 'Sign-in failed: ',
+  sessionGone: 'Your sign-in has expired: please sign in again. Sets on this phone stay saved.',
   noPlan: 'No active plan in this account.', firstLoad: 'Internet is needed to download your plan the first time.',
   syncOk: 'All saved online', syncPending: (n) => n + (n === 1 ? ' change' : ' changes') + ' on the phone, to send',
   syncOffline: (n) => 'Offline · ' + n + ' on the phone', syncErr: (n) => n + ' rejected online', syncing: 'Sending…',

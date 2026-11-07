@@ -111,6 +111,10 @@ async function refresh() {
   refresh.again = false;
   refresh.busy = true;
   try {
+    // L'accesso salvato vale ancora? (Per esempio: account ricreato, sessione chiusa.) Senza rete si continua col telefono.
+    const auth = await api.checkAuth();
+    if (!S.user) return;
+    if (auth.state === 'invalid' || (auth.state === 'ok' && auth.user.id !== S.user.id)) { await sessionLost(auth.code); return; }
     await syncNow(true);
     const uid = S.user.id;
     const [snap, hist, st] = await Promise.all([api.snapshot(uid), api.history(uid, addDays(localDate(), -HISTORY_DAYS)), api.getStarter(uid)]);
@@ -193,6 +197,17 @@ function safeRender() {
 document.addEventListener('focusout', () => setTimeout(() => { if (S.pendingRender) { S.pendingRender = false; safeRender(); } }, 50));
 
 /* ---------- accesso ---------- */
+/**
+ * Il server dice che l'accesso salvato non vale più: si torna al login.
+ * Si toglie SOLO l'accesso salvato. Serie, sedute e coda restano sul telefono (IndexedDB), anche quelle non inviate.
+ */
+async function sessionLost(code) {
+  log('auth-invalid', code || '');
+  await api.forgetSession();
+  S.user = null; S.local = null; S.snap = null; S.starter = null; S.pick = null;
+  stopTimer(); renderLogin(S.T.sessionGone);
+}
+
 function renderLogin(msg) {
   document.body.innerHTML = '<main class="login"><img class="blogo" src="./icons/icon-192.png" alt="Gym"><h1>' + S.T.loginTitle + '</h1>' +
     '<form id="loginForm" autocomplete="on"><input id="email" type="email" inputmode="email" autocomplete="username" placeholder="' + S.T.email + '" required>' +
