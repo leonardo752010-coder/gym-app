@@ -222,8 +222,8 @@ input{font:inherit;color:inherit}
 
 /* =====================================================================
    PELLE "TRACK" (solo aspetto): schermata ALLENAMENTO, solo tema notte.
-   Vale quando la pagina ha #wrap (seduta) e il tema è "dark"; accesso,
-   CHOOSE YOUR STARTER e tema giorno restano come sopra.
+   Vale quando la pagina ha #wrap (seduta) e il tema è "dark"; accesso
+   e CHOOSE YOUR STARTER restano come sopra. Tema giorno: sezione sotto.
    Qui ci sono solo colori, angoli e misure: nessun testo, nessuna logica.
    ===================================================================== */
 :root[data-theme="dark"]:has(#wrap){
@@ -306,9 +306,119 @@ input{font:inherit;color:inherit}
 :root[data-theme="dark"]:has(#wrap) .sync.err i{background:var(--sk-bad)}
 
 /* =====================================================================
+   PELLE "TRACK" CHIARA (solo aspetto): il corrispettivo della notte
+   nel tema giorno. Stessi token --sk-*, angoli e misure della notte,
+   colori chiari. Vale su accesso, caricamento, Allenamento, Programma,
+   Progressi, barra in basso, menu, timer. CHOOSE YOUR STARTER
+   (#starterScr) resta com'era.
+   Contrasti calcolati (WCAG): testi almeno 4.5:1, icone e bordi dei
+   controlli almeno 3:1. Il viola #8B6CF0 con testo bianco fa solo
+   3.8:1, quindi qui tasti, testi, icone e bordi viola usano #6F4FE0
+   (bianco sopra: 5.4:1); #8B6CF0 resta per barre e luci decorative.
+   Il logo ha il fondo nero suo: resta in un riquadro nero arrotondato.
+   ===================================================================== */
+:root[data-theme="light"]:not(:has(#starterScr)){
+  /* token della pelle */
+  --sk-bg:#F6F5FA;          /* sfondo, bianco sporco */
+  --sk-card:#FFFFFF;        /* carte e righe */
+  --sk-card2:#F4F3F9;       /* carte dentro le carte (volta scorsa, editor, serie fatte) */
+  --sk-chip:#ECEAF3;        /* tasti piccoli e pastiglie */
+  --sk-line:#E4E2EC;        /* bordo sottile delle carte, grigio chiaro */
+  --sk-ctl:#868294;         /* bordo dei controlli (caselle, tasti con bordo): 3.4-3.7:1 */
+  --sk-ac:#8B6CF0;          /* viola della notte: solo barre e luci */
+  --sk-acStrong:#6F4FE0;    /* viola per testi, icone, bordi e tasti: 4.9-5.4:1 */
+  --sk-acDark:#5638C4;      /* viola premuto */
+  --sk-acSoft:rgba(111,79,224,.10);
+  --sk-ok:#13805A;          /* verde: solo cose positive, scuro per leggersi */
+  --sk-bad:#B12F20;         /* errori ed elimina: rossi, scuri per leggersi */
+  --sk-tx:#16141D;          /* testo principale, quasi nero */
+  --sk-mu:#5F5C6E;          /* testo secondario, grigio medio */
+  --sk-mu2:#6C6979;         /* testo terziario: anche questo almeno 4.5:1 */
+  --sk-r-card:18px;
+  --sk-r-box:12px;
+  --sk-num:46px;
+
+  /* i colori dell'app prendono quelli della pelle */
+  --bg:var(--sk-bg); --card:var(--sk-card); --card2:var(--sk-card2); --chip:var(--sk-chip); --line:var(--sk-line);
+  --tx:var(--sk-tx); --mu:var(--sk-mu); --mu2:var(--sk-mu2);
+  --ac:var(--sk-acStrong); --acTx:#FFFFFF; --acSoft:var(--sk-acSoft); --glow:0 8px 22px rgba(111,79,224,.26);
+  --cream:var(--sk-acStrong); --creamTx:#FFFFFF;
+  --ok:var(--sk-card2); --okTx:var(--sk-tx); --okIc:var(--sk-ok);
+  --warn:#A86200;           /* pallino "in attesa": 4.4:1 */
+  --shadow:0 10px 30px rgba(40,30,80,.16);
+  background:var(--bg);     /* vince sul colore di partenza scritto in index.html */
+}
+:root[data-theme="light"]:not(:has(#starterScr)) body{background:var(--bg)}
+/* logo completo: dentro un riquadro nero arrotondato, intero, mai deformato */
+:root[data-theme="light"]:not(:has(#starterScr)) .llogo{background:#000;box-shadow:0 8px 24px rgba(22,20,29,.22)}
+:root[data-theme="light"]:not(:has(#starterScr)) .sheet .mlogo{box-shadow:none}
+/* accesso */
+:root[data-theme="light"]:not(:has(#starterScr)) .login input{border-color:var(--sk-ctl);border-radius:14px}
+:root[data-theme="light"]:not(:has(#starterScr)) .login input:focus{border-color:var(--sk-acStrong);box-shadow:0 0 0 3px var(--sk-acSoft)}
+:root[data-theme="light"]:not(:has(#starterScr)) .login .msg{color:var(--sk-bad)}
+/* testata: il cerchio col gorilla resta su fondo nero */
+:root[data-theme="light"]:not(:has(#starterScr)) .blogo{background:#000;box-shadow:0 6px 18px rgba(111,79,224,.22)}
+:root[data-theme="light"]:not(:has(#starterScr)) .day{border:1px solid var(--sk-ctl);background:var(--sk-card)}
+:root[data-theme="light"]:not(:has(#starterScr)) .day.on{background:var(--sk-acSoft);border-color:var(--sk-acStrong);color:var(--sk-tx);box-shadow:none}   /* un solo tasto grande viola: Salva */
+:root[data-theme="light"]:not(:has(#starterScr)) .bar button.full{background:var(--sk-ac);opacity:1}
+:root[data-theme="light"]:not(:has(#starterScr)) .bar button.cur{background:var(--sk-acDark)}
+:root[data-theme="light"]:not(:has(#starterScr)) .li.cur{background:var(--sk-card);box-shadow:0 0 0 1px var(--sk-line)}
+:root[data-theme="light"]:not(:has(#starterScr)) .li.full .n{background:var(--sk-acStrong);color:#fff}
+/* carta dell'esercizio */
+:root[data-theme="light"]:not(:has(#starterScr)) .card{border-radius:var(--sk-r-card);border:1px solid var(--sk-line);box-shadow:none}
+:root[data-theme="light"]:not(:has(#starterScr)) .chips span{border-radius:10px}
+/* suggerimento di carico: viola e grande */
+:root[data-theme="light"]:not(:has(#starterScr)) .sugg{border-radius:16px;border:1px solid rgba(139,108,240,.45);padding:12px 14px;background:rgba(111,79,224,.07)}
+:root[data-theme="light"]:not(:has(#starterScr)) .sugg b{color:var(--sk-acStrong)}
+:root[data-theme="light"]:not(:has(#starterScr)) .sugg .sv{color:var(--sk-acStrong);font-size:40px;line-height:1.05}
+/* volta scorsa: carta grigia chiara */
+:root[data-theme="light"]:not(:has(#starterScr)) .last{border-radius:16px;border:1px solid var(--sk-line)}
+/* serie fatte: riga grigia chiara con cerchio viola e spunta */
+:root[data-theme="light"]:not(:has(#starterScr)) .done{background:var(--sk-card2);border:1px solid var(--sk-line);border-radius:var(--sk-r-box)}
+:root[data-theme="light"]:not(:has(#starterScr)) .done .ck{width:26px;height:26px;flex:none;border-radius:50%;background:var(--sk-acStrong);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:900}
+:root[data-theme="light"]:not(:has(#starterScr)) .done .sv small{color:var(--sk-mu);opacity:1}
+:root[data-theme="light"]:not(:has(#starterScr)) .done .pend{opacity:1;color:var(--sk-mu)}
+:root[data-theme="light"]:not(:has(#starterScr)) .done.editing{outline:2px solid var(--sk-acStrong);outline-offset:-1px}
+/* serie da fare: stessa riga, bianca, cerchio vuoto */
+:root[data-theme="light"]:not(:has(#starterScr)) .todo{background:var(--sk-card);border:1px solid var(--sk-line);border-radius:var(--sk-r-box);align-items:center}
+:root[data-theme="light"]:not(:has(#starterScr)) .todo span:first-child{display:flex;align-items:center;gap:10px}
+:root[data-theme="light"]:not(:has(#starterScr)) .todo span:first-child::before{content:"";width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--sk-ctl)}
+/* serie in corso: caselle bianche arrotondate, numeri grandi */
+:root[data-theme="light"]:not(:has(#starterScr)) .ed{border:1px solid var(--sk-line);border-radius:16px}
+:root[data-theme="light"]:not(:has(#starterScr)) .box{background:var(--sk-card);border:1px solid var(--sk-ctl);border-radius:var(--sk-r-box)}
+:root[data-theme="light"]:not(:has(#starterScr)) .box:focus-within{border-color:var(--sk-acStrong);box-shadow:0 0 0 3px var(--sk-acSoft)}
+:root[data-theme="light"]:not(:has(#starterScr)) .box .lbl{color:var(--sk-mu)}
+:root[data-theme="light"]:not(:has(#starterScr)) .box input{font-size:var(--sk-num);color:var(--sk-tx)}
+:root[data-theme="light"]:not(:has(#starterScr)) .pm button{border-radius:10px}
+:root[data-theme="light"]:not(:has(#starterScr)) .r5 button{height:46px;border-radius:var(--sk-r-box);font-size:19px}
+:root[data-theme="light"]:not(:has(#starterScr)) .r5 button.on{background:var(--sk-acStrong);color:#fff}
+/* il tasto grande viola (bianco sopra: 5.4:1) */
+:root[data-theme="light"]:not(:has(#starterScr)) .save{height:58px;border-radius:16px;background:var(--sk-acStrong);color:#fff}
+:root[data-theme="light"]:not(:has(#starterScr)) .save:active{background:var(--sk-acDark)}
+:root[data-theme="light"]:not(:has(#starterScr)) .edbtns button{border-radius:var(--sk-r-box)}
+:root[data-theme="light"]:not(:has(#starterScr)) .edbtns .del{color:var(--sk-bad);background:rgba(177,47,32,.10)}
+:root[data-theme="light"]:not(:has(#starterScr)) .navrow .back,
+:root[data-theme="light"]:not(:has(#starterScr)) .next,
+:root[data-theme="light"]:not(:has(#starterScr)) .finish{border:1px solid var(--sk-ctl);border-radius:var(--sk-r-card)}
+:root[data-theme="light"]:not(:has(#starterScr)) .endbtn,
+:root[data-theme="light"]:not(:has(#starterScr)) .extra{border-color:var(--sk-ctl)}
+/* timer di recupero: carta bianca con ombra, barra viola sottile */
+:root[data-theme="light"]:not(:has(#starterScr)) .timer{background:var(--sk-card);border-color:var(--sk-line)}
+:root[data-theme="light"]:not(:has(#starterScr)) .timer .pg{height:3px;background:var(--sk-ac)}
+:root[data-theme="light"]:not(:has(#starterScr)) .timer button{border-radius:var(--sk-r-box)}
+:root[data-theme="light"]:not(:has(#starterScr)) .timer.zero{background:#F1EDFD;border-color:var(--sk-acStrong)}
+/* menu */
+:root[data-theme="light"]:not(:has(#starterScr)) .sheetBg{background:rgba(22,20,29,.45)}
+/* errori: restano rossi */
+:root[data-theme="light"]:not(:has(#starterScr)) .toast.bad{background:var(--sk-bad)}
+:root[data-theme="light"]:not(:has(#starterScr)) .err,
+:root[data-theme="light"]:not(:has(#starterScr)) .sheet .errs{color:var(--sk-bad)}
+:root[data-theme="light"]:not(:has(#starterScr)) .sync.err i{background:var(--sk-bad)}
+
+/* =====================================================================
    BARRA IN BASSO (Program / Track / Progress) e pagine in sola lettura.
    Colori dai token di sopra: nel tema notte prendono la pelle (vedi sotto),
-   nel tema giorno restano quelli di sempre.
+   nel tema giorno la pelle chiara (vedi sotto).
    ===================================================================== */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(3,minmax(0,170px));justify-content:center;
   height:calc(62px + env(safe-area-inset-bottom));padding:0 8px env(safe-area-inset-bottom);background:var(--card);border-top:1px solid var(--line)}
@@ -362,3 +472,14 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 :root[data-theme="dark"]:has(#wrap) .pday.on{border-color:var(--sk-ac)}
 :root[data-theme="dark"]:has(#wrap) .pday.on .pdayH b{color:var(--sk-tx)}
 :root[data-theme="dark"]:has(#wrap) .pex .n{background:var(--sk-chip)}
+
+/* pelle giorno (bianco e viola) per la barra e le due pagine */
+:root[data-theme="light"]:not(:has(#starterScr)) .tabbar{background:rgba(255,255,255,.94);border-top-color:var(--sk-line);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 -4px 16px rgba(40,30,80,.06)}
+:root[data-theme="light"]:not(:has(#starterScr)) .tab{color:var(--sk-mu)}
+:root[data-theme="light"]:not(:has(#starterScr)) .tab.on{color:var(--sk-acStrong)}
+:root[data-theme="light"]:not(:has(#starterScr)) .tab.on::before{background:var(--sk-acStrong)}
+:root[data-theme="light"]:not(:has(#starterScr)) .pday,
+:root[data-theme="light"]:not(:has(#starterScr)) .hses{border:1px solid var(--sk-line);border-radius:var(--sk-r-card)}
+:root[data-theme="light"]:not(:has(#starterScr)) .pday.on{border-color:var(--sk-acStrong)}
+:root[data-theme="light"]:not(:has(#starterScr)) .pday.on .pdayH b{color:var(--sk-tx)}
+:root[data-theme="light"]:not(:has(#starterScr)) .pex .n{background:var(--sk-chip)}
