@@ -12,7 +12,10 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<style>html,body{margin:0;background:#121110}:root[data-theme="light"],:root[data-theme="light"] body{background:#f4ede1}</style>
+<style>html,body{margin:0;background:#121110}:where(:root[data-theme="light"]),:where(:root[data-theme="light"]) body{background:#F6F5FA}</style>
+<!-- prima del caricamento: tema scelto col tasto luna (o quello del telefono) e barra di stato dello stesso colore dello sfondo
+     (notte #121110 = --bg di styles.css; giorno #F6F5FA = --sk-bg). Poi main.js la tiene uguale allo sfondo vero, schermata per schermata. -->
+<script>try{var t=localStorage.getItem('gym.theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.dataset.theme=t;document.querySelector('meta[name=theme-color]').content=t==='light'?'#F6F5FA':'#121110'}catch(e){}</script>
 </head>
 <body>
 <script type="module" src="./src/main.js"></script>

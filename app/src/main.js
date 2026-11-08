@@ -69,7 +69,15 @@ const ICON_MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   const b = $('themeBtn'); if (b) b.innerHTML = t === 'light' ? ICON_MOON : ICON_SUN;
-  const meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.content = t === 'light' ? '#f4ede1' : '#121110';
+  syncBar();
+}
+/* Barra di stato del telefono (theme-color) = sfondo vero della pagina, letto dal CSS: segue il tasto luna
+   e la schermata (accesso, app, CHOOSE YOUR STARTER hanno sfondi diversi). Si riallinea quando cambia la schermata. */
+function syncBar() {
+  const meta = document.querySelector('meta[name=theme-color]'); if (!meta || !document.body) return;
+  const c = (getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g) || []).map(Number);
+  if (c.length >= 3 && (c[3] == null || c[3] > 0)) meta.content = '#' + c.slice(0, 3).map((v) => v.toString(16).padStart(2, '0')).join('');
+  if (!syncBar.obs) { syncBar.obs = new MutationObserver(syncBar); syncBar.obs.observe(document.body, { childList: true }); }
 }
 const theme = () => ls.get('theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 applyTheme(theme());
