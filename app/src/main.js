@@ -28,6 +28,7 @@ import {
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList } from './pages.js';
 import { versionText } from './version.js';
+import { tableRows, exNav, dayOptions, clock, rirLabel } from './allenamento.js';
 
 // Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
@@ -66,11 +67,23 @@ document.documentElement.lang = S.lang;
 /* ---------- giorno / notte ---------- */
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+const themeIcon = () => (document.documentElement.dataset.theme === 'light' ? ICON_MOON : ICON_SUN);
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
-  const b = $('themeBtn'); if (b) b.innerHTML = t === 'light' ? ICON_MOON : ICON_SUN;
   syncBar();
+  for (const id of ['themeBtn', 'mTheme']) { const b = $(id); if (b) b.innerHTML = themeIcon(); }
 }
+/** Tasto luna (in alto su Programma e Progressi, nel menu "..." in Allenamento). */
+function toggleTheme() { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; ls.set('theme', t); applyTheme(t); buzz(8); }
+// Icone della schermata Allenamento (solo disegno, a tratto, colore del testo)
+const SVG = (p, w = 2) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+const ICON_DOWN = SVG('<path d="M6 9l6 6 6-6"/>', 2.4);
+const ICON_MORE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+const ICON_PREV = SVG('<path d="M15 6l-6 6 6 6"/>', 2.4), ICON_NEXT = SVG('<path d="M9 6l6 6-6 6"/>', 2.4);
+const ICON_WATCH = SVG('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M12 2.5V6"/>');
+const ICON_RESET = SVG('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>');
+const ICON_CHECK = SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 3);
+const ICON_NOTE = SVG('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>');
 /* Barra di stato del telefono (theme-color) = sfondo vero della pagina, letto dal CSS: segue il tasto luna
    e la schermata (accesso, app, CHOOSE YOUR STARTER hanno sfondi diversi). Si riallinea quando cambia la schermata. */
 function syncBar() {
@@ -198,12 +211,15 @@ function updateSyncInfo() {
 
 function setSync() {
   updateSyncInfo();
-  const el = $('sync'); if (!el) return;
   const T = S.T, p = S.sync.pending;
   const txt = S.sync.state === 'ok' ? T.syncOk : S.sync.state === 'syncing' ? T.syncing : S.sync.state === 'err' ? T.syncErr(S.sync.failed)
     : S.sync.state === 'offline' ? T.syncOffline(p) : T.syncPending(p);
-  el.className = 'sync ' + S.sync.state;
-  el.innerHTML = '<i></i>' + esc(txt);
+  // stesso stato in due posti: testata di Programma/Progressi (#sync) e testata di Allenamento (#tsync)
+  for (const [id, cls] of [['sync', 'sync '], ['tsync', 'sync tsync ']]) {
+    const el = $(id); if (!el) continue;
+    el.className = cls + S.sync.state;
+    el.innerHTML = '<i></i>' + esc(txt);
+  }
 }
 
 /** Ridisegna senza chiudere la tastiera mentre l'utente scrive. */
@@ -288,27 +304,38 @@ function renderStarter() {
 }
 
 /* ---------- struttura della pagina ---------- */
+// Due testate: quella di sempre (logo, titolo, data, luna, kg/lb) per Programma, Progressi e caricamento;
+// quella di Allenamento (#thdr: workout a tendina, stato di sincronizzazione, menu "..."), accesa da render() con la classe "trk".
+// In basso, sopra la barra delle pagine: timer di recupero + tasto per azzerarlo + tasto grande per salvare la serie (#timer).
 function shell() {
-  if ($('wrap') && $('days')) return;
+  if ($('wrap') && $('thdr')) return;
   document.body.innerHTML = `
-<header class="top"><div class="hdr"><div class="brand">
+<header class="top" id="top"><div class="hdr"><div class="brand">
   <img class="blogo" id="logo" src="${logoHead}" alt="Gym">
   <div class="btitle" id="btitle">${S.T.workout}</div><div class="sync" id="sync"></div></div>
   <div class="ctrls"><span class="pill static" id="dateTxt"></span>
   <button class="theme" id="themeBtn" aria-label="${S.T.dayNight}"></button>
   <div class="seg" id="unitSeg"><button data-u="kg">kg</button><button data-u="lb">lb</button></div></div></div>
-  <div class="days" id="days"></div><div id="progBox"></div></header>
+  <div class="thdr" id="thdr"><div class="trow"><span></span>
+    <button class="dayBtn" id="dayBtn" aria-haspopup="dialog" aria-label="${esc(S.T.chooseDay)}"><b id="dayName"></b>${ICON_DOWN}</button>
+    <button class="more" id="moreBtn" aria-haspopup="dialog" aria-label="${esc(S.T.more)}">${ICON_MORE}</button></div>
+    <div class="sync tsync" id="tsync"></div></div></header>
 <main class="wrap" id="wrap"></main>
-<div class="timer hide" id="timer"><div class="pg" id="tPg"></div><div class="tt"><span id="tLab"></span><b id="tTxt">0:00</b></div><button id="tMinus">−15</button><button id="tPlus">+15</button><button id="tStop">✕</button></div>
+<div class="timer idle" id="timer"><div class="tclock"><span class="tic">${ICON_WATCH}</span><div class="tt"><span id="tLab"></span><b id="tTxt">0:00</b>
+  <div class="tbar"><div class="pg" id="tPg"></div></div></div><button id="tMinus">−15</button><button id="tPlus">+15</button></div>
+  <button class="treset" id="tStop" aria-label="${esc(S.T.resetTimer)}" title="${esc(S.T.resetTimer)}">${ICON_RESET}</button>
+  <button class="go" id="save" aria-label="${esc(S.T.save)}" title="${esc(S.T.save)}">${ICON_CHECK}</button></div>
 <nav class="tabbar" id="tabs" aria-label="${S.T.pages}"></nav>
 <div class="toast" id="toast"></div><div id="sheetHost"></div>`;
   applyTheme(theme());
-  $('themeBtn').onclick = () => { const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; ls.set('theme', t); applyTheme(t); buzz(8); };
+  $('themeBtn').onclick = toggleTheme;
   $('tMinus').onclick = () => { T_.end -= 15000; saveTimer(); tick(); };
   $('tPlus').onclick = () => { T_.end += 15000; T_.tot += 15; saveTimer(); tick(); };
   $('tStop').onclick = stopTimer;
   $('logo').onclick = openMenu;
   $('sync').onclick = openMenu;
+  $('tsync').onclick = openMenu;
+  idleTimer();
   resumeTimer();
 }
 
@@ -346,37 +373,109 @@ function render() {
   $('dateTxt').textContent = T.today.toUpperCase() + ' · ' + niceDate(S.date);
   [...$('unitSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.u === S.unit));
   renderTabs();
-  if (S.page !== 'track') { $('days').innerHTML = ''; $('progBox').innerHTML = ''; S.page === 'program' ? renderProgram() : renderProgress(); return; }
+  const top = $('top');
+  if (S.page !== 'track') { top.classList.remove('trk'); dock(null); S.page === 'program' ? renderProgram() : renderProgress(); return; }
   const p = plan();
-  if (!p || !p.days.length) { $('days').innerHTML = ''; $('progBox').innerHTML = ''; $('wrap').innerHTML = '<div class="load err" style="grid-column:1/-1">' + T.noPlan + '</div>'; return; }
+  if (!p || !p.days.length) { top.classList.remove('trk'); dock(null); $('wrap').innerHTML = '<div class="load err" style="grid-column:1/-1">' + T.noPlan + '</div>'; return; }
 
   let v = view();
   if (!S.dayId || !p.days.some((d) => d.id === S.dayId)) {
     const d = defaultDay(p, v.idx, S.date, new Date()); S.dayId = d.id; v = view(); S.idx = firstOpenIdx(v); S.idxSet = true;
   }
   if (!S.idxSet) { S.idx = firstOpenIdx(v); S.idxSet = true; }   // all'apertura: primo esercizio non finito
-  $('days').innerHTML = p.days.map((d) => {
-    const vv = { idx: v.idx, sessions: openSessions(v.idx, { date: S.date, day: d, now: new Date() }) };
-    const act = d.exercises.filter(active), tot = act.reduce((a, e) => a + e.sets, 0);
-    const dn = act.reduce((a, e) => a + Math.min(doneOf(vv, e).length, e.sets), 0);
-    return '<button class="day' + (d.id === v.day.id ? ' on' : '') + '" data-day="' + esc(d.id) + '">' + esc(d.name) + (dn ? '<small>' + dn + '/' + tot + '</small>' : '') + '</button>';
-  }).join('');
+  // testata di Allenamento: nome del workout (tocco → elenco dei giorni del piano), stato di sincronizzazione, "..."
+  top.classList.add('trk');
+  $('dayName').textContent = v.day.name;
 
   const exs = v.day.exercises;
-  if (!exs.length) { $('progBox').innerHTML = ''; $('wrap').innerHTML = ''; return; }
+  if (!exs.length) { $('wrap').innerHTML = ''; dock(null); return; }
   if (S.idx >= exs.length) S.idx = 0;
   const pe = exs[S.idx];
-  const prog = (x) => { const n = doneOf(v, x).length; return active(x) ? Math.min(n / x.sets, 1) : 0; };
-  $('progBox').innerHTML = '<div class="prog">' + T.exOf(S.idx + 1, exs.length) + '</div><div class="bar">' +
-    exs.map((x, i) => '<button data-idx="' + i + '" class="' + (i === S.idx ? 'cur' : prog(x) >= 1 ? 'full' : '') + '" aria-label="' + esc(exName(x)) + '"></button>').join('') + '</div>';
-  const list = '<aside class="list">' + exs.map((x, i) => {
-    const n = doneOf(v, x).length, pr = prog(x);
-    const cls = 'li' + (i === S.idx ? ' cur' : '') + (pr >= 1 ? ' full' : '') + (!active(x) && !n ? ' off' : '');
-    const sub = !active(x) ? T.listOff : n + '/' + x.sets + ' ' + T.sets + ' · ' + range(x);
-    return '<button class="' + cls + '" data-idx="' + i + '"><span class="n">' + (pr >= 1 ? '✓' : i + 1) + '</span><span class="t"><b>' +
-      esc(exName(x)) + '</b><span>' + esc(sub) + '</span></span></button>';
-  }).join('') + '</aside>';
-  $('wrap').innerHTML = list + '<section>' + closedBar(v) + card(v, pe) + navRow(v, exs) + endRow(v) + '</section>';
+  // su schermi larghi (tablet) resta l'elenco degli esercizi a sinistra, come prima
+  const list = '<aside class="list">' + exs.map((x, i) => exItem(v, x, i, 'data-idx')).join('') + '</aside>';
+  const ex = exView(v, exs, pe);
+  $('wrap').innerHTML = list + '<section class="exv" id="exv">' + ex.html + '</section>';
+  dock(pe, ex.canSave, ex.isUpdate);
+}
+
+const exProg = (v, x) => { const n = doneOf(v, x).length; return active(x) ? Math.min(n / x.sets, 1) : 0; };
+/** Una riga dell'elenco degli esercizi (a sinistra sul tablet, nella tendina "Esercizio N di M" sul telefono). */
+function exItem(v, x, i, attr) {
+  const T = S.T, n = doneOf(v, x).length, pr = exProg(v, x);
+  const cls = 'li' + (i === S.idx ? ' cur' : '') + (pr >= 1 ? ' full' : '') + (!active(x) && !n ? ' off' : '');
+  const sub = !active(x) ? T.listOff : n + '/' + x.sets + ' ' + T.sets + ' · ' + range(x);
+  return '<button class="' + cls + '" ' + attr + '="' + i + '"' + (i === S.idx ? ' aria-current="true"' : '') + '><span class="n">' + (pr >= 1 ? '✓' : i + 1) + '</span><span class="t">' +
+    (x.superset_label ? '<span class="ss">SUPERSET ' + esc(x.superset_label) + '</span>' : '') + '<b>' + esc(exName(x)) + '</b><span>' + esc(sub) + '</span></span></button>';
+}
+
+/**
+ * L'esercizio scelto, dall'alto in basso: "Esercizio N di M" (tocco → elenco) con ‹ ›, nome, macchina, Note,
+ * suggerimento di carico, tabella Set / Kg / Rep / RIR, Volta scorsa, poi "Prossimo".
+ */
+function exView(v, exs, pe) {
+  const T = S.T, done = doneOf(v, pe), { last, sugg } = infoFor(v, pe), m = pe.machine, nav = exNav(S.idx, exs.length);
+  let h = closedBar(v);
+  h += '<div class="exTop"><button class="exOf" id="exList" aria-haspopup="dialog">' + esc(T.exOf(S.idx + 1, exs.length)) + ICON_DOWN + '</button>' +
+    '<span class="arrs"><button class="arr" data-go="-1" aria-label="' + esc(T.back) + '"' + (nav.prev ? '' : ' disabled') + '>' + ICON_PREV + '</button>' +
+    '<button class="arr" data-go="1" aria-label="' + esc(T.next) + '"' + (nav.next ? '' : ' disabled') + '>' + ICON_NEXT + '</button></span></div>';
+  h += '<div class="bar">' + exs.map((x, i) => '<button data-idx="' + i + '" class="' + (i === S.idx ? 'cur' : exProg(v, x) >= 1 ? 'full' : '') + '" aria-label="' + esc(exName(x)) + '"></button>').join('') + '</div>';
+  if (pe.superset_label) h += '<div class="ss">SUPERSET ' + esc(pe.superset_label) + '</div>';
+  h += '<h1 class="ex">' + esc(exName(pe)) + '</h1>';
+  if (m) {
+    const wl = Array.isArray(m.weight_list) ? m.weight_list : [];
+    const stepTxt = wl.length ? (wl.length > 5 ? fmtN(wl[0]) + '…' + fmtN(wl[wl.length - 1]) + ' ' + m.weight_unit + ' (' + T.weights(wl.length) + ')' : wl.map(fmtN).join(' / ') + ' ' + m.weight_unit)
+      : m.weight_step ? T.step + ' ' + fmtN(m.weight_step) + ' ' + m.weight_unit : '';
+    h += '<div class="mac">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
+      (pe.alt_machine ? ' <span>· ' + T.alt + ': ' + esc(machineLabel(pe.alt_machine) || pe.alt_machine.code) + '</span>' : '') + '</div>';
+  }
+  // Note: solo se l'esercizio del piano ha una nota (oggi l'unica nota che l'app conosce), nella stessa riga dei dati del piano.
+  // Un tasto per lo storico del singolo esercizio non c'è: l'app non ha quella funzione.
+  const noteBtn = pe.notes ? '<button class="mini' + (S.openNotes ? ' on' : '') + '" id="notesBtn" aria-expanded="' + S.openNotes + '">' + ICON_NOTE + esc(T.notesBtn) + '</button>' : '';
+  h += '<div class="chips"><span>' + pe.sets + ' × ' + esc(range(pe)) + ' ' + T.rep + '</span>' +
+    (rirTxt(pe) ? '<span>RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span>' + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + noteBtn + '</div>';
+  if (pe.notes && S.openNotes) h += '<p class="notes open" id="notes">' + esc(pe.notes) + '</p>';
+
+  const nextN = done.reduce((mx, s) => Math.max(mx, s.set_number), 0) + 1;
+  const sg = sugg && sugg.sets[Math.min(nextN, sugg.sets.length) - 1];
+  if (sg && done.length < Math.max(pe.sets, 1)) {
+    h += '<div class="sugg" id="sugg"><b>' + T.suggested + ' · ' + T.set + ' ' + nextN + '</b><div class="sv">' + fmtN(sg.weight) + ' ' + S.unit + ' × ' + sg.reps +
+      '</div><div class="why">' + esc(T.why[sg.why]) + '</div></div>';
+  }
+  if (!active(pe) && !done.length) h += '<div class="offnote">' + T.notPlan + '</div>';
+
+  const editing = !!(S.edit && S.edit.pe === pe.id);
+  const key = S.dayId + '|' + pe.id, allDone = done.length >= pe.sets;
+  const showDraft = !editing && (!allDone || S.extraOpen === key);
+  const rows = tableRows({ done, plannedSets: pe.sets, draft: showDraft ? draftFor(v, pe, done, sugg) : null, editId: editing ? S.edit.id : null, showDraft, sugg });
+  if (rows.length) {
+    h += '<div class="sets" id="sets"><div class="sh" aria-hidden="true"><span></span><span>' + esc(T.set) + '</span><span>' + (S.unit === 'lb' ? 'Lb' : 'Kg') + '</span><span>' +
+      esc(T.rep.charAt(0).toUpperCase() + T.rep.slice(1)) + '</span><span>RIR</span></div>';
+    for (const r of rows) {
+      if (r.kind === 'done') {
+        const s = r.set, row = S.local.rows.get(s.id);
+        h += '<button class="srow sdone" data-edit="' + esc(s.id) + '" aria-label="' + esc(T.set + ' ' + s.set_number + ': ' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + (s.rir != null ? ', RIR ' + fmtN(s.rir) : '')) + '">' +
+          '<span class="ck">✓</span><span class="sn">' + s.set_number + (row && row.dirty ? '<span class="pend" title="' + esc(T.syncPending(1)) + '">⟳</span>' : '') + '</span>' +
+          '<span class="cell">' + fmtN(setWeightIn(s, S.unit)) + '</span><span class="cell">' + s.reps + '</span><span class="cell">' + (s.rir != null ? fmtN(s.rir) : '—') + '</span></button>';
+      } else if (r.kind === 'todo') {
+        h += '<div class="srow splan"><span class="ck"></span><span class="sn">' + r.n + '</span><span class="cell">' + (r.weight != null ? fmtN(r.weight) : '—') + '</span>' +
+          '<span class="cell">' + (r.reps != null ? r.reps : '—') + '</span><span class="cell">—</span></div>';
+      } else h += editor(pe, r.edit ? S.edit : r.draft, r.edit);
+    }
+    h += '</div>';
+  }
+  if (!editing && allDone && S.extraOpen !== key) h += '<button class="extra" id="extra">' + T.extra + '</button>';
+
+  if (last) {
+    h += '<div class="last small" id="last"><b>' + T.last + ' · ' + esc(shortDate(last.date)) + '</b><div class="lv">' +
+      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' × ' + s.reps + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
+  } else if (active(pe)) h += '<div class="last small"><b>' + T.noLast + '</b></div>';
+
+  // esercizio finito: subito il prossimo (o "Allenamento completato" sull'ultimo)
+  if (!editing && allDone && S.extraOpen !== key) {
+    if (nav.next) h += '<div class="navrow"><button class="next" data-go="1"><span><span>' + T.next + '</span><b>' + esc(exName(exs[S.idx + 1])) + '</b></span><i>→</i></button></div>';
+    else if (exs.every((x) => !active(x) || doneOf(v, x).length >= x.sets)) h += '<div class="navrow"><div class="finish">' + T.finished + '</div></div>';
+  }
+  return { html: h, canSave: editing || showDraft, isUpdate: editing };
 }
 
 /** Dopo "Fine seduta": riga con l'ora di chiusura e "Riapri" (finché non inizia una seduta nuova di questo giorno). */
@@ -388,9 +487,9 @@ function closedBar(v) {
   return '<div class="closed" id="closedBar"><span>' + esc(S.T.closedAt(t)) + '</span><button id="reopen" data-sid="' + esc(c.id) + '">' + S.T.reopen + '</button></div>';
 }
 
-/** "Fine seduta": solo se c'è una seduta in corso (cioè almeno una serie salvata), in fondo e separato. */
+/** "Fine seduta": solo se c'è una seduta in corso (cioè almeno una serie salvata), in fondo al menu "..." e separato. */
 function endRow(v) {
-  if (!v.sessions.length) return '';
+  if (!v || !v.sessions.length) return '';
   return '<div class="endrow"><button class="endbtn" id="endSession">' + S.T.endSession + '</button></div>';
 }
 
@@ -462,68 +561,9 @@ const exName = (pe) => tr(pe.exercise && pe.exercise.name, S.lang) || '—';
 const range = (pe) => (pe.reps_min ?? '') + (pe.reps_max && pe.reps_max !== pe.reps_min ? '–' + pe.reps_max : '');
 const rirTxt = (pe) => pe.rir_min == null ? '' : fmtN(pe.rir_min) + (pe.rir_max != null && pe.rir_max !== pe.rir_min ? '–' + fmtN(pe.rir_max) : '');
 
-function navRow(v, exs) {
-  let h = '<div class="navrow">';
-  if (S.idx > 0) h += '<button class="back" data-go="-1" aria-label="' + S.T.back + '">‹</button>';
-  if (S.idx < exs.length - 1) h += '<button class="next" data-go="1"><span><span>' + S.T.next + '</span><b>' + esc(exName(exs[S.idx + 1])) + '</b></span><i>→</i></button>';
-  else {
-    const allDone = exs.every((x) => !active(x) || doneOf(v, x).length >= x.sets);
-    h += '<div class="finish">' + (allDone ? S.T.finished : '') + '</div>';
-  }
-  return h + '</div>';
-}
-
 function infoFor(v, pe) {
   const last = lastPerformance(v.idx, pe, { excludeSessionId: v.sessions.map((s) => s.id), onOrBefore: S.date });
   return { last, sugg: suggest(pe, last, S.unit) };
-}
-
-function card(v, pe) {
-  const T = S.T, done = doneOf(v, pe), { last, sugg } = infoFor(v, pe);
-  const m = pe.machine;
-  let h = '<div class="card">' + (pe.superset_label ? '<div class="ss">SUPERSET ' + esc(pe.superset_label) + '</div>' : '') +
-    '<h1 class="ex">' + esc(exName(pe)) + '</h1><div class="sub"></div>';
-  if (m) {
-    const wl = Array.isArray(m.weight_list) ? m.weight_list : [];
-    const stepTxt = wl.length ? (wl.length > 5 ? fmtN(wl[0]) + '…' + fmtN(wl[wl.length - 1]) + ' ' + m.weight_unit + ' (' + T.weights(wl.length) + ')' : wl.map(fmtN).join(' / ') + ' ' + m.weight_unit)
-      : m.weight_step ? T.step + ' ' + fmtN(m.weight_step) + ' ' + m.weight_unit : '';
-    h += '<div class="mac">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
-      (pe.alt_machine ? ' <span>· ' + T.alt + ': ' + esc(machineLabel(pe.alt_machine) || pe.alt_machine.code) + '</span>' : '') + '</div>';
-  }
-  h += '<div class="chips"><span>' + pe.sets + ' × ' + esc(range(pe)) + ' ' + T.rep + '</span>' +
-    (rirTxt(pe) ? '<span>RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span>' + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + '</div>';
-  if (pe.notes) h += '<p class="notes' + (S.openNotes ? ' open' : '') + '" id="notes">' + esc(pe.notes) + '</p>';
-
-  const nextN = done.reduce((mx, s) => Math.max(mx, s.set_number), 0) + 1;
-  const sg = sugg && sugg.sets[Math.min(nextN, sugg.sets.length) - 1];
-  if (sg && done.length < Math.max(pe.sets, 1)) {
-    h += '<div class="sugg" id="sugg"><b>' + T.suggested + ' · ' + T.set + ' ' + nextN + '</b><div class="sv">' + fmtN(sg.weight) + ' ' + S.unit + ' × ' + sg.reps +
-      '</div><div class="why">' + esc(T.why[sg.why]) + '</div></div>';
-  }
-  if (last) {
-    h += '<div class="last small" id="last"><b>' + T.last + ' · ' + esc(shortDate(last.date)) + '</b><div class="lv">' +
-      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' × ' + s.reps + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
-  } else if (active(pe)) h += '<div class="last small"><b>' + T.noLast + '</b></div>';
-
-  if (!active(pe) && !done.length) h += '<div class="offnote">' + T.notPlan + '</div>';
-  const editing = S.edit && S.edit.pe === pe.id;
-  done.forEach((s) => {
-    const isEd = editing && S.edit.id === s.id;
-    const row = S.local.rows.get(s.id);
-    h += '<button class="done' + (isEd ? ' editing' : '') + '" data-edit="' + esc(s.id) + '"><span class="ck">✓</span><span class="sn">' + T.set + ' ' + s.set_number +
-      (row && row.dirty ? '<span class="pend" title="' + esc(T.syncPending(1)) + '">⟳</span>' : '') +
-      '</span><span class="sv">' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + (s.rir != null ? '<small>RIR ' + fmtN(s.rir) + '</small>' : '') + '</span></button>';
-    if (isEd) h += editor(pe, S.edit, true);
-  });
-  const allDone = done.length >= pe.sets;
-  const key = S.dayId + '|' + pe.id;
-  if (!editing && (!allDone || S.extraOpen === key)) {
-    const d = draftFor(v, pe, done, sugg);
-    h += editor(pe, d, false);
-    for (let n = d.n + 1; n <= pe.sets; n++) h += '<div class="todo"><span>' + T.set + ' ' + n + '</span><span>—</span></div>';
-  }
-  if (!editing && allDone && S.extraOpen !== key) h += '<button class="extra" id="extra">' + T.extra + '</button>';
-  return h + '</div>';
 }
 
 function draftFor(v, pe, done, sugg) {
@@ -541,18 +581,36 @@ function draftFor(v, pe, done, sugg) {
   return d;
 }
 
+/**
+ * Serie da salvare adesso (o in modifica): una riga della tabella con le caselle Kg e Rep,
+ * sotto i tasti − / + (grandi, a tutta larghezza) e la scelta del RIR. Salva il tasto viola in basso.
+ */
 function editor(pe, d, isEdit) {
-  const T = S.T;
-  return '<div class="ed"><div class="edh"><b>' + T.set + ' ' + d.n + (d.n > pe.sets ? ' (extra)' : '') + '</b><span>' + T.target + ' ' + esc(range(pe)) + ' ' + T.rep + '</span></div>' +
-    '<div class="boxes">' +
-    '<div class="box"><div class="lbl">' + S.unit.toUpperCase() + '</div><input id="inKg" inputmode="decimal" autocomplete="off" value="' + esc(fmtN(d.weight)) + '" placeholder="0">' +
-    '<div class="pm"><button data-st="weight" data-d="-1" aria-label="−">−</button><button data-st="weight" data-d="1" aria-label="+">+</button></div></div>' +
-    '<div class="box"><div class="lbl">' + T.rep.toUpperCase() + '</div><input id="inReps" inputmode="numeric" autocomplete="off" value="' + esc(d.reps) + '" placeholder="0">' +
-    '<div class="pm"><button data-st="reps" data-d="-1" aria-label="−">−</button><button data-st="reps" data-d="1" aria-label="+">+</button></div></div>' +
-    '</div><div class="rirrow"><span>RIR</span><div class="r5">' + [0, 1, 2, 3, 4].map((n) => '<button data-rir="' + n + '" class="' + (d.rir === n ? 'on' : '') + '">' + (n === 4 ? '4+' : n) + '</button>').join('') + '</div></div>' +
-    (isEdit
-      ? '<button class="save" id="update"' + (S.busy ? ' disabled' : '') + '>' + T.update + '</button><div class="edbtns"><button class="del" id="delSet">' + T.del + '</button><button id="cancelEd">' + T.cancel + '</button></div>'
-      : '<button class="save" id="save"' + (S.busy ? ' disabled' : '') + '>' + T.save + '</button>') + '</div>';
+  const T = S.T, U = S.unit.toUpperCase(), R = T.rep.toUpperCase();
+  return '<div class="srow scur' + (isEdit ? ' editing' : '') + '" id="curRow"><span class="ck"></span><span class="sn">' + d.n + (d.n > pe.sets ? '<small>extra</small>' : '') + '</span>' +
+    '<label class="cell in"><input id="inKg" inputmode="decimal" autocomplete="off" aria-label="' + U + '" value="' + esc(fmtN(d.weight)) + '" placeholder="0"></label>' +
+    '<label class="cell in"><input id="inReps" inputmode="numeric" autocomplete="off" aria-label="' + R + '" value="' + esc(d.reps) + '" placeholder="0"></label>' +
+    '<span class="cell rv" id="rirVal">' + rirLabel(d.rir) + '</span></div>' +
+    '<div class="steps"><div class="stp"><button data-st="weight" data-d="-1" aria-label="− ' + U + '">−</button><span>' + U + '</span><button data-st="weight" data-d="1" aria-label="+ ' + U + '">+</button></div>' +
+    '<div class="stp"><button data-st="reps" data-d="-1" aria-label="− ' + R + '">−</button><span>' + R + '</span><button data-st="reps" data-d="1" aria-label="+ ' + R + '">+</button></div></div>' +
+    '<div class="rirrow"><span>RIR</span><div class="r5">' + [0, 1, 2, 3, 4].map((n) => '<button data-rir="' + n + '" class="' + (d.rir === n ? 'on' : '') + '">' + (n === 4 ? '4+' : n) + '</button>').join('') + '</div></div>' +
+    (isEdit ? '<div class="edbtns"><button class="del" id="delSet">' + T.del + '</button><button id="cancelEd">' + T.cancel + '</button></div>' : '');
+}
+
+/* ---------- barra in basso: timer + azzera + salva (sopra la barra delle pagine) ---------- */
+/**
+ * Prepara la barra per l'esercizio mostrato. pe = null: non si è su Allenamento (si vede solo il timer, se va).
+ * Il tasto grande è "Salva serie" (#save) oppure "Aggiorna serie" (#update) mentre si modifica una serie fatta.
+ */
+function dock(pe, canSave = false, isUpdate = false) {
+  const t = $('timer'); if (!t) return;
+  t.classList.toggle('onTrack', !!pe);
+  const b = t.querySelector('.go'), txt = isUpdate ? S.T.update : S.T.save;
+  b.id = isUpdate ? 'update' : 'save';
+  b.setAttribute('aria-label', txt); b.title = txt;
+  b.disabled = !pe || !canSave || S.busy;
+  S.rest = pe ? restFor(pe) : 0;
+  if (!T_.end) idleTimer();
 }
 
 function curPe() { const d = dayObj(); return d ? d.exercises[S.idx] : null; }
@@ -691,12 +749,81 @@ function openMenu() {
   };
 }
 
+/* ---------- Allenamento: menu "...", tendina dei workout, elenco degli esercizi ---------- */
+const closeSheet = () => { $('sheetHost').innerHTML = ''; };
+function sheetBox(cls, inner) {
+  $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet ' + cls + '" role="dialog">' + inner + '</div></div>';
+  $('sbg').onclick = (ev) => { if (ev.target.id === 'sbg') closeSheet(); };
+}
+
+/** Menu "...": data, luna (giorno/notte), kg/lb, Account (versione, sincronizzazione, lingua, Esci), Fine seduta. */
+function openMore() {
+  const T = S.T, v = plan() && dayObj() ? view() : null;
+  const unitBtns = () => ['kg', 'lb'].map((u) => '<button data-mu="' + u + '" class="' + (u === S.unit ? 'on' : '') + '">' + u + '</button>').join('');
+  sheetBox('msheet', '<h2>' + esc(T.more) + '</h2>' +
+    '<div class="mrow"><span class="pill static" id="mDate">' + esc(T.today.toUpperCase() + ' · ' + niceDate(S.date)) + '</span>' +
+    '<span class="mctl"><button class="theme" id="mTheme" aria-label="' + esc(T.dayNight) + '">' + themeIcon() + '</button>' +
+    '<span class="seg" id="mUnit" role="group" aria-label="' + esc(T.unit) + '">' + unitBtns() + '</span></span></div>' +
+    '<div class="stack"><button id="mAccount">' + esc(T.account) + '</button><button id="moreClose">' + esc(T.close) + '</button></div>' + endRow(v));
+  $('mTheme').onclick = toggleTheme;
+  $('mUnit').onclick = (ev) => { const u = ev.target.dataset.mu; if (!u) return; setUnit(u); $('mUnit').innerHTML = unitBtns(); };
+  $('mAccount').onclick = openMenu;
+  $('moreClose').onclick = closeSheet;
+  if ($('endSession')) $('endSession').onclick = () => { closeSheet(); endSession(); };
+}
+
+/** Tendina "Upper A ▾": i giorni del piano; toccandone uno si apre quel giorno (come le schede di prima). */
+function openDays() {
+  const p = plan(); if (!p || !p.days.length) return;
+  const T = S.T, idx = indexRows(S.local.list());
+  const opts = dayOptions(p.days, dayObj().id, (d) => {
+    const vv = { idx, sessions: openSessions(idx, { date: S.date, day: d, now: new Date() }) };
+    const act = d.exercises.filter(active);
+    return { total: act.reduce((a, e) => a + e.sets, 0), done: act.reduce((a, e) => a + Math.min(doneOf(vv, e).length, e.sets), 0) };
+  });
+  sheetBox('pick', '<h2>' + esc(T.chooseDay) + '</h2><div class="plist">' + opts.map((o) =>
+    '<button class="popt' + (o.on ? ' on' : '') + '" data-pday="' + esc(o.id) + '"' + (o.on ? ' aria-current="true"' : '') + '><span class="t"><b>' + esc(o.name) + '</b><small>' +
+    esc(T.exCount(o.count)) + '</small></span>' + (o.done ? '<em>' + o.done + '/' + o.total + '</em>' : '') + '<i>' + (o.on ? '✓' : '') + '</i></button>').join('') +
+    '</div><div class="stack"><button id="pClose">' + esc(T.close) + '</button></div>');
+  $('pClose').onclick = closeSheet;
+  document.querySelectorAll('[data-pday]').forEach((b) => { b.onclick = () => { closeSheet(); chooseDay(b.dataset.pday); }; });
+}
+
+/** Tendina "Esercizio N di M ▾": tutti gli esercizi del giorno, in qualsiasi ordine. */
+function openExList() {
+  const d = dayObj(); if (!d) return;
+  const v = view();
+  sheetBox('pick', '<h2>' + esc(S.T.exercises) + '</h2><div class="plist exl">' + d.exercises.map((x, i) => exItem(v, x, i, 'data-pidx')).join('') +
+    '</div><div class="stack"><button id="pClose">' + esc(S.T.close) + '</button></div>');
+  $('pClose').onclick = closeSheet;
+  document.querySelectorAll('[data-pidx]').forEach((b) => { b.onclick = () => { closeSheet(); goTo(Number(b.dataset.pidx)); scrollTo(0, 0); }; });
+}
+
+/** Giorno scelto (tendina in Allenamento o tocco in Programma): vale solo per oggi, si apre sul primo esercizio non finito. */
+function chooseDay(id) {
+  if (setPage('track')) scrollTo(0, 0);
+  S.dayId = id; ls.set('day', S.date + '|' + S.dayId); S.idx = firstOpenIdx(view()); S.extraOpen = null; S.edit = null; render();
+}
+
+/** kg / lb (testata di Programma e Progressi, menu "..." in Allenamento). Come prima: i numeri scritti restano nella bozza. */
+function setUnit(u) {
+  if (curPe()) readInputs();
+  if (u !== S.unit) { S.unit = u; ls.set('unit', S.unit); S.drafts = {}; S.edit = null; render(); }
+}
+
 /* ---------- timer di recupero (sopravvive alla chiusura dell'app) ---------- */
 const T_ = { end: 0, tot: 0, iv: null, buzzed: false };
 function saveTimer() { ls.set('timer', T_.end ? JSON.stringify({ end: T_.end, tot: T_.tot }) : null); }
 function startTimer(sec) { T_.tot = sec; T_.end = Date.now() + sec * 1000; T_.buzzed = false; saveTimer(); showTimer(); }
-function showTimer() { $('timer').classList.remove('hide'); tick(); clearInterval(T_.iv); T_.iv = setInterval(tick, 250); }
-function stopTimer() { clearInterval(T_.iv); T_.end = 0; saveTimer(); const t = $('timer'); if (t) t.classList.add('hide'); }
+function showTimer() { $('timer').classList.remove('idle'); $('tStop').disabled = false; tick(); clearInterval(T_.iv); T_.iv = setInterval(tick, 250); }
+function stopTimer() { clearInterval(T_.iv); T_.end = 0; saveTimer(); idleTimer(); }
+/** Timer fermo: mostra il recupero dell'esercizio (quello che partirà dopo il salvataggio), barra vuota. */
+function idleTimer() {
+  const t = $('timer'); if (!t) return;
+  t.classList.add('idle'); t.classList.remove('zero');
+  $('tTxt').textContent = clock(S.rest || 0); $('tLab').textContent = S.T.rest; $('tPg').style.width = '0%';
+  $('tStop').disabled = true;
+}
 function resumeTimer() {
   try { const t = JSON.parse(ls.get('timer') || 'null'); if (t && Date.now() - t.end < 10 * 60000) { T_.end = t.end; T_.tot = t.tot; T_.buzzed = Date.now() > t.end; showTimer(); } } catch (e) { /* niente */ }
 }
@@ -715,21 +842,21 @@ function tick() {
 function goTo(i) { if (curPe()) readInputs(); S.idx = i; S.extraOpen = null; S.edit = null; render(); }
 
 document.addEventListener('click', (ev) => {
-  const b = ev.target.closest('button, #notes');
+  const b = ev.target.closest('button');
   if (!b || !S.snap || !$('wrap')) return;
-  if (b.closest('.sheet') || b.closest('.timer') || b.id === 'themeBtn') return;
-  if (b.id === 'notes') { S.openNotes = !S.openNotes; b.classList.toggle('open', S.openNotes); return; }
+  // tasti con un loro gestore: menu e tendine (.sheet), timer, luna
+  if (b.closest('.sheet') || ['tMinus', 'tPlus', 'tStop', 'themeBtn'].includes(b.id)) return;
+  if (b.id === 'notesBtn') { S.openNotes = !S.openNotes; render(); return; }
+  if (b.id === 'dayBtn') { openDays(); return; }
+  if (b.id === 'moreBtn') { openMore(); return; }
+  if (b.id === 'exList') { openExList(); return; }
   if (b.dataset.page) { if (setPage(b.dataset.page)) { render(); scrollTo(0, 0); } return; }
   const pe = curPe();
   // giorno toccato nelle schede di Track o in Program: si apre quel giorno in Track (come le schede di sempre)
-  if (b.dataset.day) { if (setPage('track')) scrollTo(0, 0); S.dayId = b.dataset.day; ls.set('day', S.date + '|' + S.dayId); S.idx = firstOpenIdx(view()); S.extraOpen = null; S.edit = null; render(); return; }
+  if (b.dataset.day) { chooseDay(b.dataset.day); return; }
   if (b.dataset.idx !== undefined) { goTo(Number(b.dataset.idx)); return; }
-  if (b.dataset.go) { goTo(S.idx + Number(b.dataset.go)); scrollTo(0, 0); return; }
-  if (b.dataset.u) {
-    if (pe) readInputs();
-    if (b.dataset.u !== S.unit) { S.unit = b.dataset.u; ls.set('unit', S.unit); S.drafts = {}; S.edit = null; render(); }
-    return;
-  }
+  if (b.dataset.go) { const i = S.idx + Number(b.dataset.go); if (pe && i >= 0 && i < dayObj().exercises.length) { goTo(i); scrollTo(0, 0); } return; }
+  if (b.dataset.u) { setUnit(b.dataset.u); return; }
   if (b.dataset.edit) {
     const id = b.dataset.edit;
     if (S.edit && S.edit.id === id) { S.edit = null; render(); return; }
@@ -745,7 +872,9 @@ document.addEventListener('click', (ev) => {
   }
   if (b.dataset.rir !== undefined) {
     const d = readInputs(); d.rir = Number(b.dataset.rir);
-    [...b.parentNode.children].forEach((x) => x.classList.toggle('on', x === b)); buzz(8); return;
+    [...b.parentNode.children].forEach((x) => x.classList.toggle('on', x === b));
+    if ($('rirVal')) $('rirVal').textContent = rirLabel(d.rir);
+    buzz(8); return;
   }
   if (b.id === 'save') { save(false, false); return; }
   if (b.id === 'update') { save(false, true); return; }
@@ -759,7 +888,7 @@ document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.t
 
 // scorrimento orizzontale tra esercizi (telefono)
 let sx = null, sy = null;
-document.addEventListener('touchstart', (ev) => { if (S.page !== 'track' || ev.target.closest('input,.days,.bar,.sheet,.tabbar')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
+document.addEventListener('touchstart', (ev) => { if (S.page !== 'track' || ev.target.closest('input,.bar,.sheet,.tabbar,.timer,.steps,.r5')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
 document.addEventListener('touchend', (ev) => {
   if (sx === null || !S.snap || !$('wrap') || S.page !== 'track' || innerWidth >= 700 || !dayObj()) return;
   const dx = ev.changedTouches[0].clientX - sx, dy = ev.changedTouches[0].clientY - sy;
