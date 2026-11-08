@@ -114,8 +114,17 @@ describe('layout nel codice', () => {
     expect(px('.dayBtn', 'min-height')).toBeGreaterThanOrEqual(44);
   });
 
+  it('finestra del timer solo dopo un salvataggio, chiusa col ✕; il tasto viola resta sempre', () => {
+    expect(css).toMatch(/#timer#timer\.idle \.tclock,#timer#timer\.idle \.treset\{display:none\}/);
+    expect(css).toMatch(/#timer#timer\.idle\{[^}]*background:transparent[^}]*pointer-events:none/);
+    expect(css).toMatch(/#timer#timer\.idle \.go\{pointer-events:auto\}/);
+    expect(main).toMatch(/if \(!isUpdate\) startTimer\(restFor\(pe\)\)/);   // parte solo salvando una serie nuova
+    expect(main).toMatch(/\$\('tStop'\)\.onclick = stopTimer/);
+    expect(main).toMatch(/aria-label="\$\{esc\(S\.T\.closeTimer\)\}"/);
+  });
+
   it('testi nuovi in italiano e inglese', () => {
-    for (const k of ['more', 'chooseDay', 'exercises', 'notesBtn', 'resetTimer']) {
+    for (const k of ['more', 'chooseDay', 'exercises', 'notesBtn', 'closeTimer']) {
       expect(LANGS.it[k], k).toBeTruthy();
       expect(LANGS.en[k], k).toBeTruthy();
     }

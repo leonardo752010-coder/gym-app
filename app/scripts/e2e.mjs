@@ -120,12 +120,19 @@ try {
   await page.click('[data-st=weight][data-d="-1"]');
 
   console.log('3. Registrare una serie (online)');
+  // prima di salvare: niente finestra del timer, solo il tasto viola
+  const timerWin = () => page.evaluate(() => { const t = document.getElementById('timer'), cs = getComputedStyle(t), vis = (s) => { const e = t.querySelector(s); return !!e && e.getClientRects().length > 0; };
+    return { clock: vis('.tclock'), close: vis('#tStop'), save: vis('.go'), bg: cs.backgroundColor, border: cs.borderTopColor }; });
+  { const w = await timerWin();
+    check('prima della serie: niente finestra del timer (né tempo né ✕), solo il tasto viola', !w.clock && !w.close && w.save && /rgba\(0, 0, 0, 0\)|transparent/.test(w.bg), JSON.stringify(w)); }
+  await page.screenshot({ path: path.join(out, '16-timer-chiuso.png') });
   await page.click('#save');
   await page.waitForSelector('.sdone');
   const p1 = await page.evaluate(() => window.__gymPerf);
   check('serie salvata sul telefono in < 1 s', p1.saveEnd - p1.saveStart < 1000, (p1.saveEnd - p1.saveStart) + ' ms');
   check('schermo aggiornato in < 1 s', p1.saveRendered - p1.saveStart < 1000, (p1.saveRendered - p1.saveStart) + ' ms');
   check('timer di recupero partito', await page.isVisible('#timer') && !(await page.$('#timer.idle')));
+  { const w = await timerWin(); check('dopo la serie: finestra del timer con tempo e ✕', w.clock && w.close && w.save, JSON.stringify(w)); }
   await waitSync('ok');
   let sv = await serverSets();
   check('online: 1 serie', sv.length === 1 && Number(sv[0].weight_kg) === 82.5 && sv[0].reps === 6, JSON.stringify(sv.map((x) => [x.set_number, x.weight_kg, x.reps])));
@@ -244,6 +251,18 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.click('.arr[data-go="1"]'); await page.click('.arr[data-go="-1"]');
     check('cambiare workout ed esercizio più volte non cambia nessun dato (telefono e online)', (await localRows()) === rowsBefore && (await serverSets()).length === setsBefore);
+    // ✕: chiude la finestra del timer; resta il tasto viola, nessun dato cambia, e non torna dopo la riapertura
+    await page.click('#tStop');
+    { const w = await timerWin();
+      check('✕: finestra del timer chiusa, resta solo il tasto viola (acceso)', !w.clock && !w.close && w.save && !(await page.isDisabled('#save')), JSON.stringify(w)); }
+    await page.screenshot({ path: L('12-timer-chiuso-con-x.png') });
+    check('chiudere il timer non cambia nessun dato', (await localRows()) === rowsBefore && (await serverSets()).length === setsBefore);
+    await page.reload();
+    await page.waitForSelector('#exv', { timeout: 15000 });
+    check('riaperta l\'app: il timer chiuso resta chiuso', !(await timerWin()).clock);
+    await page.click('[data-page=program]'); await page.waitForSelector('#planName');
+    check('timer chiuso: su Programma la striscia in basso non c\'è', !(await page.isVisible('#timer')));
+    await page.click('[data-page=track]'); await page.waitForSelector('#exv');
   }
 
   console.log('3b. Barra in basso: Programma, Allenamento, Progressi (sola lettura)');

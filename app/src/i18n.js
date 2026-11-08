@@ -41,7 +41,7 @@ const it = {
   noHistory: 'Nessuna seduta salvata sul telefono.', historyNote: 'Sedute salvate su questo telefono.',
   inProgress: 'in corso', setCount: (n) => n + ' serie',
   // Allenamento: workout a tendina, menu "...", elenco esercizi, timer
-  more: 'Altro', chooseDay: 'Scegli l\'allenamento', exercises: 'Esercizi', notesBtn: 'Note', resetTimer: 'Azzera timer',
+  more: 'Altro', chooseDay: 'Scegli l\'allenamento', exercises: 'Esercizi', notesBtn: 'Note', closeTimer: 'Chiudi timer',
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -75,7 +75,7 @@ const en = {
   openDay: (d) => 'Open ' + d + ' in Workout', exCount: (n) => n + (n === 1 ? ' exercise' : ' exercises'),
   noHistory: 'No sessions saved on this phone.', historyNote: 'Sessions saved on this phone.',
   inProgress: 'in progress', setCount: (n) => n + (n === 1 ? ' set' : ' sets'),
-  more: 'More', chooseDay: 'Choose workout', exercises: 'Exercises', notesBtn: 'Notes', resetTimer: 'Reset timer',
+  more: 'More', chooseDay: 'Choose workout', exercises: 'Exercises', notesBtn: 'Notes', closeTimer: 'Close timer',
 };
 export const LANGS = { it, en };
 

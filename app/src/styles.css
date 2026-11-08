@@ -569,10 +569,15 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .exv .r5{gap:4px}
 .exv .edbtns{margin:0 0 12px}
 
-/* in basso: timer (barra viola), azzera, tasto viola per salvare */
+/* in basso: tasto viola per salvare; la finestra del timer (barra viola, −15/+15, ✕ per chiuderla) compare solo
+   dopo aver salvato una serie e si chiude col ✕. Timer chiuso ("idle"): resta solo il tasto viola, a destra,
+   e il resto della striscia è trasparente e non blocca i tocchi. */
 #timer#timer{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 12px;border-radius:22px}
 #timer#timer.idle:not(.onTrack){display:none}
 #timer#timer:not(.onTrack) .go{display:none}
+#timer#timer.idle{justify-content:flex-end;background:transparent;border-color:transparent;box-shadow:none;overflow:visible;pointer-events:none}
+#timer#timer.idle .tclock,#timer#timer.idle .treset{display:none}
+#timer#timer.idle .go{pointer-events:auto}
 .tclock{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
 .tic{flex:none;color:var(--mu)}
 .tic svg{width:22px;height:22px;display:block}
@@ -585,7 +590,6 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #timer#timer #tMinus,#timer#timer #tPlus{flex:none;height:44px;min-width:44px;padding:0 6px;font-size:13px}
 #timer#timer .treset{flex:none;width:44px;height:44px;min-width:0;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--chip);color:var(--tx)}
 #timer#timer .treset svg{width:22px;height:22px}
-#timer#timer .treset:disabled{opacity:.4}
 #timer#timer .go{flex:none;width:58px;height:58px;min-width:0;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--ac);color:var(--acTx);box-shadow:var(--glow)}
 #timer#timer .go svg{width:28px;height:28px}
 #timer#timer .go:disabled{opacity:.4;box-shadow:none}

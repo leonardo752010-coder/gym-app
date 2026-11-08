@@ -81,7 +81,7 @@ const ICON_DOWN = SVG('<path d="M6 9l6 6 6-6"/>', 2.4);
 const ICON_MORE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICON_PREV = SVG('<path d="M15 6l-6 6 6 6"/>', 2.4), ICON_NEXT = SVG('<path d="M9 6l6 6-6 6"/>', 2.4);
 const ICON_WATCH = SVG('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M12 2.5V6"/>');
-const ICON_RESET = SVG('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>');
+const ICON_CLOSE = SVG('<path d="M6 6l12 12M18 6L6 18"/>', 2.4);
 const ICON_CHECK = SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 3);
 const ICON_NOTE = SVG('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>');
 /* Barra di stato del telefono (theme-color) = sfondo vero della pagina, letto dal CSS: segue il tasto luna
@@ -323,7 +323,7 @@ function shell() {
 <main class="wrap" id="wrap"></main>
 <div class="timer idle" id="timer"><div class="tclock"><span class="tic">${ICON_WATCH}</span><div class="tt"><span id="tLab"></span><b id="tTxt">0:00</b>
   <div class="tbar"><div class="pg" id="tPg"></div></div></div><button id="tMinus">−15</button><button id="tPlus">+15</button></div>
-  <button class="treset" id="tStop" aria-label="${esc(S.T.resetTimer)}" title="${esc(S.T.resetTimer)}">${ICON_RESET}</button>
+  <button class="treset" id="tStop" aria-label="${esc(S.T.closeTimer)}" title="${esc(S.T.closeTimer)}">${ICON_CLOSE}</button>
   <button class="go" id="save" aria-label="${esc(S.T.save)}" title="${esc(S.T.save)}">${ICON_CHECK}</button></div>
 <nav class="tabbar" id="tabs" aria-label="${S.T.pages}"></nav>
 <div class="toast" id="toast"></div><div id="sheetHost"></div>`;
@@ -597,7 +597,7 @@ function editor(pe, d, isEdit) {
     (isEdit ? '<div class="edbtns"><button class="del" id="delSet">' + T.del + '</button><button id="cancelEd">' + T.cancel + '</button></div>' : '');
 }
 
-/* ---------- barra in basso: timer + azzera + salva (sopra la barra delle pagine) ---------- */
+/* ---------- in basso, sopra la barra delle pagine: tasto viola per salvare + finestra del timer (solo dopo un salvataggio) ---------- */
 /**
  * Prepara la barra per l'esercizio mostrato. pe = null: non si è su Allenamento (si vede solo il timer, se va).
  * Il tasto grande è "Salva serie" (#save) oppure "Aggiorna serie" (#update) mentre si modifica una serie fatta.
@@ -817,7 +817,7 @@ function saveTimer() { ls.set('timer', T_.end ? JSON.stringify({ end: T_.end, to
 function startTimer(sec) { T_.tot = sec; T_.end = Date.now() + sec * 1000; T_.buzzed = false; saveTimer(); showTimer(); }
 function showTimer() { $('timer').classList.remove('idle'); $('tStop').disabled = false; tick(); clearInterval(T_.iv); T_.iv = setInterval(tick, 250); }
 function stopTimer() { clearInterval(T_.iv); T_.end = 0; saveTimer(); idleTimer(); }
-/** Timer fermo: mostra il recupero dell'esercizio (quello che partirà dopo il salvataggio), barra vuota. */
+/** Timer chiuso (col ✕, a fine tempo + 10 minuti, o mai partito): la finestra sparisce, resta solo il tasto viola. */
 function idleTimer() {
   const t = $('timer'); if (!t) return;
   t.classList.add('idle'); t.classList.remove('zero');
