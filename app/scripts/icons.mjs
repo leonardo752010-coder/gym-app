@@ -1,4 +1,5 @@
-// Crea le icone dell'app da risorse/Gym-app-icon.png (testa del gorilla con corona viola, fondo nero puro, 1254x1254).
+// Crea le icone dell'app da risorse/Gym-app-icon.png (gorilla con corona viola, occhiali e camice, fondo nero puro, 1024x1024;
+// = nuove-icone/icon-1024.png dal Drive, 2026-11-09). Il disegno arriva fino al bordo: il camice tocca il lato sinistro e quello in basso.
 // Le icone si rifanno a ogni dev/build in public/icons (ignorata da git).
 // (logo.b64 nella radice del repository resta per la vecchia cornice su GitHub Pages: qui non si usa piu'.)
 import fs from 'node:fs';
@@ -14,18 +15,19 @@ const BG = { r: 0, g: 0, b: 0, alpha: 1 };                // stesso nero del fon
 const PNG = { palette: true, quality: 90, compressionLevel: 9 };
 
 const plain = (size, name) => sharp(src).resize(size, size).png(PNG).toFile(path.join(out, name));
-// Disegno ridotto (proporzioni intatte) al centro di una tela nera piu' grande.
-// Maskable (Android): la punta della corona e' il punto piu' lontano dal centro (46,5% del lato);
-// con 0.82 arriva al 38%, dentro il cerchio sicuro (40%). Il mento resta piu' dentro.
+// Maskable (Android): disegno ridotto (proporzioni intatte) su tela nera, appoggiato in basso a sinistra,
+// cosi' il camice continua fino al bordo (al centro resterebbe tagliato da una riga dritta).
+// Con 0.82 la punta della corona arriva al 31% dal centro, dentro il cerchio sicuro (40%); faccia ancora piu' dentro.
 async function tile(size, name, scale) {
   const s = Math.round(size * scale);
   const art = await sharp(src).resize(s, s).png().toBuffer();
   await sharp({ create: { width: size, height: size, channels: 4, background: BG } })
-    .composite([{ input: art, gravity: 'center' }]).flatten({ background: BG }).png(PNG).toFile(path.join(out, name));
+    .composite([{ input: art, gravity: 'southwest' }]).flatten({ background: BG }).png(PNG).toFile(path.join(out, name));
 }
 await plain(192, 'icon-192.png');
 await plain(512, 'icon-512.png');
 await tile(192, 'icon-maskable-192.png', 0.82);
 await tile(512, 'icon-maskable-512.png', 0.82);
-await tile(180, 'apple-touch-icon.png', 0.92);
+// iPhone: disegno intero fino al bordo (gli angoli li arrotonda iOS), come icon-180 del Drive
+await plain(180, 'apple-touch-icon.png');
 console.log('icone pronte in public/icons');
