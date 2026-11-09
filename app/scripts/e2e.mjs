@@ -47,7 +47,8 @@ try {
   const openMore = async (p) => { await p.click('#moreBtn'); await p.waitForSelector('.sheet.msheet'); };
   const openAccount = async (p) => { await openMore(p); await p.click('#mAccount'); await p.waitForSelector('#mOut'); };
   const toggleTheme = async (p) => { await openMore(p); await p.click('#mTheme'); await p.click('#moreClose'); };
-  const endSes = async (p) => { await openMore(p); await p.click('#endSession'); };
+  // Fine seduta: conferma Sì / No, poi il riquadro "Session done" con un solo OK
+  const endSes = async (p) => { await openMore(p); await p.click('#endSession'); await p.click('#fYes'); await p.waitForSelector('#doneOk'); await p.click('#doneOk'); };
   const hasEnd = async (p) => { await openMore(p); const r = !!(await p.$('#endSession')); await p.click('#moreClose'); return r; };
   const serverSets = async () => (await admin.from('sets').select('id, set_number, weight_kg, reps, rir, deleted_at, session_exercise_id').eq('user_id', ref.userId).gte('created_at', START).order('set_number')).data;
 
@@ -484,6 +485,7 @@ try {
   const A = await phone(), B = await phone();
   await toDay(A.p, 'Upper B');
   check('senza serie: nessun tasto Fine seduta (nemmeno nel menu "...")', !(await hasEnd(A.p)));
+  check('senza serie: nessun tasto Fine seduta nella schermata (#endPage)', !(await A.p.$('#endPage')));
   await A.p.click('#save');
   await A.p.waitForSelector('.sdone');
   await openMore(A.p);
@@ -493,8 +495,29 @@ try {
     await A.p.screenshot({ path: path.join(out, '08-fine-seduta.png') }); }
   await A.p.click('#moreClose');
   await sync(A.p);
-  await endSes(A.p);
+  // Tasto "Fine seduta" nella schermata (#endPage), telefono 390×844: in fondo alla pagina, sopra timer e barra, non coperto.
+  // Qui la seduta si chiude da questo tasto; più sotto si chiude ancora dal menu "..." (endSes).
+  { await A.p.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await A.p.waitForTimeout(150);
+    const r = await A.p.evaluate(() => { const e = document.getElementById('endPage'); if (!e) return { found: false }; const b = e.getBoundingClientRect();
+      const hitEl = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return { found: true, w: Math.round(b.width), h: Math.round(b.height), top: Math.round(b.top), bottom: Math.round(b.bottom), vh: innerHeight, vw: innerWidth,
+        hit: !!hitEl && (hitEl === e || e.contains(hitEl)), sopra: hitEl ? (hitEl.id || hitEl.className || hitEl.tagName) : null, testo: e.textContent }; });
+    check('tasto Fine seduta nella schermata: visibile, grande (≥ 56 px, quasi tutta la larghezza), non coperto', r.found && r.h >= 56 && r.w >= r.vw - 40 && r.top >= 0 && r.bottom <= r.vh && r.hit && r.testo === 'Fine seduta', JSON.stringify(r));
+    await A.p.screenshot({ path: path.join(out, '17-fine-seduta-tasto.png') }); }
+  await A.p.click('#endPage');                                  // Playwright controlla anche che il tocco arrivi proprio al tasto
+  await A.p.waitForSelector('#fYes');
+  check('tocco: conferma "Finire la sessione?" con No / Sì', (await A.p.textContent('.sheet h2')) === 'Finire la sessione?' &&
+    (await A.p.textContent('#fNo')) === 'No' && (await A.p.textContent('#fYes')) === 'Sì');
+  await A.p.click('#fYes');
+  await A.p.waitForSelector('#doneOk');
+  { const t = await A.p.textContent('.sheet h2'), btns = await A.p.$$('.sheet button');
+    check('dopo Sì: riquadro "Seduta finita. Ottimo allenamento" (IT di "Session done. Great workout") con un solo tasto OK', t === 'Seduta finita. Ottimo allenamento' && btns.length === 1 && (await A.p.textContent('#doneOk')) === 'OK', t);
+    await A.p.screenshot({ path: path.join(out, '18-fine-seduta-popup.png') }); }
+  await A.p.click('#doneOk');
+  check('OK chiude il riquadro', !(await A.p.$('#doneOk')) && (await A.p.innerHTML('#sheetHost')) === '');
   await A.p.waitForSelector('#closedBar');
+  check('dopo la chiusura: niente tasto Fine seduta nella schermata', !(await A.p.$('#endPage')));
   check('chiusa: schermata vuota, "Riapri" visibile, la serie è la volta scorsa', (await A.p.$$('.sdone')).length === 0 && await A.p.isVisible('#reopen') && /Volta scorsa/.test(await A.p.textContent('#last')));
   await A.p.screenshot({ path: path.join(out, '09-seduta-chiusa.png'), fullPage: true });
   await sync(A.p);

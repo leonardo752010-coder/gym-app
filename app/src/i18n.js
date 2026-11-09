@@ -28,7 +28,7 @@ const it = {
   syncNow: 'Invia ora', lastSync: 'Ultimo aggiornamento', never: 'mai', errors: 'Errori', version: 'Versione',
   install: 'Per installarla: Condividi → Aggiungi alla schermata Home (iPhone) oppure menu ⋮ → Installa app (Android).',
   // fine seduta
-  endSession: 'Fine seduta', ended: 'Seduta chiusa', closedAt: (t) => 'Seduta chiusa alle ' + t, reopen: 'Riapri', reopened: 'Seduta riaperta',
+  endSession: 'Fine seduta', endQ: 'Finire la sessione?', yes: 'Sì', no: 'No', doneMsg: 'Seduta finita. Ottimo allenamento', ok: 'OK', ended: 'Seduta chiusa', closedAt: (t) => 'Seduta chiusa alle ' + t, reopen: 'Riapri', reopened: 'Seduta riaperta',
   // altro
   // CHOOSE YOUR STARTER (il titolo resta in inglese anche in italiano: è scritto in main.js)
   starterHint: 'Scegli il tuo compagno. Si sceglie una volta sola.', starterOk: 'Conferma',
@@ -66,7 +66,7 @@ const en = {
   logout: 'Sign out', logoutBlocked: 'Some changes are not online yet. Connect to the internet and try again.', close: 'Close',
   syncNow: 'Send now', lastSync: 'Last update', never: 'never', errors: 'Errors', version: 'Version',
   install: 'To install: Share → Add to Home Screen (iPhone) or menu ⋮ → Install app (Android).',
-  endSession: 'End session', ended: 'Session ended', closedAt: (t) => 'Session ended at ' + t, reopen: 'Reopen', reopened: 'Session reopened',
+  endSession: 'End session', endQ: 'End the session?', yes: 'Yes', no: 'No', doneMsg: 'Session done. Great workout', ok: 'OK', ended: 'Session ended', closedAt: (t) => 'Session ended at ' + t, reopen: 'Reopen', reopened: 'Session reopened',
   starterHint: 'Pick your partner. You only choose once.', starterOk: 'Confirm',
   starterNames: { gorilla: 'Gorilla', lion: 'Lion', tiger: 'Tiger' }, starterSaved: (n) => 'You chose: ' + n,
   saveErr: 'Could not save: ', sync: 'Sync', back: 'Back',

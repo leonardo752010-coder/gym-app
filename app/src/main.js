@@ -470,11 +470,12 @@ function exView(v, exs, pe) {
       last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' × ' + s.reps + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
   } else if (active(pe)) h += '<div class="last small"><b>' + T.noLast + '</b></div>';
 
-  // esercizio finito: subito il prossimo (o "Allenamento completato" sull'ultimo)
-  if (!editing && allDone && S.extraOpen !== key) {
-    if (nav.next) h += '<div class="navrow"><button class="next" data-go="1"><span><span>' + T.next + '</span><b>' + esc(exName(exs[S.idx + 1])) + '</b></span><i>→</i></button></div>';
-    else if (exs.every((x) => !active(x) || doneOf(v, x).length >= x.sets)) h += '<div class="navrow"><div class="finish">' + T.finished + '</div></div>';
+  // esercizio finito: subito il prossimo. Sull'ultimo niente scritta fissa: "Session done" compare solo dopo "Fine seduta".
+  if (!editing && allDone && S.extraOpen !== key && nav.next) {
+    h += '<div class="navrow"><button class="next" data-go="1"><span><span>' + T.next + '</span><b>' + esc(exName(exs[S.idx + 1])) + '</b></span><i>→</i></button></div>';
   }
+  // "Fine seduta" anche nella schermata, in fondo: stessa condizione del menu "..." (dopo la prima serie salvata), stessa conferma (askEnd)
+  if (v.sessions.length) h += '<button class="endbig" id="endPage">' + esc(T.endSession) + '</button>';
   return { html: h, canSave: editing || showDraft, isUpdate: editing };
 }
 
@@ -677,9 +678,19 @@ async function endSession() {
     if (!closed.length) return;
     stopTimer();
     S.drafts = {}; S.edit = null; S.extraOpen = null; S.idx = 0;
-    buzz(30); toast(S.T.ended);
+    buzz(30);
   } finally { S.busy = false; }
   render(); scrollTo(0, 0); syncNow();
+  doneBox();
+}
+
+/** Tocco su "Fine seduta" (menu "..."): prima la conferma Sì / No, poi la stessa endSession(). */
+function askEnd() { sheet(S.T.endQ, '', S.T.no, S.T.yes, endSession); }
+
+/** Dopo la chiusura riuscita: "Session done. Great workout" con un solo tasto OK. */
+function doneBox() {
+  sheetBox('donebox', '<h2>' + esc(S.T.doneMsg) + '</h2><div class="stack"><button class="p" id="doneOk">' + esc(S.T.ok) + '</button></div>');
+  $('doneOk').onclick = closeSheet;
 }
 
 async function reopen(id) {
@@ -695,8 +706,8 @@ async function reopen(id) {
 }
 
 function sheet(title, msg, noTxt, yesTxt, onYes) {
-  $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet"><h2>' + esc(title) + '</h2><p>' + esc(msg) +
-    '</p><div class="row"><button id="fNo">' + esc(noTxt) + '</button><button class="p" id="fYes">' + esc(yesTxt) + '</button></div></div></div>';
+  $('sheetHost').innerHTML = '<div class="sheetBg" id="sbg"><div class="sheet"><h2>' + esc(title) + '</h2>' + (msg ? '<p>' + esc(msg) + '</p>' : '') +
+    '<div class="row"><button id="fNo">' + esc(noTxt) + '</button><button class="p" id="fYes">' + esc(yesTxt) + '</button></div></div></div>';
   const close = () => { $('sheetHost').innerHTML = ''; };
   $('fNo').onclick = close;
   $('sbg').onclick = (ev) => { if (ev.target.id === 'sbg') close(); };
@@ -769,7 +780,7 @@ function openMore() {
   $('mUnit').onclick = (ev) => { const u = ev.target.dataset.mu; if (!u) return; setUnit(u); $('mUnit').innerHTML = unitBtns(); };
   $('mAccount').onclick = openMenu;
   $('moreClose').onclick = closeSheet;
-  if ($('endSession')) $('endSession').onclick = () => { closeSheet(); endSession(); };
+  if ($('endSession')) $('endSession').onclick = askEnd;
 }
 
 /** Tendina "Upper A ▾": i giorni del piano; toccandone uno si apre quel giorno (come le schede di prima). */
@@ -882,6 +893,7 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'cancelEd') { S.edit = null; render(); return; }
   if (b.id === 'extra') { S.extraOpen = S.dayId + '|' + pe.id; render(); return; }
   if (b.id === 'endSession') { endSession(); return; }
+  if (b.id === 'endPage') { askEnd(); return; }
   if (b.id === 'reopen') { reopen(b.dataset.sid); return; }
 });
 document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.target.id === 'inReps') readInputs(); });
