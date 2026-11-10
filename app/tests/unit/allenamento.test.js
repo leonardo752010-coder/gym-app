@@ -2,7 +2,7 @@
 // E controlli sul codice: le schede dei giorni non ci sono più, ogni funzione di prima resta raggiungibile.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { tableRows, exNav, dayOptions, clock, rirLabel } from '../../src/allenamento.js';
+import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from '../../src/allenamento.js';
 import { LANGS } from '../../src/i18n.js';
 
 const read = (f) => fs.readFileSync(new URL('../../' + f, import.meta.url), 'utf8');
@@ -38,6 +38,21 @@ describe('tabella Set / Kg / Rep / RIR', () => {
 
   it('RIR: 4 vuol dire "4+"; vuoto = trattino', () => {
     expect([0, 1, 2, 3, 4, null].map(rirLabel)).toEqual(['0', '1', '2', '3', '4+', '—']);
+  });
+
+  it('RIR a tocco: 0 → 1 → 2 → 3 → 4+ → 0 (da un valore strano si riparte da 0)', () => {
+    expect([0, 1, 2, 3, 4].map(rirNext)).toEqual([1, 2, 3, 4, 0]);
+    expect([5, null, undefined, 'x', -1].map(rirNext)).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it('badge "vs volta scorsa": stesso peso → differenza di rep; peso diverso → differenza di peso; senza volta scorsa niente', () => {
+    expect(vsLast({ weight: 80, reps: 10 }, 80, 9)).toEqual({ kind: 'reps', diff: 1 });
+    expect(vsLast({ weight: 80, reps: 9 }, 80, 9)).toEqual({ kind: 'reps', diff: 0 });
+    expect(vsLast({ weight: 82.5, reps: 6 }, 80, 10)).toEqual({ kind: 'weight', diff: 2.5 });
+    expect(vsLast({ weight: 185, reps: 6 }, 180, 10)).toEqual({ kind: 'weight', diff: 5 });   // lb: stessa regola
+    expect(vsLast(null, 80, 9)).toBe(null);
+    expect(vsLast({ weight: 80, reps: 10 }, null, null)).toBe(null);
+    expect([LANGS.it.repDiff(1), LANGS.en.repDiff(1), LANGS.en.repDiff(2)]).toEqual(['+1 rep', '+1 rep', '+2 reps']);
   });
 });
 
@@ -83,8 +98,11 @@ describe('layout nel codice', () => {
 
   it('tasti + / − per kg e rep, suggerimento sopra la tabella, un solo tasto viola per salvare', () => {
     const ed = main.slice(main.indexOf('function editor('), main.indexOf('function dock('));
-    expect((ed.match(/data-st="weight"/g) || []).length).toBe(2);
-    expect((ed.match(/data-st="reps"/g) || []).length).toBe(2);
+    // una capsula "− numero +" per il peso e una per le rep: ognuna ha il suo − (data-d="-1") e il suo + (data-d="1")
+    expect(ed).toContain("cap('weight', 'inKg'");
+    expect(ed).toContain("cap('reps', 'inReps'");
+    expect(ed.split(`data-st="' + f + '" data-d="-1"`).length - 1).toBe(1);
+    expect(ed.split(`data-st="' + f + '" data-d="1"`).length - 1).toBe(1);
     const ex = main.slice(main.indexOf('function exView('), main.indexOf('function editor('));
     expect(ex.indexOf('id="sugg"')).toBeGreaterThan(0);
     expect(ex.indexOf('id="sugg"')).toBeLessThan(ex.indexOf('id="sets"'));
@@ -104,13 +122,21 @@ describe('layout nel codice', () => {
     expect(main).not.toMatch(/photo|foto|histBtn|T\.history\b/i);
   });
 
-  it('tocchi di almeno 40 px per +/− e RIR, almeno 44 px per frecce, timer, salva, tendine', () => {
-    const px = (sel, prop) => { const i = css.indexOf(sel + '{'); expect(i, sel).toBeGreaterThan(-1); const m = css.slice(i, css.indexOf('}', i)).match(new RegExp(prop + ':(\\d+)px')); return m ? Number(m[1]) : 0; };
-    expect(px('.stp button', 'height')).toBeGreaterThanOrEqual(40);   // − / + più piccoli: la serie resta in primo piano
-    expect(px('.stp button', 'width')).toBeGreaterThanOrEqual(40);
-    expect(px('.r5 button', 'height')).toBeGreaterThanOrEqual(40);
+  it('area di tocco (non il disegno): almeno 40 × 40 px per − / + e RIR, almeno 44 px per frecce, timer, salva, tendine', () => {
+    const rule = (sel) => { const i = css.indexOf(sel + '{'); expect(i, sel).toBeGreaterThan(-1); return css.slice(i, css.indexOf('}', i)); };
+    const px = (sel, prop) => { const m = rule(sel).match(new RegExp('(?:\\{|;)' + prop + ':(\\d+)px')); return m ? Number(m[1]) : 0; };
+    // − / +: disegnati come cerchi di 28 px (::before), ma il tasto vero, quello che si tocca, è 40 × 40 px
+    expect(px('#exv#exv .cap button', 'width')).toBeGreaterThanOrEqual(40);
+    expect(px('#exv#exv .cap button', 'height')).toBeGreaterThanOrEqual(40);
+    expect(px('#exv#exv .cap button::before', 'width')).toBeLessThan(px('#exv#exv .cap button', 'width'));   // disegno più piccolo del tocco
+    expect(rule('#exv#exv .cap::after')).toMatch(/inset:0 6px/);   // bordo disegnato 6 px dentro: il tocco sporge nello spazio vuoto
+    expect(rule('#exv#exv .scur .cell.cap')).toMatch(/grid-template-columns:40px minmax\(0,1fr\) 40px/);   // − numero +: niente si sovrappone
+    // RIR: una casella sola, tocco almeno 40 × 40 px
+    expect(px('.rirb', 'width')).toBeGreaterThanOrEqual(40);
+    expect(px('.rirb', 'height')).toBeGreaterThanOrEqual(40);
     expect(px('.arr', 'width')).toBeGreaterThanOrEqual(44);
-    expect(px('#timer#timer .go', 'width')).toBeGreaterThanOrEqual(44);
+    expect(px('#timer#timer .go', 'min-width')).toBeGreaterThanOrEqual(44);
+    expect(px('#timer#timer .go', 'min-height')).toBeGreaterThanOrEqual(44);
     expect(px('#timer#timer .treset', 'width')).toBeGreaterThanOrEqual(44);
     expect(px('.more', 'width')).toBeGreaterThanOrEqual(44);
     expect(px('.dayBtn', 'min-height')).toBeGreaterThanOrEqual(44);
@@ -125,8 +151,16 @@ describe('layout nel codice', () => {
     expect(main).toMatch(/aria-label="\$\{esc\(S\.T\.closeTimer\)\}"/);
   });
 
+  it('serie in corso: capsule "− numero +" e casella RIR nella riga; niente riga separata di − / + né 5 tasti RIR', () => {
+    const ed = main.slice(main.indexOf('function editor('), main.indexOf('function dock('));
+    expect(ed).toMatch(/class="cell cap/);
+    expect(ed).toMatch(/id="rirVal" data-rirc=/);
+    expect(ed).not.toMatch(/class="steps"|class="rirrow"|data-rir="/);
+    expect(main).toMatch(/d\.rir = rirNext\(d\.rir\)/);   // il tocco cambia solo la bozza: si salva come prima
+  });
+
   it('testi nuovi in italiano e inglese', () => {
-    for (const k of ['more', 'chooseDay', 'exercises', 'notesBtn', 'closeTimer']) {
+    for (const k of ['more', 'chooseDay', 'exercises', 'notesBtn', 'closeTimer', 'goal', 'vsLast', 'repDiff', 'weightCol', 'complete', 'rirTap']) {
       expect(LANGS.it[k], k).toBeTruthy();
       expect(LANGS.en[k], k).toBeTruthy();
     }

@@ -429,7 +429,7 @@ input{font:inherit;color:inherit}
 .tab.on{color:var(--ac)}
 .tab.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--ac)}
 /* con la barra: il timer sta sopra la barra e la pagina finisce più in alto (stesse distanze di prima) */
-body:has(.tabbar:not(:empty)){padding-bottom:calc(202px + env(safe-area-inset-bottom))}
+body:has(.tabbar:not(:empty)){padding-bottom:calc(222px + env(safe-area-inset-bottom))}   /* +20 px: la scritta sotto il tasto viola */
 body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bottom))}
 
 .wrap.page{display:block;max-width:720px}
@@ -563,14 +563,7 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .scur .cell.in:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px var(--acSoft)}
 .scur input{width:100%;height:100%;min-width:0;border:0;outline:0;background:none;text-align:center;font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tx);padding:0}
 .scur .rv{color:var(--ac);font-weight:800}
-/* tasti − / + sotto la serie in corso: piccoli (40×40 px), così la serie e i numeri grandi nelle caselle restano in primo piano */
-.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 6px}
-.stp{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:4px;padding:3px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
-.stp button{height:40px;width:40px;padding:0;border-radius:9px;background:var(--chip);border:1px solid var(--sk-ctl,transparent);font-size:22px;font-weight:600;line-height:1;color:var(--tx)}
-.stp button:active{transform:scale(.96)}
-.stp span{min-width:24px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--mu)}
-.exv .rirrow{margin:0 0 10px}
-.exv .r5{gap:4px}
+/* tasti − / + e RIR della serie in corso: dentro la riga (capsule e casella RIR), vedi "SCHERMATA DELLA SERIE" in fondo */
 .exv .edbtns{margin:0 0 12px}
 
 /* in basso: tasto viola per salvare; la finestra del timer (barra viola, −15/+15, ✕ per chiuderla) compare solo
@@ -594,12 +587,19 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #timer#timer #tMinus,#timer#timer #tPlus{flex:none;height:44px;min-width:44px;padding:0 6px;font-size:13px}
 #timer#timer .treset{flex:none;width:44px;height:44px;min-width:0;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--chip);color:var(--tx)}
 #timer#timer .treset svg{width:22px;height:22px}
-#timer#timer .go{flex:none;width:58px;height:58px;min-width:0;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--ac);color:var(--acTx);box-shadow:var(--glow)}
+/* tasto viola "Completa serie": cerchio con la spunta e scritta piccola sotto (tutto il blocco si tocca: almeno 58 × 58 px) */
+#timer#timer .go{flex:none;width:auto;min-width:58px;height:auto;min-height:58px;padding:0;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;color:var(--tx);box-shadow:none}
+#timer#timer .go .goc{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:var(--ac);color:var(--acTx);box-shadow:var(--glow)}
 #timer#timer .go svg{width:28px;height:28px}
-#timer#timer .go:disabled{opacity:.4;box-shadow:none}
-#timer#timer .go:active{transform:scale(.96)}
+#timer#timer .go .gol{font-size:11px;font-weight:700;line-height:15px;padding:0 7px;border-radius:8px;white-space:nowrap;color:var(--tx);background:var(--bg)}
+#timer#timer:not(.idle) .go .gol{background:none}
+#timer#timer .go:disabled{opacity:.4}
+#timer#timer .go:disabled .goc{box-shadow:none}
+#timer#timer .go:active .goc{transform:scale(.96)}
 /* telefoni stretti: niente icona; mentre il timer va, la scritta "Recupero" lascia posto a −15 / +15 (resta il tempo grande) */
-@media (max-width:359px){ .tic{display:none} #timer:not(.idle) .tt span{display:none} }
+@media (max-width:359px){ .tic{display:none} #timer:not(.idle) .tt span{display:none} #timer#timer:not(.idle) .go .gol{display:none} }   /* sotto 360 px, mentre il timer va: solo il cerchio (la scritta resta per i lettori di schermo) */
+/* fino a 399 px, mentre il timer va: niente icona dell'orologio, così il tempo resta intero accanto al tasto viola con la scritta */
+@media (max-width:399px){ #timer:not(.idle) .tic{display:none} }
 
 /* menu "..." e tendine (workout, esercizi) */
 .sheet.msheet .mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
@@ -620,3 +620,138 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #sheetHost#sheetHost .plist .li.cur{background:var(--acSoft);border-color:var(--ac);box-shadow:none}
 .li .t .ss{display:block;font-size:10px;margin:0;color:var(--ac)}
 .plist .li .t b{white-space:normal;overflow-wrap:anywhere}
+
+/* =====================================================================
+   SCHERMATA DELLA SERIE (grafica nuova, 2026-11-11): solo aspetto.
+   Testata con freccia indietro e nuvola dello stato, "Esercizio N di M"
+   con ‹ › (› col bordo viola), chip con icona, scheda obiettivo viola con
+   badge "vs volta scorsa", tabella con capsule "− numero +" e casella RIR,
+   "Volta scorsa" col calendario, tasto viola "Completa serie".
+   Notte e giorno con gli stessi token; qui sotto solo i colori nuovi.
+   "#exv#exv" serve solo a vincere sulle regole delle pelli (:has(#wrap)).
+   Tocchi: − / + disegnati di 28 px, ma ogni tasto è un riquadro di 40×40
+   px (l'area in più è trasparente e sporge fuori dal bordo disegnato
+   della capsula, nello spazio vuoto: non copre i tasti vicini).
+   ===================================================================== */
+:root[data-theme="dark"]:has(#wrap){
+  --vt:#B9A9F8;             /* viola tenue per testi piccoli (macchina, OBIETTIVO, muscolo) */
+  --vtx:#A48DF6;            /* viola di "kg", "×" e del valore RIR */
+  --okT:#3DDC97; --okB:rgba(61,220,151,.12); --okL:rgba(61,220,151,.38);   /* badge verde */
+  --tg1:rgba(139,108,240,.26); --tg2:rgba(139,108,240,.07); --tgB:#8B6CF0; --tgGlow:0 10px 30px rgba(139,108,240,.26);
+  --capBg:#101016;
+}
+:root[data-theme="light"]:not(:has(#starterScr)){
+  --vt:#5638C4;             /* viola più scuro sul fondo chiaro: 6.6-7.6:1 */
+  --vtx:#6F4FE0;
+  --okT:#0E6A4A; --okB:#E1F3EA; --okL:#A9D9C2;
+  --tg1:#EEE8FE; --tg2:#FBFAFF; --tgB:#8B6CF0; --tgGlow:0 6px 18px rgba(111,79,224,.12);   /* bagliore più morbido */
+  --capBg:#FFFFFF;
+}
+
+/* testata: freccia indietro (a Programma), nuvola dello stato online */
+.hback svg{width:24px;height:24px}
+.tsync{gap:5px}
+.tsync svg{width:17px;height:17px;flex:none;color:var(--mu)}
+.tsync.ok svg{color:var(--okT,var(--okIc))}
+.tsync.pending svg{color:var(--warn)}
+.tsync.err svg{color:var(--sk-bad,var(--ac))}
+
+/* Esercizio N di M, ‹ ›, barra a segmenti */
+#exv#exv .arr.nx:not(:disabled){border:1.5px solid var(--tgB,var(--ac));color:var(--vt,var(--ac))}
+#exv#exv .bar{gap:5px;margin:0 0 16px}
+#exv#exv .bar button{height:5px;border-radius:3px}
+#exv#exv .bar button.cur{background:var(--tgB,var(--ac));opacity:1}
+
+/* nome, macchina, chip */
+#exv#exv .ex{font-size:clamp(24px,7.6vw,30px);line-height:1.12}
+#exv#exv .mac{margin:5px 0 12px;font-size:13px;font-weight:600;line-height:1.35;color:var(--mu)}
+#exv#exv .mac b{font-weight:700;color:var(--vt,var(--ac))}
+#exv#exv .mac span{color:var(--mu)}
+#exv#exv .chips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 14px}
+#exv#exv .chips > span,#exv#exv .mini > span{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 6px;border-radius:9px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap}
+#exv#exv .chips svg{width:14px;height:14px;flex:none;color:var(--mu)}
+#exv#exv .chips .mu{background:var(--acSoft);border-color:rgba(139,108,240,.4);color:var(--vt,var(--ac))}
+#exv#exv .chips .mu svg{color:var(--vt,var(--ac))}
+#exv#exv .mini{min-height:44px;padding:0;border:0;border-radius:10px;background:none;gap:0}   /* Note: chip disegnato di 30 px, tocco alto 44 px */
+#exv#exv .mini.on > span{border-color:var(--tgB,var(--ac));color:var(--vt,var(--ac))}
+#exv#exv .mini.on svg{color:var(--vt,var(--ac))}
+
+/* scheda obiettivo: bordo viola, fondo viola scuro con sfumatura; badge verde a destra */
+#exv#exv .sugg{display:flex;align-items:center;gap:10px;margin:0 0 16px;padding:13px 12px 13px 16px;border-radius:18px;border:1.5px solid var(--tgB,var(--ac));background:linear-gradient(155deg,var(--tg1,var(--acSoft)),var(--tg2,transparent));box-shadow:var(--tgGlow,none)}
+.sgt{flex:1;min-width:0}
+#exv#exv .sugg .sgl{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.07em;white-space:nowrap;text-transform:uppercase;color:var(--vt,var(--ac))}
+#exv#exv .sugg .sgl svg{width:14px;height:14px;flex:none}
+#exv#exv .sugg .sv{margin:3px 0 3px;font-size:clamp(30px,9vw,38px);line-height:1.08;font-weight:800;letter-spacing:-.02em;color:var(--tx);white-space:nowrap}
+#exv#exv .sugg .sv b,#exv#exv .sugg .vs b{font-size:inherit;letter-spacing:inherit;text-transform:none}
+#exv#exv .sugg .sv b{font-weight:800;color:var(--tx)}
+#exv#exv .sugg .sv.lng{font-size:clamp(26px,7.8vw,33px)}
+#exv#exv .sugg .sv i{font-style:normal;font-weight:700;font-size:.6em;color:var(--vtx,var(--ac))}
+#exv#exv .sugg .why{font-size:13px;font-weight:600;line-height:1.3;color:var(--mu)}
+.vs{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 9px;border-radius:12px;background:var(--okB,var(--chip));border:1px solid var(--okL,var(--line));text-align:center}
+.vs small{font-size:11px;font-weight:700;line-height:1.25;color:var(--okT,var(--tx));white-space:nowrap}
+#exv#exv .sugg .vs b{font-size:17px;font-weight:800;line-height:1.2;color:var(--okT,var(--tx));white-space:nowrap}
+.vs.flat{background:var(--chip);border-color:var(--line)}
+#exv#exv .vs.flat small,#exv#exv .vs.flat b{color:var(--mu)}
+
+/* tabella: Serie | Peso | Rep | RIR. Colonne: numero serie, capsula peso, capsula rep, casella RIR */
+#exv#exv .sets{margin:0 0 14px}
+#exv#exv .sh,#exv#exv .srow{grid-template-columns:26px minmax(0,1.2fr) minmax(0,1fr) 42px;column-gap:0}
+#exv#exv .sh{padding:0 4px 7px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--mu);white-space:nowrap}
+#exv#exv .sh span{text-align:center;min-width:0}
+#exv#exv .sh span:first-child{text-align:left;width:max-content}   /* "Serie" un po' più larga della colonna: esce nello spazio vuoto, non si taglia */
+#exv#exv .sh span:last-child{justify-self:end;width:40px}
+#exv#exv .srow{min-height:48px;padding:4px 4px;margin-bottom:6px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.sc{display:flex;align-items:center;gap:2px;min-width:0}
+#exv#exv .srow .ck{width:15px;height:15px;flex:none;border-width:2px;font-size:10px}
+#exv#exv .srow .sn{font-size:14px;font-weight:700}
+#exv#exv .srow .sn small{font-size:9px}
+#exv#exv .srow .cell{height:auto;min-height:0;background:none;border:0;border-radius:0;font-size:18px;font-weight:700}
+#exv#exv .srow > .cell:last-child{justify-self:end;width:40px}
+/* serie fatte: pallino pieno con spunta (si toccano per modificarle) */
+#exv#exv .sdone{background:var(--card)}
+/* serie successive: tratteggiate e più spente, valori suggeriti (testo grigio leggibile: 4.5:1 o più) */
+#exv#exv .splan{background:transparent;border:1.5px dashed var(--line);color:var(--mu)}
+#exv#exv .splan .cell{color:var(--mu);font-weight:600}
+:root[data-theme="light"] #exv#exv .splan{border-color:#CFCCDA}
+/* serie in corso: bordo viola, pallino vuoto, capsule e casella RIR */
+#exv#exv .scur{padding:6px 4px 12px;border:1.5px solid var(--tgB,var(--ac));background:var(--acSoft)}
+#exv#exv .scur .ck{border-color:var(--tgB,var(--ac))}
+#exv#exv .scur .cell.cap{position:relative;isolation:isolate;display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;height:52px;padding:0;overflow:visible;background:none;border:0;box-shadow:none}
+/* bordo disegnato della capsula: 6 px dentro il riquadro, così le aree di tocco di − e + sporgono fuori senza coprire i vicini */
+#exv#exv .cap::after{content:"";position:absolute;inset:0 6px;z-index:-1;border-radius:16px;background:var(--capBg,var(--bg));border:1.5px solid var(--sk-ctl,var(--mu2))}
+#exv#exv .cap:focus-within::after{border-color:var(--tgB,var(--ac));box-shadow:0 0 0 3px var(--acSoft)}
+#exv#exv .cap button{position:relative;z-index:0;width:40px;height:40px;padding:0;border:0;background:none;font-size:20px;font-weight:600;line-height:1;color:var(--tx);display:grid;place-items:center}
+#exv#exv .cap button::before{content:"";position:absolute;top:6px;width:28px;height:28px;z-index:-1;border-radius:50%;background:var(--chip);border:1px solid var(--sk-ctl,transparent)}
+#exv#exv .cap button:first-child{padding-left:12px}
+#exv#exv .cap button:first-child::before{right:0}
+#exv#exv .cap button:last-of-type{padding-right:12px}
+#exv#exv .cap button:last-of-type::before{left:0}
+#exv#exv .cap button:active::before{background:var(--acSoft);border-color:var(--tgB,var(--ac))}
+#exv#exv .cap input{height:100%;min-width:0;padding:0;font-size:var(--nf,28px);font-weight:800;letter-spacing:-.01em;text-align:center}
+#exv#exv .cap.lng input{font-size:calc(var(--nf,28px) * .8)}
+/* etichetta "kg" / "rep" piccola, al centro, a cavallo del bordo in basso */
+#exv#exv .cap small{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);padding:0 6px;border-radius:7px;font-size:10px;font-weight:700;line-height:14px;letter-spacing:.03em;white-space:nowrap;color:var(--mu);background:var(--capBg,var(--bg));border:1px solid var(--sk-ctl,var(--line))}
+/* RIR: una casella piccola, valore viola; un tocco = valore dopo (area di tocco 40 × 52 px) */
+.rirb{justify-self:end;width:40px;height:52px;padding:0;border-radius:12px;background:var(--capBg,var(--bg));border:1.5px solid var(--sk-ctl,var(--mu2));display:grid;place-items:center}
+.rirb b{font-size:20px;font-weight:800;color:var(--vtx,var(--ac))}
+.rirb:active{border-color:var(--tgB,var(--ac));background:var(--acSoft)}
+/* numeri delle capsule: 28 px sugli schermi larghi, un po' più piccoli fino a 24 px a 360 px (così stanno sempre interi) */
+#exv{--nf:clamp(22px,calc(7.5vw - 3px),28px)}
+/* schermi più stretti di 360 px: la riga in corso va su due righe (numero serie e RIR sopra, le due capsule sotto) */
+@media (max-width:359px){
+  #exv#exv .scur{grid-template-columns:26px minmax(0,1fr) minmax(0,1fr) 42px;grid-template-areas:"sc . . rir" "w w r r";row-gap:6px}
+  #exv#exv .scur > .sc{grid-area:sc} #exv#exv .scur > .rirb{grid-area:rir;height:40px}
+  #exv#exv .scur > div.cap:nth-of-type(1){grid-area:w} #exv#exv .scur > div.cap:nth-of-type(2){grid-area:r}
+  #exv{--nf:24px}
+}
+
+/* volta scorsa: calendario a sinistra, data piccola, serie separate da una riga verticale */
+#exv#exv .last{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:0 0 12px;border-radius:16px;border:1px solid var(--line);background:var(--card)}
+.lic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--chip);color:var(--mu)}
+.lic svg{width:19px;height:19px}
+.lb{flex:1;min-width:0}
+#exv#exv .last .lb > b{display:block;font-size:12px;font-weight:700;color:var(--mu);line-height:1.3}
+.lvw{overflow:hidden}
+#exv#exv .last .lv{display:flex;flex-wrap:wrap;gap:2px 0;margin:2px 0 0 -13px;font-size:15px;font-weight:700}
+#exv#exv .last .lv span{white-space:nowrap;padding:0 12px;border-left:1px solid var(--sk-ctl,var(--line))}
+#exv#exv .last .lv em{margin-left:0;font-size:13px;color:var(--mu)}

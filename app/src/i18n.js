@@ -42,6 +42,9 @@ const it = {
   inProgress: 'in corso', setCount: (n) => n + ' serie',
   // Allenamento: workout a tendina, menu "...", elenco esercizi, timer
   more: 'Altro', chooseDay: 'Scegli l\'allenamento', exercises: 'Esercizi', notesBtn: 'Note', closeTimer: 'Chiudi timer',
+  // schermata della serie (grafica nuova): obiettivo, confronto con la volta scorsa, tabella, tasto viola
+  goal: 'Obiettivo', vsLast: 'vs volta scorsa', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + ' rep',
+  weightCol: (u) => 'Peso (' + u + ')', complete: 'Completa serie', rirTap: 'RIR, tocca per cambiare',
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -76,6 +79,8 @@ const en = {
   noHistory: 'No sessions saved on this phone.', historyNote: 'Sessions saved on this phone.',
   inProgress: 'in progress', setCount: (n) => n + (n === 1 ? ' set' : ' sets'),
   more: 'More', chooseDay: 'Choose workout', exercises: 'Exercises', notesBtn: 'Notes', closeTimer: 'Close timer',
+  goal: 'Target', vsLast: 'vs. last time', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + (Math.abs(n) === 1 ? ' rep' : ' reps'),
+  weightCol: (u) => 'Weight (' + u + ')', complete: 'Complete set', rirTap: 'RIR, tap to change',
 };
 export const LANGS = { it, en };
 

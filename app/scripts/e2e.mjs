@@ -119,6 +119,16 @@ try {
   await page.click('[data-st=weight][data-d="1"]');
   check('+ usa il salto della macchina (85)', (await page.inputValue('#inKg')) === '85');
   await page.click('[data-st=weight][data-d="-1"]');
+  // grafica nuova della serie: scheda OBIETTIVO con badge, capsule − numero +, RIR a tocco, tasto "Completa serie"
+  check('scheda obiettivo: "Serie 1 · Obiettivo" e badge "vs volta scorsa +2,5 kg" (peso diverso → differenza di kg)',
+    /Serie 1 · Obiettivo/i.test(await page.textContent('#sugg .sgl')) && /vs volta scorsa\s*\+2,5 kg/.test(await page.textContent('#vsLast')), await page.textContent('#sugg'));
+  check('tabella: intestazioni Serie / Peso (kg) / Rep / RIR', (await page.textContent('#sets .sh')).replace(/\s+/g, '') === 'SeriePeso(kg)RepRIR', await page.textContent('#sets .sh'));
+  check('niente riga separata di − / + e niente 5 tasti RIR', !(await page.$('.steps')) && !(await page.$('[data-rir]')) && (await page.$$('.scur .cap')).length === 2);
+  { const r0 = await page.textContent('#rirVal'), seq = [];
+    for (let i = 0; i < 5; i++) { await page.click('#rirVal'); seq.push(await page.textContent('#rirVal')); }
+    const order = ['0', '1', '2', '3', '4+'], i0 = order.indexOf(r0);
+    check('RIR a tocco: valore dopo, 4+ → 0, cinque tocchi = giro completo', i0 >= 0 && seq.join(',') === [1, 2, 3, 4, 5].map((k) => order[(i0 + k) % 5]).join(','), r0 + ' → ' + seq.join(' → ')); }
+  check('tasto viola con la scritta "Completa serie"', (await page.textContent('#save .gol')) === 'Completa serie' && (await page.getAttribute('#save', 'aria-label')) === 'Completa serie');
 
   console.log('3. Registrare una serie (online)');
   // prima di salvare: niente finestra del timer, solo il tasto viola
@@ -149,8 +159,14 @@ try {
       const R = (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
       const q = (s) => document.querySelector(s), qa = (s) => [...document.querySelectorAll(s)];
       const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-      const small = qa('#dayBtn, #moreBtn, #exList, .arr, [data-st], [data-rir], #tStop, #save, #update, #tMinus, #tPlus, #notesBtn, .sdone')
-        .filter(vis).map((e) => ({ id: e.id || e.dataset.st || e.className, ...R(e) })).filter((r) => r.w < 44 - 0.5 || r.h < 44 - 0.5);
+      // aree di tocco (il riquadro del tasto, non il disegno): 44 px per i tasti di sempre, 40 px per − / + e la casella RIR
+      const small = [...qa('#dayBtn, #moreBtn, #hBack, #exList, .arr, #tStop, #save, #update, #tMinus, #tPlus, #notesBtn, .sdone')
+        .filter(vis).map((e) => ({ id: e.id || e.className, min: 44, ...R(e) })),
+        ...qa('[data-st], #rirVal').filter(vis).map((e) => ({ id: e.id || e.dataset.st + e.dataset.d, min: 40, ...R(e) }))].filter((r) => r.w < r.min - 0.5 || r.h < r.min - 0.5);
+      // le aree di tocco di − / + e RIR non si coprono a vicenda
+      const tb = qa('[data-st], #rirVal').filter(vis).map((e) => ({ id: e.id || e.dataset.st + e.dataset.d, ...R(e) }));
+      const touchOverlap = [];
+      for (let i = 0; i < tb.length; i++) for (let j = i + 1; j < tb.length; j++) { const a = tb[i], b = tb[j]; if (a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5) touchOverlap.push(a.id + '/' + b.id); }
       const clipped = qa('#exv .cell, #exv input, .dayBtn b, .ex, .tt b').filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1 && !(e.matches('.dayBtn b'))).map((e) => e.className || e.id || e.tagName);
       const s = q('#sugg'), sets = q('#sets'), t = q('#timer'), tabs = q('#tabs'), sync = q('#tsync');
       scrollTo(0, document.body.scrollHeight);
@@ -160,8 +176,9 @@ try {
       const kids = ['.tclock', '#tStop', '.go'].map((x) => R(q('#timer ' + x) || q(x)));
       return {
         overflow: document.documentElement.scrollWidth > innerWidth + 1,
-        small, clipped,
-        sugg: s ? { vis: vis(s), aboveTable: !sets || R(s).b <= R(sets).y, size: parseFloat(getComputedStyle(s.querySelector('.sv')).fontSize), color: getComputedStyle(s.querySelector('.sv')).color, inView: R(s.querySelector('.sv')).b <= R(t).y } : null,
+        small, clipped, touchOverlap,
+        sugg: s ? { vis: vis(s), aboveTable: !sets || R(s).b <= R(sets).y, size: parseFloat(getComputedStyle(s.querySelector('.sv')).fontSize), num: getComputedStyle(s.querySelector('.sv b')).color,
+          unit: getComputedStyle(s.querySelector('.sv i')).color, text: getComputedStyle(document.body).color, inView: R(s.querySelector('.sv')).b <= R(t).y } : null,
         sync: vis(sync) && sync.textContent.length > 3 ? sync.textContent : null, syncTop: Math.round(R(sync).b),
         timerAboveTabs: R(t).b <= R(tabs).y + 0.5, notCovered: bottom.last <= bottom.timerTop, bottom,
         dockOverlap: kids[0].r > kids[1].x + 0.5 || kids[1].r > kids[2].x + 0.5 ||
@@ -172,10 +189,11 @@ try {
     const layoutChecks = async (name, suggInView = true) => {
       const m = await measure();
       check(name + ': niente scorrimento laterale', !m.overflow);
-      check(name + ': tasti (+/−, frecce, timer, salva, tendine) almeno 44 × 44 px', m.small.length === 0, JSON.stringify(m.small).slice(0, 300));
+      check(name + ': aree di tocco: − / + e RIR almeno 40 × 40 px, frecce, timer, salva, tendine almeno 44 × 44 px', m.small.length === 0, JSON.stringify(m.small).slice(0, 300));
+      check(name + ': aree di tocco di − / + e RIR che non si coprono', m.touchOverlap.length === 0, m.touchOverlap.join(','));
       check(name + ': numeri e nomi non tagliati', m.clipped.length === 0, m.clipped.join(','));
       check(name + ': numeri leggibili (≥ 18 px)', m.numFont >= 18, m.numFont + ' px');
-      check(name + ': suggerimento viola, grande, sopra la tabella' + (suggInView ? ', numero visibile senza scorrere' : ''), !!m.sugg && m.sugg.vis && m.sugg.aboveTable && m.sugg.size >= 30 && (m.sugg.inView || !suggInView), JSON.stringify(m.sugg));
+      check(name + ': scheda obiettivo grande, sopra la tabella' + (suggInView ? ', numero visibile senza scorrere' : ''), !!m.sugg && m.sugg.vis && m.sugg.aboveTable && m.sugg.size >= 30 && (m.sugg.inView || !suggInView), JSON.stringify(m.sugg));
       check(name + ': stato di sincronizzazione visibile in alto', !!m.sync && m.syncTop < 120, m.sync);
       check(name + ': timer sopra la barra; in fondo alla pagina timer e barra non coprono niente', m.timerAboveTabs && m.notCovered, JSON.stringify(m.bottom));
       check(name + ': timer (scritte comprese), −15/+15, azzera e salva non si sovrappongono', !m.dockOverlap);
@@ -184,7 +202,8 @@ try {
     // serie 1 fatta (cerchio viola con spunta), serie 2 da fare, timer che va
     check('tabella: 1 serie fatta, 1 in corso con caselle Kg e Rep', (await page.$$('.sdone')).length === 1 && (await page.$$('.scur #inKg')).length === 1);
     const m1 = await layoutChecks('notte 390 px');
-    check('suggerimento in viola (colore del tasto Salva)', m1.sugg && m1.sugg.color === (await page.$eval('#save', (b) => getComputedStyle(b).backgroundColor)), m1.sugg && m1.sugg.color);
+    { const rgb = (c) => (c || '').match(/\d+/g).map(Number), u = rgb(m1.sugg && m1.sugg.unit);
+      check('obiettivo: numeri nel colore del testo, "kg" e "×" viola', m1.sugg && m1.sugg.num === m1.sugg.text && u[2] > u[0] && u[0] > u[1], m1.sugg && m1.sugg.num + ' / ' + m1.sugg.unit); }
     await page.screenshot({ path: L('01-notte.png') });
     await page.screenshot({ path: L('01-notte-intera.png'), fullPage: true });
     // menu "...": data, luna, kg/lb, Account, Fine seduta
@@ -275,6 +294,10 @@ try {
   { const r = await page.evaluate(() => ({ t: document.getElementById('timer').getBoundingClientRect().bottom, b: document.getElementById('tabs').getBoundingClientRect().top }));
     check('timer sopra la barra, non sotto', r.t <= r.b, JSON.stringify(r)); }
   await page.screenshot({ path: path.join(out, '13-track.png') });
+  await page.click('#hBack');
+  await page.waitForSelector('#planName');
+  check('freccia indietro in testata: apre Programma (come il tasto in basso)', (await tabOn()) === 'Programma');
+  await page.click('[data-page=track]'); await page.waitForSelector('#exv');
   await page.click('[data-page=program]');
   await page.waitForSelector('#planName');
   check('Programma: piano, 4 giorni, esercizi con macchina', (await page.$$('.pday')).length === 4 && /Marca Finta · Incline Press · MF-10/.test(await page.textContent('.pex')) && (await tabOn()) === 'Programma');
@@ -339,7 +362,7 @@ try {
   await page.click('.sdone >> nth=1');
   await page.waitForSelector('#update');
   await page.click('[data-st=reps][data-d="1"]');
-  await page.click('[data-rir="1"]');
+  for (let i = 0; i < 5 && (await page.textContent('#rirVal')) !== '1'; i++) await page.click('#rirVal');   // RIR a tocco fino a 1
   await page.screenshot({ path: path.join(out, '04-modifica-serie.png'), fullPage: true });
   await page.click('#update');
   await page.waitForFunction(() => !document.getElementById('update'));
@@ -426,7 +449,7 @@ try {
   await page.waitForSelector('#last');
   check('Upper A la settimana dopo: schermata vuota', (await page.$$('.sdone')).length === 0);
   const lastW = (await page.textContent('#last')).replace(/\s+/g, ' ');
-  check('volta scorsa = la serie della settimana prima (82,5 × 6)', /82,5 × 6/.test(lastW), lastW);
+  check('volta scorsa = la serie della settimana prima (82,5 kg × 6)', /82,5 kg × 6/.test(lastW), lastW);
   check('aprire non crea sedute nemmeno la settimana dopo', (await localSessions()).length === nBefore);
   await page.click('#save');
   await page.waitForSelector('.sdone');

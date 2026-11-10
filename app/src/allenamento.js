@@ -45,3 +45,22 @@ export function rirLabel(r) {
   const n = Number(r);
   return n >= 4 ? '4+' : String(n).replace('.', ',');
 }
+
+/** RIR a tocco (casella della serie in corso): 0 → 1 → 2 → 3 → 4+ → 0. Solo il valore mostrato e della bozza. */
+export function rirNext(r) {
+  const n = r == null || r === '' ? NaN : Number(r);
+  return !(n >= 0) || n >= 4 ? 0 : Math.floor(n) + 1;
+}
+
+/**
+ * Badge "vs volta scorsa" della scheda obiettivo, solo con dati che l'app ha già:
+ * stesso peso → differenza di rep; peso diverso → differenza di peso (nell'unità mostrata).
+ * target: { weight, reps } della serie suggerita; lastW / lastReps: la serie corrispondente della volta scorsa.
+ * Senza volta scorsa: null (il badge non compare).
+ */
+export function vsLast(target, lastW, lastReps) {
+  if (!target || lastW == null || lastReps == null) return null;
+  const dw = Math.round((Number(target.weight) - Number(lastW)) * 100) / 100;
+  if (dw !== 0) return { kind: 'weight', diff: dw };
+  return { kind: 'reps', diff: Number(target.reps) - Number(lastReps) };
+}

@@ -28,7 +28,7 @@ import {
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList } from './pages.js';
 import { versionText } from './version.js';
-import { tableRows, exNav, dayOptions, clock, rirLabel } from './allenamento.js';
+import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 
 // Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
@@ -84,6 +84,13 @@ const ICON_WATCH = SVG('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.
 const ICON_CLOSE = SVG('<path d="M6 6l12 12M18 6L6 18"/>', 2.4);
 const ICON_CHECK = SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 3);
 const ICON_NOTE = SVG('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>');
+// schermata della serie: freccia su (obiettivo), calendario (volta scorsa), nuvola (stato online), icone dei chip
+const ICON_UP = SVG('<path d="M12 19V5M6 11l6-6 6 6"/>', 2.6);
+const ICON_CAL = SVG('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
+const ICON_CLOUD = (ok) => SVG('<path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.3 9.2 4.7 4.7 0 0 0 7 18.5z"/>' + (ok ? '<path d="M9.3 13.6l2 2 3.6-3.8"/>' : ''));
+const ICON_SETS = SVG('<path d="M4 7h16M4 12h16M4 17h10"/>');
+const ICON_GAUGE = SVG('<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l3.5-5"/>');
+const ICON_MUSCLE = SVG('<path d="M6.5 7v10M17.5 7v10M3.5 10v4M20.5 10v4M6.5 12h11"/>');
 /* Barra di stato del telefono (theme-color) = sfondo vero della pagina, letto dal CSS: segue il tasto luna
    e la schermata (accesso, app, CHOOSE YOUR STARTER hanno sfondi diversi). Si riallinea quando cambia la schermata. */
 function syncBar() {
@@ -218,7 +225,7 @@ function setSync() {
   for (const [id, cls] of [['sync', 'sync '], ['tsync', 'sync tsync ']]) {
     const el = $(id); if (!el) continue;
     el.className = cls + S.sync.state;
-    el.innerHTML = '<i></i>' + esc(txt);
+    el.innerHTML = (id === 'tsync' ? ICON_CLOUD(S.sync.state === 'ok') : '<i></i>') + esc(txt);
   }
 }
 
@@ -316,7 +323,7 @@ function shell() {
   <div class="ctrls"><span class="pill static" id="dateTxt"></span>
   <button class="theme" id="themeBtn" aria-label="${S.T.dayNight}"></button>
   <div class="seg" id="unitSeg"><button data-u="kg">kg</button><button data-u="lb">lb</button></div></div></div>
-  <div class="thdr" id="thdr"><div class="trow"><span></span>
+  <div class="thdr" id="thdr"><div class="trow"><button class="more hback" id="hBack" aria-label="${esc(S.T.navProgram)}">${ICON_PREV}</button>
     <button class="dayBtn" id="dayBtn" aria-haspopup="dialog" aria-label="${esc(S.T.chooseDay)}"><b id="dayName"></b>${ICON_DOWN}</button>
     <button class="more" id="moreBtn" aria-haspopup="dialog" aria-label="${esc(S.T.more)}">${ICON_MORE}</button></div>
     <div class="sync tsync" id="tsync"></div></div></header>
@@ -324,7 +331,7 @@ function shell() {
 <div class="timer idle" id="timer"><div class="tclock"><span class="tic">${ICON_WATCH}</span><div class="tt"><span id="tLab"></span><b id="tTxt">0:00</b>
   <div class="tbar"><div class="pg" id="tPg"></div></div></div><button id="tMinus">−15</button><button id="tPlus">+15</button></div>
   <button class="treset" id="tStop" aria-label="${esc(S.T.closeTimer)}" title="${esc(S.T.closeTimer)}">${ICON_CLOSE}</button>
-  <button class="go" id="save" aria-label="${esc(S.T.save)}" title="${esc(S.T.save)}">${ICON_CHECK}</button></div>
+  <button class="go" id="save" aria-label="${esc(S.T.complete)}" title="${esc(S.T.complete)}"><span class="goc">${ICON_CHECK}</span><span class="gol" aria-hidden="true">${esc(S.T.complete)}</span></button></div>
 <nav class="tabbar" id="tabs" aria-label="${S.T.pages}"></nav>
 <div class="toast" id="toast"></div><div id="sheetHost"></div>`;
   applyTheme(theme());
@@ -417,29 +424,35 @@ function exView(v, exs, pe) {
   let h = closedBar(v);
   h += '<div class="exTop"><button class="exOf" id="exList" aria-haspopup="dialog">' + esc(T.exOf(S.idx + 1, exs.length)) + ICON_DOWN + '</button>' +
     '<span class="arrs"><button class="arr" data-go="-1" aria-label="' + esc(T.back) + '"' + (nav.prev ? '' : ' disabled') + '>' + ICON_PREV + '</button>' +
-    '<button class="arr" data-go="1" aria-label="' + esc(T.next) + '"' + (nav.next ? '' : ' disabled') + '>' + ICON_NEXT + '</button></span></div>';
+    '<button class="arr nx" data-go="1" aria-label="' + esc(T.next) + '"' + (nav.next ? '' : ' disabled') + '>' + ICON_NEXT + '</button></span></div>';
   h += '<div class="bar">' + exs.map((x, i) => '<button data-idx="' + i + '" class="' + (i === S.idx ? 'cur' : exProg(v, x) >= 1 ? 'full' : '') + '" aria-label="' + esc(exName(x)) + '"></button>').join('') + '</div>';
   if (pe.superset_label) h += '<div class="ss">SUPERSET ' + esc(pe.superset_label) + '</div>';
   h += '<h1 class="ex">' + esc(exName(pe)) + '</h1>';
+  // macchina: "marca · modello · codice" in viola tenue; salto dei pesi e alternativa in grigio, come prima
   if (m) {
     const wl = Array.isArray(m.weight_list) ? m.weight_list : [];
     const stepTxt = wl.length ? (wl.length > 5 ? fmtN(wl[0]) + '…' + fmtN(wl[wl.length - 1]) + ' ' + m.weight_unit + ' (' + T.weights(wl.length) + ')' : wl.map(fmtN).join(' / ') + ' ' + m.weight_unit)
       : m.weight_step ? T.step + ' ' + fmtN(m.weight_step) + ' ' + m.weight_unit : '';
-    h += '<div class="mac">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
+    h += '<div class="mac"><b>' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</b>' + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
       (pe.alt_machine ? ' <span>· ' + T.alt + ': ' + esc(machineLabel(pe.alt_machine) || pe.alt_machine.code) + '</span>' : '') + '</div>';
   }
-  // Note: solo se l'esercizio del piano ha una nota (oggi l'unica nota che l'app conosce), nella stessa riga dei dati del piano.
-  // Un tasto per lo storico del singolo esercizio non c'è: l'app non ha quella funzione.
-  const noteBtn = pe.notes ? '<button class="mini' + (S.openNotes ? ' on' : '') + '" id="notesBtn" aria-expanded="' + S.openNotes + '">' + ICON_NOTE + esc(T.notesBtn) + '</button>' : '';
-  h += '<div class="chips"><span>' + pe.sets + ' × ' + esc(range(pe)) + ' ' + T.rep + '</span>' +
-    (rirTxt(pe) ? '<span>RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span>' + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + noteBtn + '</div>';
+  // chip con icona: schema, RIR, muscolo (viola), Note (solo se l'esercizio del piano ha una nota: è un tasto)
+  const noteBtn = pe.notes ? '<button class="mini' + (S.openNotes ? ' on' : '') + '" id="notesBtn" aria-expanded="' + S.openNotes + '"><span>' + ICON_NOTE + esc(T.notesBtn) + '</span></button>' : '';
+  h += '<div class="chips"><span>' + ICON_SETS + pe.sets + ' × ' + esc(range(pe)) + '</span>' +
+    (rirTxt(pe) ? '<span>' + ICON_GAUGE + 'RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span class="mu">' + ICON_MUSCLE + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + noteBtn + '</div>';
   if (pe.notes && S.openNotes) h += '<p class="notes open" id="notes">' + esc(pe.notes) + '</p>';
 
+  // scheda obiettivo: suggerimento di oggi (stessa suggest()), badge "vs volta scorsa" solo se c'è una volta scorsa
   const nextN = done.reduce((mx, s) => Math.max(mx, s.set_number), 0) + 1;
   const sg = sugg && sugg.sets[Math.min(nextN, sugg.sets.length) - 1];
   if (sg && done.length < Math.max(pe.sets, 1)) {
-    h += '<div class="sugg" id="sugg"><b>' + T.suggested + ' · ' + T.set + ' ' + nextN + '</b><div class="sv">' + fmtN(sg.weight) + ' ' + S.unit + ' × ' + sg.reps +
-      '</div><div class="why">' + esc(T.why[sg.why]) + '</div></div>';
+    const ls = last && last.sets.length ? last.sets[Math.min(nextN, last.sets.length) - 1] : null;
+    const vs = ls ? vsLast(sg, setWeightIn(ls, S.unit), ls.reps) : null;
+    const vsTxt = !vs ? '' : vs.kind === 'weight' ? (vs.diff > 0 ? '+' : '−') + fmtN(Math.abs(vs.diff)) + ' ' + S.unit : T.repDiff(vs.diff);
+    h += '<div class="sugg" id="sugg"><div class="sgt"><b class="sgl">' + ICON_UP + esc(T.set + ' ' + nextN + ' · ' + T.goal) + '</b>' +
+      '<div class="sv' + (fmtN(sg.weight).length >= 5 ? ' lng' : '') + '"><b>' + fmtN(sg.weight) + '</b> <i>' + S.unit + '</i> <i>×</i> <b>' + sg.reps + '</b></div>' +
+      '<div class="why">' + esc(T.why[sg.why]) + '</div></div>' +
+      (vs ? '<div class="vs' + (vs.diff > 0 ? '' : ' flat') + '" id="vsLast"><small>' + esc(T.vsLast) + '</small><b>' + esc(vsTxt) + '</b></div>' : '') + '</div>';
   }
   if (!active(pe) && !done.length) h += '<div class="offnote">' + T.notPlan + '</div>';
 
@@ -448,16 +461,16 @@ function exView(v, exs, pe) {
   const showDraft = !editing && (!allDone || S.extraOpen === key);
   const rows = tableRows({ done, plannedSets: pe.sets, draft: showDraft ? draftFor(v, pe, done, sugg) : null, editId: editing ? S.edit.id : null, showDraft, sugg });
   if (rows.length) {
-    h += '<div class="sets" id="sets"><div class="sh" aria-hidden="true"><span></span><span>' + esc(T.set) + '</span><span>' + (S.unit === 'lb' ? 'Lb' : 'Kg') + '</span><span>' +
+    h += '<div class="sets" id="sets"><div class="sh" aria-hidden="true"><span>' + esc(T.set) + '</span><span>' + esc(T.weightCol(S.unit)) + '</span><span>' +
       esc(T.rep.charAt(0).toUpperCase() + T.rep.slice(1)) + '</span><span>RIR</span></div>';
     for (const r of rows) {
       if (r.kind === 'done') {
         const s = r.set, row = S.local.rows.get(s.id);
         h += '<button class="srow sdone" data-edit="' + esc(s.id) + '" aria-label="' + esc(T.set + ' ' + s.set_number + ': ' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + (s.rir != null ? ', RIR ' + fmtN(s.rir) : '')) + '">' +
-          '<span class="ck">✓</span><span class="sn">' + s.set_number + (row && row.dirty ? '<span class="pend" title="' + esc(T.syncPending(1)) + '">⟳</span>' : '') + '</span>' +
+          '<span class="sc"><span class="ck">✓</span><span class="sn">' + s.set_number + (row && row.dirty ? '<span class="pend" title="' + esc(T.syncPending(1)) + '">⟳</span>' : '') + '</span></span>' +
           '<span class="cell">' + fmtN(setWeightIn(s, S.unit)) + '</span><span class="cell">' + s.reps + '</span><span class="cell">' + (s.rir != null ? fmtN(s.rir) : '—') + '</span></button>';
       } else if (r.kind === 'todo') {
-        h += '<div class="srow splan"><span class="ck"></span><span class="sn">' + r.n + '</span><span class="cell">' + (r.weight != null ? fmtN(r.weight) : '—') + '</span>' +
+        h += '<div class="srow splan"><span class="sc"><span class="ck"></span><span class="sn">' + r.n + '</span></span><span class="cell">' + (r.weight != null ? fmtN(r.weight) : '—') + '</span>' +
           '<span class="cell">' + (r.reps != null ? r.reps : '—') + '</span><span class="cell">—</span></div>';
       } else h += editor(pe, r.edit ? S.edit : r.draft, r.edit);
     }
@@ -465,10 +478,11 @@ function exView(v, exs, pe) {
   }
   if (!editing && allDone && S.extraOpen !== key) h += '<button class="extra" id="extra">' + T.extra + '</button>';
 
+  // volta scorsa: calendario, data piccola, le serie separate da una riga (vanno a capo intere se non entrano)
   if (last) {
-    h += '<div class="last small" id="last"><b>' + T.last + ' · ' + esc(shortDate(last.date)) + '</b><div class="lv">' +
-      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + ' ' + T.rep + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
-  } else if (active(pe)) h += '<div class="last small"><b>' + T.noLast + '</b></div>';
+    h += '<div class="last small" id="last"><span class="lic">' + ICON_CAL + '</span><div class="lb"><b>' + T.last + ' · ' + esc(shortDate(last.date)) + '</b><div class="lvw"><div class="lv">' +
+      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + ' ' + T.rep + (s.rir != null ? ' <em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div></div></div>';
+  } else if (active(pe)) h += '<div class="last small"><span class="lic">' + ICON_CAL + '</span><div class="lb"><b>' + T.noLast + '</b></div></div>';
 
   // esercizio finito: subito il prossimo. Sull'ultimo niente scritta fissa: "Session done" compare solo dopo "Fine seduta".
   if (!editing && allDone && S.extraOpen !== key && nav.next) {
@@ -582,19 +596,22 @@ function draftFor(v, pe, done, sugg) {
   return d;
 }
 
+/** Numero lungo (peso di 5 caratteri o più, per esempio 102,5; rep di 3 cifre): carattere un po' più piccolo, così resta tutto nella capsula. */
+const longCls = (v, n) => (String(v ?? '').length >= n ? ' lng' : '');
+
 /**
- * Serie da salvare adesso (o in modifica): una riga della tabella con le caselle Kg e Rep,
- * sotto i tasti − / + (grandi, a tutta larghezza) e la scelta del RIR. Salva il tasto viola in basso.
+ * Serie da salvare adesso (o in modifica): una riga della tabella con due capsule "− numero +" (peso e rep)
+ * e la casella RIR (un tocco = valore dopo: 0 → 1 → 2 → 3 → 4+ → 0). Salva il tasto viola in basso.
+ * − / + disegnati piccoli, ma l'area di tocco di ogni tasto è almeno 40 × 40 px (vedi .cap button in styles.css).
  */
 function editor(pe, d, isEdit) {
   const T = S.T, U = S.unit.toUpperCase(), R = T.rep.toUpperCase();
-  return '<div class="srow scur' + (isEdit ? ' editing' : '') + '" id="curRow"><span class="ck"></span><span class="sn">' + d.n + (d.n > pe.sets ? '<small>extra</small>' : '') + '</span>' +
-    '<label class="cell in"><input id="inKg" inputmode="decimal" autocomplete="off" aria-label="' + U + '" value="' + esc(fmtN(d.weight)) + '" placeholder="0"></label>' +
-    '<label class="cell in"><input id="inReps" inputmode="numeric" autocomplete="off" aria-label="' + R + '" value="' + esc(d.reps) + '" placeholder="0"></label>' +
-    '<span class="cell rv" id="rirVal">' + rirLabel(d.rir) + '</span></div>' +
-    '<div class="steps"><div class="stp"><button data-st="weight" data-d="-1" aria-label="− ' + U + '">−</button><span>' + U + '</span><button data-st="weight" data-d="1" aria-label="+ ' + U + '">+</button></div>' +
-    '<div class="stp"><button data-st="reps" data-d="-1" aria-label="− ' + R + '">−</button><span>' + R + '</span><button data-st="reps" data-d="1" aria-label="+ ' + R + '">+</button></div></div>' +
-    '<div class="rirrow"><span>RIR</span><div class="r5">' + [0, 1, 2, 3, 4].map((n) => '<button data-rir="' + n + '" class="' + (d.rir === n ? 'on' : '') + '">' + (n === 4 ? '4+' : n) + '</button>').join('') + '</div></div>' +
+  const cap = (f, id, mode, val, tag, lbl) => '<div class="cell cap' + longCls(val, f === 'weight' ? 5 : 3) + '" data-lng="' + (f === 'weight' ? 5 : 3) + '"><button data-st="' + f + '" data-d="-1" aria-label="− ' + lbl + '">−</button>' +
+    '<input id="' + id + '" inputmode="' + mode + '" autocomplete="off" aria-label="' + lbl + '" value="' + esc(val) + '" placeholder="0">' +
+    '<button data-st="' + f + '" data-d="1" aria-label="+ ' + lbl + '">+</button><small aria-hidden="true">' + esc(tag) + '</small></div>';
+  return '<div class="srow scur' + (isEdit ? ' editing' : '') + '" id="curRow"><span class="sc"><span class="ck"></span><span class="sn">' + d.n + (d.n > pe.sets ? '<small>extra</small>' : '') + '</span></span>' +
+    cap('weight', 'inKg', 'decimal', fmtN(d.weight), S.unit, U) + cap('reps', 'inReps', 'numeric', d.reps, T.rep, R) +
+    '<button class="rirb" id="rirVal" data-rirc="1" aria-label="' + esc(T.rirTap) + '"><b>' + rirLabel(d.rir) + '</b></button></div>' +
     (isEdit ? '<div class="edbtns"><button class="del" id="delSet">' + T.del + '</button><button id="cancelEd">' + T.cancel + '</button></div>' : '');
 }
 
@@ -606,9 +623,9 @@ function editor(pe, d, isEdit) {
 function dock(pe, canSave = false, isUpdate = false) {
   const t = $('timer'); if (!t) return;
   t.classList.toggle('onTrack', !!pe);
-  const b = t.querySelector('.go'), txt = isUpdate ? S.T.update : S.T.save;
+  const b = t.querySelector('.go'), txt = isUpdate ? S.T.update : S.T.complete;
   b.id = isUpdate ? 'update' : 'save';
-  b.setAttribute('aria-label', txt); b.title = txt;
+  b.setAttribute('aria-label', txt); b.title = txt; b.querySelector('.gol').textContent = txt;
   b.disabled = !pe || !canSave || S.busy;
   S.rest = pe ? restFor(pe) : 0;
   if (!T_.end) idleTimer();
@@ -859,6 +876,7 @@ document.addEventListener('click', (ev) => {
   if (b.closest('.sheet') || ['tMinus', 'tPlus', 'tStop', 'themeBtn'].includes(b.id)) return;
   if (b.id === 'notesBtn') { S.openNotes = !S.openNotes; render(); return; }
   if (b.id === 'dayBtn') { openDays(); return; }
+  if (b.id === 'hBack') { if (setPage('program')) { render(); scrollTo(0, 0); } return; }   // freccia indietro: a Programma (come il tasto in basso)
   if (b.id === 'moreBtn') { openMore(); return; }
   if (b.id === 'exList') { openExList(); return; }
   if (b.dataset.page) { if (setPage(b.dataset.page)) { render(); scrollTo(0, 0); } return; }
@@ -879,12 +897,12 @@ document.addEventListener('click', (ev) => {
     const d = readInputs(), f = b.dataset.st, dir = Number(b.dataset.d);
     const cur = parseN(d[f]) ?? 0;
     d[f] = f === 'weight' ? stepWeight(cur, pe.machine, S.unit, dir) : Math.max(0, Math.round(cur + dir));
-    $(f === 'weight' ? 'inKg' : 'inReps').value = fmtN(d[f]); buzz(8); return;
+    const inp = $(f === 'weight' ? 'inKg' : 'inReps'); inp.value = fmtN(d[f]); inp.parentNode.classList.toggle('lng', inp.value.length >= Number(inp.parentNode.dataset.lng)); buzz(8); return;
   }
-  if (b.dataset.rir !== undefined) {
-    const d = readInputs(); d.rir = Number(b.dataset.rir);
-    [...b.parentNode.children].forEach((x) => x.classList.toggle('on', x === b));
-    if ($('rirVal')) $('rirVal').textContent = rirLabel(d.rir);
+  // RIR a tocco: valore dopo (0 → 1 → 2 → 3 → 4+ → 0); il valore resta nella bozza e si salva come prima
+  if (b.dataset.rirc) {
+    const d = readInputs(); d.rir = rirNext(d.rir);
+    b.querySelector('b').textContent = rirLabel(d.rir);
     buzz(8); return;
   }
   if (b.id === 'save') { save(false, false); return; }
@@ -896,11 +914,11 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'endPage') { askEnd(); return; }
   if (b.id === 'reopen') { reopen(b.dataset.sid); return; }
 });
-document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.target.id === 'inReps') readInputs(); });
+document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.target.id === 'inReps') { readInputs(); ev.target.parentNode.classList.toggle('lng', ev.target.value.length >= Number(ev.target.parentNode.dataset.lng)); } });
 
 // scorrimento orizzontale tra esercizi (telefono)
 let sx = null, sy = null;
-document.addEventListener('touchstart', (ev) => { if (S.page !== 'track' || ev.target.closest('input,.bar,.sheet,.tabbar,.timer,.steps,.r5')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
+document.addEventListener('touchstart', (ev) => { if (S.page !== 'track' || ev.target.closest('input,.bar,.sheet,.tabbar,.timer,.cap,.rirb')) { sx = null; return; } sx = ev.touches[0].clientX; sy = ev.touches[0].clientY; }, { passive: true });
 document.addEventListener('touchend', (ev) => {
   if (sx === null || !S.snap || !$('wrap') || S.page !== 'track' || innerWidth >= 700 || !dayObj()) return;
   const dx = ev.changedTouches[0].clientX - sx, dy = ev.changedTouches[0].clientY - sy;
