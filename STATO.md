@@ -1,6 +1,20 @@
 # Stato
 
-Aggiornato: 2026-11-09 (15:40): **icona nuova + "Fine seduta" con conferma e riquadro "Session done" PUBBLICATI** su Cloudflare (versione dell'app **"09/11/2026 15:34"**, Cloudflare `38ac1468`), dal branch `feature/icona-e-end-session` (su GitHub). **Non unito in `claude/app-v1`**: oggi l'app online viene da `feature/icona-e-end-session`. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 73dce1db-4842-4d08-8835-89c5b82fe18c`.
+Aggiornato: 2026-11-10: **bottoni − / + e RIR più compatti, unità nella riga "Volta scorsa"**, sul branch nuovo `ui/bottoni-compatti` (creato da `feature/icona-e-end-session`). **Solo sul computer**: commit locale, niente push, niente deploy. L'app online è ancora quella del 09/11 15:34.
+
+Prima, 2026-11-09 (15:40): **icona nuova + "Fine seduta" con conferma e riquadro "Session done" PUBBLICATI** su Cloudflare (versione dell'app **"09/11/2026 15:34"**, Cloudflare `38ac1468`), dal branch `feature/icona-e-end-session` (su GitHub). **Non unito in `claude/app-v1`**: oggi l'app online viene da `feature/icona-e-end-session`. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 73dce1db-4842-4d08-8835-89c5b82fe18c`.
+
+## Bottoni compatti nella schermata della serie (2026-11-10, richiesta di Leonardo)
+
+- **Branch** `ui/bottoni-compatti`, creato da `feature/icona-e-end-session` (`4252a78`), come chiesto da Leonardo (non da `main`). Fuori da git restano, non toccati: `nuove-icone/` e `app/risorse/Gym-logo-silverback-v5.png`.
+- **Solo grafica**, nessuna logica o dato cambiato. File: `app/src/styles.css`, `app/src/main.js` (una riga: la "Volta scorsa"), `app/tests/unit/allenamento.test.js`, `app/scripts/e2e.mjs`.
+- **Tasti − / + (kg e rep)**: da 48 px di altezza (larghi circa 57 px su 360 px) a **40×40 px**. Spazio tra i due gruppi da 10 a 8 px, margini più stretti.
+- **Caselle Kg / Rep della serie in corso**: più grandi dei tasti, da 44 a **52 px** di altezza; numero da 22 a **28 px**.
+- **RIR 0-4+**: da 46 px (42 px nel tema di base) a **40 px** di altezza; numero da 19 a 17 px. Spazio sotto la riga RIR da 12 a 10 px.
+- **Volta scorsa**: ora con le unità, per esempio `80 kg × 8 rep @0` (in inglese `80 kg × 8 reps @0`; in lb `lb`). `@0` resta com'era. Decimali come prima (`2,5`). Ogni serie resta su una riga sola (non va a capo a metà). Prima volta: testo di sempre.
+- **Test aggiornato con l'ok di Leonardo**: la prova "tocchi di almeno 44 px" ora chiede almeno **40 px** per − / + (altezza e larghezza) e per RIR; frecce, timer, tasto viola e tendine restano ad almeno 44 px. Nella prova e2e il controllo della "Volta scorsa" ora cerca `80 kg × 10 rep`.
+- **Prove**: `npm test` **125 verdi**; `npm run build` ok. Controllo a 360 px di larghezza (pagina di prova con lo stile vero, notte e giorno, italiano e inglese, kg e lb, numeri come 102,5): niente scorrimento laterale, niente tagliato, niente a capo. **Non lanciati**: `npm run test:e2e` e `npm run test:locale` (creano e cancellano un atleta finto nel database locale: servirebbe l'ok di Leonardo). Su un telefono vero non è provato.
+- Attenzione: con il numero a 28 px, un peso di 6 caratteri (per esempio `1102,5`) su 360 px non ci sta tutto nella casella. Fino a `999,5` va bene.
 
 ## Deploy di icona + Fine seduta (2026-11-09, 15:34, richiesta di Leonardo)
 
@@ -136,7 +150,7 @@ Aggiornato: 2026-11-09 (15:40): **icona nuova + "Fine seduta" con conferma e riq
 
 ## Branch
 
-Branch attuale: **`feature/icona-e-end-session`** (creato da `claude/app-v1` `5694c1b`; commit su GitHub, **pubblicato** alle 15:34, **non unito** in `claude/app-v1`). `claude/app-v1` è uguale a GitHub ma è **indietro** rispetto all'app online. Ultimo lavoro pubblicato: timer solo dopo la serie (commit `11fc8f7`, dal branch `timer-a-comparsa`, fast-forward `6bc9847..11fc8f7`, push senza force; vedi sopra). Prima: layout nuovo di ALLENAMENTO (commit `9709f34`, dal branch `layout-allenamento`, fast-forward `65ca61c..9709f34`, push senza force; vedi sopra). Prima: barra di stato dello stesso colore dello sfondo (commit `6e19cbc`, dal branch `barra-stato`, fast-forward `92773cf..6e19cbc`, push senza force). Prima: tema giorno con la pelle chiara (commit `5ec5c1d`, dal branch `tema-giorno`, fast-forward `db51cf8..5ec5c1d`, push senza force; vedi sopra). Prima: versione visibile dentro l'app (commit `41af5f7`, dal branch `versione-app`, fast-forward `75ea0ed..41af5f7`, push senza force; vedi sopra). Prima: logo silverback dentro l'app (commit `dbf3cbf`, dal branch `logo-interno`, fast-forward `be98f20..dbf3cbf`, push senza force, con l'ok di Leonardo; vedi sopra). Prima, l'icona nuova: commit `abcac6e` "icona: gorilla con corona" fatto su `icona-app` e unito con `git merge --ff-only` (fast-forward `3d97086..abcac6e`), push senza force, con l'ok di Leonardo. `icona-app` è fermo anche lui su `abcac6e` (solo locale).
+Branch attuale: **`ui/bottoni-compatti`** (creato il 2026-11-10 da `feature/icona-e-end-session`; bottoni − / + e RIR più compatti e unità nella "Volta scorsa"; **solo locale**, non pubblicato). Prima: **`feature/icona-e-end-session`** (creato da `claude/app-v1` `5694c1b`; commit su GitHub, **pubblicato** alle 15:34, **non unito** in `claude/app-v1`). `claude/app-v1` è uguale a GitHub ma è **indietro** rispetto all'app online. Ultimo lavoro pubblicato: timer solo dopo la serie (commit `11fc8f7`, dal branch `timer-a-comparsa`, fast-forward `6bc9847..11fc8f7`, push senza force; vedi sopra). Prima: layout nuovo di ALLENAMENTO (commit `9709f34`, dal branch `layout-allenamento`, fast-forward `65ca61c..9709f34`, push senza force; vedi sopra). Prima: barra di stato dello stesso colore dello sfondo (commit `6e19cbc`, dal branch `barra-stato`, fast-forward `92773cf..6e19cbc`, push senza force). Prima: tema giorno con la pelle chiara (commit `5ec5c1d`, dal branch `tema-giorno`, fast-forward `db51cf8..5ec5c1d`, push senza force; vedi sopra). Prima: versione visibile dentro l'app (commit `41af5f7`, dal branch `versione-app`, fast-forward `75ea0ed..41af5f7`, push senza force; vedi sopra). Prima: logo silverback dentro l'app (commit `dbf3cbf`, dal branch `logo-interno`, fast-forward `be98f20..dbf3cbf`, push senza force, con l'ok di Leonardo; vedi sopra). Prima, l'icona nuova: commit `abcac6e` "icona: gorilla con corona" fatto su `icona-app` e unito con `git merge --ff-only` (fast-forward `3d97086..abcac6e`), push senza force, con l'ok di Leonardo. `icona-app` è fermo anche lui su `abcac6e` (solo locale).
 
 `app/risorse/Gym-logo-silverback-v5.png` (originale, 906 KB) è sul computer ma **fuori dai commit** (per scelta di Leonardo): git lo mostra come file non tracciato. Su GitHub ci sono solo le due versioni ottimizzate in `app/src/assets/logo/`.
 
@@ -152,6 +166,7 @@ Su `claude/app-v1`: Contiene ora anche la pelle nuova della schermata ALLENAMENT
 
 | Branch | Cosa contiene |
 | --- | --- |
+| `ui/bottoni-compatti` | `feature/icona-e-end-session` + bottoni − / + (40×40 px) e RIR (40 px) più compatti, caselle Kg / Rep più grandi, unità nella "Volta scorsa" (2026-11-10). **Solo locale**, non su GitHub, non pubblicato |
 | `nav-tre-pagine` | Barra in basso (Programma / Allenamento / Progressi), commit `cab1d7d`. **Solo locale** (mai su GitHub). Già tutto dentro `claude/app-v1` |
 | `icona-app` | Icona nuova (commit `abcac6e`). **Solo locale**. Già tutto dentro `claude/app-v1` |
 | `logo-interno` | Logo silverback dentro l'app (commit `dbf3cbf`). **Solo locale**. Già tutto dentro `claude/app-v1` |
@@ -447,6 +462,8 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
+Bottoni compatti (2026-11-10, solo sul computer): Leonardo guarda il risultato. Per vederlo sul telefono serve un deploy (cambia l'app anche per Raina) e quindi prima il push del branch: tutti e due solo con il suo ok. Se va bene: decidere se unire `ui/bottoni-compatti` dopo `feature/icona-e-end-session`.
+
 Icona + Fine seduta online (15:34): sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla: nel menu "..." → Account, in fondo, deve comparire **"Versione 09/11/2026 15:34"** (se compare ancora 11:52, chiudere e riaprire ancora una volta). Poi i 5 controlli: tasto "Fine seduta" in fondo all'esercizio dopo la prima serie; "No" non fa niente; "Sì" → riquadro con OK e poi "Seduta chiusa alle … · Riapri"; niente scritta finta "Session done" sull'ultimo esercizio; icona nuova (su iPhone togliere l'app dalla Home e rimetterla). Se va bene: unire `feature/icona-e-end-session` in `claude/app-v1` (con l'ok di Leonardo). **Per tornare indietro**: `npx wrangler@4 rollback 73dce1db-4842-4d08-8835-89c5b82fe18c` nella cartella `app/`. Dopo il deploy, su iPhone togliere l'app dalla Home e aggiungerla di nuovo per vedere l'icona nuova (Android la aggiorna da solo, anche dopo qualche giorno).
 
 Timer solo dopo la serie online: sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla: nel menu "..." → Account, in fondo, deve comparire **"Versione 09/11/2026 11:52"** (se compare ancora 11:38, chiudere e riaprire ancora una volta). Poi salvare una serie: compare il timer; toccare ✕ per chiuderlo. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 2ca320eb-c1be-4e2f-80e1-a9f518cd3c21`.
@@ -472,6 +489,8 @@ Pelle ALLENAMENTO online: aprire l'app con internet, aspettare qualche secondo, 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- **Bottoni compatti** (`ui/bottoni-compatti`, solo locale): guardarli; dire se fare push e deploy. Dire se lanciare `npm run test:e2e` (crea e cancella un atleta finto nel database locale). In italiano la "Volta scorsa" dice `rep` (la parola che l'app usa già), in inglese `reps`: se si vuole `reps` anche in italiano, è una parola da cambiare.
 
 - **`feature/icona-e-end-session` pubblicato ma non unito**: dopo la prova sul telefono, dare l'ok per unirlo in `claude/app-v1` (fast-forward, senza force), così il branch principale torna uguale all'app online. Finché non è unito, un deploy fatto da `claude/app-v1` toglierebbe icona nuova e tasto. Per le prove future senza toccare la versione di Raina: secondo progetto Cloudflare (es. `gym-app-prova`) o indirizzi di anteprima (oggi spenti, `"preview_urls": false`); usano comunque il database vero.
 - **Icona nuova**: guardare le icone in `app/public/icons/`. Sull'icona maskable (Android) il gorilla sta in basso a sinistra, così il camice arriva al bordo: se non piace, si può cambiare. `icon-32.png`: se serve, copiarlo a mano dal Drive in `nuove-icone/` (l'app oggi non lo usa). Decidere se `nuove-icone/` va nel commit o resta solo sul computer (`icon-1024` è già dentro `app/risorse/`).

@@ -104,9 +104,11 @@ describe('layout nel codice', () => {
     expect(main).not.toMatch(/photo|foto|histBtn|T\.history\b/i);
   });
 
-  it('tocchi di almeno 44 px per +/−, frecce, timer, salva, tendine', () => {
+  it('tocchi di almeno 40 px per +/− e RIR, almeno 44 px per frecce, timer, salva, tendine', () => {
     const px = (sel, prop) => { const i = css.indexOf(sel + '{'); expect(i, sel).toBeGreaterThan(-1); const m = css.slice(i, css.indexOf('}', i)).match(new RegExp(prop + ':(\\d+)px')); return m ? Number(m[1]) : 0; };
-    expect(px('.stp button', 'height')).toBeGreaterThanOrEqual(44);
+    expect(px('.stp button', 'height')).toBeGreaterThanOrEqual(40);   // − / + più piccoli: la serie resta in primo piano
+    expect(px('.stp button', 'width')).toBeGreaterThanOrEqual(40);
+    expect(px('.r5 button', 'height')).toBeGreaterThanOrEqual(40);
     expect(px('.arr', 'width')).toBeGreaterThanOrEqual(44);
     expect(px('#timer#timer .go', 'width')).toBeGreaterThanOrEqual(44);
     expect(px('#timer#timer .treset', 'width')).toBeGreaterThanOrEqual(44);

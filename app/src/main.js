@@ -467,7 +467,7 @@ function exView(v, exs, pe) {
 
   if (last) {
     h += '<div class="last small" id="last"><b>' + T.last + ' · ' + esc(shortDate(last.date)) + '</b><div class="lv">' +
-      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' × ' + s.reps + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
+      last.sets.map((s) => '<span>' + fmtN(setWeightIn(s, S.unit)) + ' ' + S.unit + ' × ' + s.reps + ' ' + T.rep + (s.rir != null ? '<em>@' + fmtN(s.rir) + '</em>' : '') + '</span>').join('') + '</div></div>';
   } else if (active(pe)) h += '<div class="last small"><b>' + T.noLast + '</b></div>';
 
   // esercizio finito: subito il prossimo. Sull'ultimo niente scritta fissa: "Session done" compare solo dopo "Fine seduta".

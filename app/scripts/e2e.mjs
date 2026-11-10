@@ -113,7 +113,7 @@ try {
   await page.waitForSelector('#sugg');
   const sugg = await page.textContent('#sugg'), last = await page.textContent('#last');
   check('suggerimento 82,5 kg × 6 (range chiuso)', /82,5 kg × 6/.test(sugg), sugg);
-  check('volta scorsa: 80 × 10, 80 × 10, senza la serie cancellata', /80 × 10.*80 × 10/.test(last) && !/999/.test(last), last.replace(/\s+/g, ' '));
+  check('volta scorsa: 80 kg × 10 rep, 80 kg × 10 rep, senza la serie cancellata', /80 kg × 10 reps?.*80 kg × 10 reps?/.test(last) && !/999/.test(last), last.replace(/\s+/g, ' '));
   check('macchina e salto di peso visibili', /Marca Finta · Incline Press · MF-10.*salto 2,5 kg/.test(await page.textContent('.mac')));
   check('campo peso già compilato col suggerimento', (await page.inputValue('#inKg')) === '82,5');
   await page.click('[data-st=weight][data-d="1"]');

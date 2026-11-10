@@ -79,6 +79,7 @@ input{font:inherit;color:inherit}
 .last{background:var(--card2);border-radius:14px;padding:11px 14px;margin-bottom:12px}
 .last b{font-size:14px}
 .last .lv{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:4px;font-size:17px;font-weight:700}
+.last .lv span{white-space:nowrap}
 .last .lv em{font-style:normal;color:var(--mu);font-size:12px;font-weight:600;margin-left:3px}
 .hint{margin-top:8px;font-size:13px;font-weight:700;color:var(--ac)}
 
@@ -103,7 +104,7 @@ input{font:inherit;color:inherit}
 .rirrow{display:flex;align-items:center;gap:8px;margin-top:12px}
 .rirrow>span{font-size:15px;font-weight:800;width:38px}
 .r5{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.r5 button{height:42px;border-radius:10px;background:var(--chip);font-weight:800;font-size:17px}
+.r5 button{height:40px;border-radius:10px;background:var(--chip);font-weight:800;font-size:17px}
 .r5 button.on{background:var(--cream);color:var(--creamTx)}
 .save{margin-top:14px;width:100%;height:56px;border-radius:14px;background:var(--ac);color:var(--acTx);font-size:20px;font-weight:800;box-shadow:var(--glow)}
 .save:disabled{opacity:.55}
@@ -285,7 +286,7 @@ input{font:inherit;color:inherit}
 :root[data-theme="dark"]:has(#wrap) .box .lbl{color:var(--sk-mu)}
 :root[data-theme="dark"]:has(#wrap) .box input{font-size:var(--sk-num);color:var(--sk-tx)}
 :root[data-theme="dark"]:has(#wrap) .pm button{border-radius:10px}
-:root[data-theme="dark"]:has(#wrap) .r5 button{height:46px;border-radius:var(--sk-r-box);font-size:19px}
+:root[data-theme="dark"]:has(#wrap) .r5 button{height:40px;border-radius:var(--sk-r-box);font-size:17px}
 :root[data-theme="dark"]:has(#wrap) .r5 button.on{background:var(--sk-ac);color:#fff}
 /* il tasto grande viola */
 :root[data-theme="dark"]:has(#wrap) .save{height:58px;border-radius:16px;background:var(--sk-ac);color:#fff}
@@ -390,7 +391,7 @@ input{font:inherit;color:inherit}
 :root[data-theme="light"]:not(:has(#starterScr)) .box .lbl{color:var(--sk-mu)}
 :root[data-theme="light"]:not(:has(#starterScr)) .box input{font-size:var(--sk-num);color:var(--sk-tx)}
 :root[data-theme="light"]:not(:has(#starterScr)) .pm button{border-radius:10px}
-:root[data-theme="light"]:not(:has(#starterScr)) .r5 button{height:46px;border-radius:var(--sk-r-box);font-size:19px}
+:root[data-theme="light"]:not(:has(#starterScr)) .r5 button{height:40px;border-radius:var(--sk-r-box);font-size:17px}
 :root[data-theme="light"]:not(:has(#starterScr)) .r5 button.on{background:var(--sk-acStrong);color:#fff}
 /* il tasto grande viola (bianco sopra: 5.4:1) */
 :root[data-theme="light"]:not(:has(#starterScr)) .save{height:58px;border-radius:16px;background:var(--sk-acStrong);color:#fff}
@@ -558,17 +559,17 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 /* serie in corso (o in modifica): caselle da scrivere */
 .scur{background:var(--acSoft);border-color:var(--ac)}
 .scur .ck{border-color:var(--ac)}
-.scur .cell{background:var(--bg);border:1.5px solid var(--sk-ctl,var(--mu2))}
+.scur .cell{height:52px;background:var(--bg);border:1.5px solid var(--sk-ctl,var(--mu2))}
 .scur .cell.in:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px var(--acSoft)}
-.scur input{width:100%;height:100%;min-width:0;border:0;outline:0;background:none;text-align:center;font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--tx);padding:0}
+.scur input{width:100%;height:100%;min-width:0;border:0;outline:0;background:none;text-align:center;font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tx);padding:0}
 .scur .rv{color:var(--ac);font-weight:800}
-/* tasti − / + sotto la serie in corso: a metà riga ciascuno, tocco ≥ 44 px, i numeri restano grandi nelle caselle */
-.steps{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 8px}
-.stp{display:grid;grid-template-columns:minmax(44px,1fr) auto minmax(44px,1fr);align-items:center;gap:6px;padding:4px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
-.stp button{height:48px;border-radius:10px;background:var(--chip);border:1px solid var(--sk-ctl,transparent);font-size:26px;font-weight:600;line-height:1;color:var(--tx)}
+/* tasti − / + sotto la serie in corso: piccoli (40×40 px), così la serie e i numeri grandi nelle caselle restano in primo piano */
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 6px}
+.stp{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:4px;padding:3px;border-radius:12px;background:var(--card);border:1px solid var(--line)}
+.stp button{height:40px;width:40px;padding:0;border-radius:9px;background:var(--chip);border:1px solid var(--sk-ctl,transparent);font-size:22px;font-weight:600;line-height:1;color:var(--tx)}
 .stp button:active{transform:scale(.96)}
 .stp span{min-width:24px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--mu)}
-.exv .rirrow{margin:0 0 12px}
+.exv .rirrow{margin:0 0 10px}
 .exv .r5{gap:4px}
 .exv .edbtns{margin:0 0 12px}
 
