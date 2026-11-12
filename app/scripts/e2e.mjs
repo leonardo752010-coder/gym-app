@@ -241,7 +241,7 @@ try {
     await page.click('#notesBtn');
     check('Note: si apre la nota del piano', /Nota finta/.test(await page.textContent('#notes')));
     await page.click('#notesBtn');
-    check('nessun tasto Storico e nessuna foto finta', !/storico/i.test(await page.textContent('#exv')) && (await page.$$('#exv img')).length === 0);
+    check('tasto Storico presente e nessuna foto finta', (await page.isVisible('#histBtn')) && (await page.$$('#exv img')).length === 0);
     // superserie (Upper B)
     await pickDay(page, 'Upper B');
     check('superserie: etichetta SUPERSET A sull\'esercizio', /SUPERSET A/.test(await page.textContent('#exv .ss')));
