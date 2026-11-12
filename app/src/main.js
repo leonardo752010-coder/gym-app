@@ -26,7 +26,7 @@ import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
 } from './logic.js';
-import { PAGES, START_PAGE, navStep, pageFromState, historyList } from './pages.js';
+import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory } from './pages.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 
@@ -60,6 +60,8 @@ const S = {
   sync: { state: 'ok', pending: 0, failed: 0 }, lastRefresh: 0, persisted: null, pendingRender: false,
   starter: null, pick: null,   // starter: record sul telefono (vedi starter.js); pick: carta toccata, non ancora confermata
   page: START_PAGE,            // pagina della barra in basso: 'program' | 'track' | 'progress' (vedi pages.js)
+  // Progressi: filtri dello Storico (workout, esercizio). Solo in memoria.
+  prog: { day: '', ex: '' },
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -557,18 +559,40 @@ function renderProgram() {
     }).join('') + '</ol></section>').join('') + VER('verProgram');
 }
 
+/**
+ * Progressi: Storico. Solo lettura, solo dati già sul telefono (funziona offline).
+ * Le sedute come prima, con filtro per workout e per esercizio (si possono usare insieme).
+ */
 function renderProgress() {
   const T = S.T;
   const list = historyList(indexRows(S.local.list()), plan());
   if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
-  $('wrap').innerHTML = '<p class="pgNote">' + esc(T.historyNote) + '</p>' + list.map((s) => {
+  $('wrap').innerHTML = historyView(list);
+}
+
+const macTxt = (m, id) => (m ? machineLabel(m) || tr(m.name, S.lang) || m.code : id ? S.T.otherMachine : '');
+const setTxt = (x) => fmtN(setWeightIn(x, S.unit)) + ' ' + S.unit + ' × ' + x.reps + (x.rir != null ? '<em>@' + fmtN(x.rir) + '</em>' : '');
+const pfSelect = (id, label, all, items, cur) => '<label class="pf"><span>' + esc(label) + '</span><select id="' + id + '">' +
+  (all != null ? '<option value="">' + esc(all) + '</option>' : '') +
+  items.map((o) => '<option value="' + esc(o.v) + '"' + (o.v === cur ? ' selected' : '') + '>' + esc(o.t) + '</option>').join('') + '</select></label>';
+
+function historyView(list) {
+  const T = S.T, P = S.prog, opts = historyFilterOptions(list, plan());
+  if (P.day && !opts.days.some((d) => d.key === P.day)) P.day = '';
+  if (P.ex && !opts.exercises.some((e) => e.id === P.ex)) P.ex = '';
+  const exItems = opts.exercises.map((e) => ({ v: e.id, t: tr(e.name, S.lang) || '—' })).sort((a, b) => a.t.localeCompare(b.t, T.locale));
+  let h = '<div class="pfil">' + pfSelect('fDay', T.fWorkout, T.allWorkouts, opts.days.map((d) => ({ v: d.key, t: d.name || '—' })), P.day) +
+    pfSelect('fEx', T.fExercise, T.allExercises, exItems, P.ex) + '</div>';
+  const shown = filterHistory(list, { day: P.day, exercise: P.ex });
+  if (!shown.length) return h + '<div class="load" id="noMatch">' + esc(T.noMatch) + '</div>';
+  h += '<p class="pgNote">' + esc(T.historyNote) + '</p>';
+  return h + shown.map((s) => {
     const live = !s.ended && s.date === S.date;
     return '<section class="hses" data-ses="' + esc(s.id) + '"><div class="hsH"><b>' + esc(shortDate(s.date)) + '</b><span>' + esc(s.dayName) + '</span>' +
       '<small' + (live ? ' class="live"' : '') + '>' + esc(live ? T.inProgress : T.setCount(s.setCount)) + '</small></div>' +
       s.exercises.map((e) => '<div class="hex"><b>' + esc(tr(e.name, S.lang) || '—') + '</b>' +
-        (e.machine ? '<span class="m">' + esc(machineLabel(e.machine) || tr(e.machine.name, S.lang) || e.machine.code) + '</span>' : '') +
-        '<div class="lv">' + e.sets.map((x) => '<span>' + fmtN(setWeightIn(x, S.unit)) + ' ' + S.unit + ' × ' + x.reps + (x.rir != null ? '<em>@' + fmtN(x.rir) + '</em>' : '') + '</span>').join('') +
-        '</div></div>').join('') + '</section>';
+        (macTxt(e.machine, e.machineId) ? '<span class="m">' + esc(macTxt(e.machine, e.machineId)) + '</span>' : '') +
+        '<div class="lv">' + e.sets.map((x) => '<span>' + setTxt(x) + '</span>').join('') + '</div></div>').join('') + '</section>';
   }).join('');
 }
 
@@ -913,6 +937,14 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'endSession') { endSession(); return; }
   if (b.id === 'endPage') { askEnd(); return; }
   if (b.id === 'reopen') { reopen(b.dataset.sid); return; }
+});
+// filtri dello Storico (tendine di Progressi)
+document.addEventListener('change', (ev) => {
+  const id = ev.target.id;
+  if (id === 'fDay') S.prog.day = ev.target.value;
+  else if (id === 'fEx') S.prog.ex = ev.target.value;
+  else return;
+  render();
 });
 document.addEventListener('input', (ev) => { if (ev.target.id === 'inKg' || ev.target.id === 'inReps') { readInputs(); ev.target.parentNode.classList.toggle('lng', ev.target.value.length >= Number(ev.target.parentNode.dataset.lng)); } });
 

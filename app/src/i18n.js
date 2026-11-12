@@ -45,6 +45,10 @@ const it = {
   // schermata della serie (grafica nuova): obiettivo, confronto con la volta scorsa, tabella, tasto viola
   goal: 'Obiettivo', vsLast: 'vs volta scorsa', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + ' rep',
   weightCol: (u) => 'Peso (' + u + ')', complete: 'Completa serie', rirTap: 'RIR, tocca per cambiare',
+  // Progressi: Storico (con filtri)
+  fWorkout: 'Workout', fExercise: 'Esercizio',
+  allWorkouts: 'Tutti i workout', allExercises: 'Tutti gli esercizi', noMatch: 'Nessuna seduta con questi filtri.',
+  otherMachine: 'altra macchina',
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -81,6 +85,9 @@ const en = {
   more: 'More', chooseDay: 'Choose workout', exercises: 'Exercises', notesBtn: 'Notes', closeTimer: 'Close timer',
   goal: 'Target', vsLast: 'vs. last time', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + (Math.abs(n) === 1 ? ' rep' : ' reps'),
   weightCol: (u) => 'Weight (' + u + ')', complete: 'Complete set', rirTap: 'RIR, tap to change',
+  fWorkout: 'Workout', fExercise: 'Exercise',
+  allWorkouts: 'All workouts', allExercises: 'All exercises', noMatch: 'No sessions with these filters.',
+  otherMachine: 'other machine',
 };
 export const LANGS = { it, en };
 

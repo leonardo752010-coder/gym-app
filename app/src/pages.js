@@ -56,6 +56,8 @@ export function historyList(idx, plan) {
       const pe = (se.plan_exercise_id && P.byPe.get(se.plan_exercise_id)) || P.byEx.get(se.exercise_id) || null;
       exercises.push({
         id: se.id,
+        exerciseId: se.exercise_id,
+        machineId: se.machine_id || null,
         name: pe && pe.exercise ? pe.exercise.name : null,
         machine: (se.machine_id && P.machines.get(se.machine_id)) || null,
         sets,
@@ -63,11 +65,49 @@ export function historyList(idx, plan) {
     }
     if (!exercises.length) continue;
     const day = s.plan_day_id && P.days.get(s.plan_day_id);
+    const dayName = day ? day.name : s.day_name || '';
     out.push({
-      id: s.id, date: s.session_date, dayName: day ? day.name : s.day_name || '', ended: !!s.ended_at,
+      id: s.id, date: s.session_date, dayName, dayKey: dayKeyOf(s.plan_day_id, dayName), ended: !!s.ended_at,
       start: s.started_at || s.created_at || '', exercises,
       setCount: exercises.reduce((a, e) => a + e.sets.length, 0),
     });
   }
   return out.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0) || String(b.start).localeCompare(String(a.start)));
+}
+
+/** Chiave del workout di una seduta: il giorno del piano, altrimenti il nome salvato (sedute vecchie). */
+const dayKeyOf = (dayId, name) => (dayId ? 'd:' + dayId : name ? 'n:' + name : '');
+
+/**
+ * Scelte dei due filtri della History, prese dallo storico (solo quello che c'è davvero):
+ * workout nell'ordine del piano (poi quelli fuori piano), esercizi una volta sola (per esercizio, qualsiasi macchina).
+ */
+export function historyFilterOptions(list, plan) {
+  const order = new Map(((plan && plan.days) || []).map((d, i) => [dayKeyOf(d.id, d.name), i]));
+  const days = new Map(), exercises = new Map();
+  for (const s of list) {
+    if (s.dayKey && !days.has(s.dayKey)) days.set(s.dayKey, { key: s.dayKey, name: s.dayName });
+    for (const e of s.exercises) if (e.exerciseId && (!exercises.has(e.exerciseId) || !exercises.get(e.exerciseId).name)) exercises.set(e.exerciseId, { id: e.exerciseId, name: e.name });
+  }
+  const pos = (d) => (order.has(d.key) ? order.get(d.key) : 1e6);
+  return {
+    days: [...days.values()].sort((a, b) => pos(a) - pos(b) || String(a.name).localeCompare(String(b.name))),
+    exercises: [...exercises.values()],
+  };
+}
+
+/**
+ * History filtrata: per workout (dayKey) e/o per esercizio (exerciseId). Con l'esercizio restano solo le sue righe
+ * (cronologia di quell'esercizio, dalla più recente). Filtro vuoto = tutto. Non cambia la lista di partenza.
+ */
+export function filterHistory(list, { day = '', exercise = '' } = {}) {
+  const out = [];
+  for (const s of list) {
+    if (day && s.dayKey !== day) continue;
+    if (!exercise) { out.push(s); continue; }
+    const exercises = s.exercises.filter((e) => e.exerciseId === exercise);
+    if (!exercises.length) continue;
+    out.push({ ...s, exercises, setCount: exercises.reduce((a, e) => a + e.sets.length, 0) });
+  }
+  return out;
 }

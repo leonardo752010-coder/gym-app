@@ -755,3 +755,11 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #exv#exv .last .lv{display:flex;flex-wrap:wrap;gap:2px 0;margin:2px 0 0 -13px;font-size:15px;font-weight:700}
 #exv#exv .last .lv span{white-space:nowrap;padding:0 12px;border-left:1px solid var(--sk-ctl,var(--line))}
 #exv#exv .last .lv em{margin-left:0;font-size:13px;color:var(--mu)}
+
+/* ---------- Progressi: Storico (filtri) ---------- */
+/* filtri: due tendine affiancate (una sotto l'altra sotto i 360 px) */
+.pfil{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px}
+.pf{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pf span{font-size:12px;font-weight:700;color:var(--mu)}
+.pf select{width:100%;min-width:0;min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--sk-ctl,var(--line));background:var(--card);color:var(--tx);font:inherit;font-size:15px;font-weight:700;text-overflow:ellipsis}
+@media (max-width:359px){ .pfil{grid-template-columns:1fr} }
