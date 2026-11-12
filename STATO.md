@@ -10,6 +10,14 @@ Prima, 2026-11-11 (subito dopo mezzanotte): **bottoni − / + e RIR più compatt
 
 Prima, 2026-11-09 (15:40): **icona nuova + "Fine seduta" con conferma e riquadro "Session done" PUBBLICATI** su Cloudflare (versione dell'app **"09/11/2026 15:34"**, Cloudflare `38ac1468`), dal branch `feature/icona-e-end-session` (su GitHub). **Non unito in `claude/app-v1`**: oggi l'app online viene da `feature/icona-e-end-session`. **Per tornare indietro** (solo con l'ok di Leonardo): nella cartella `app/`, `npx wrangler@4 rollback 73dce1db-4842-4d08-8835-89c5b82fe18c`.
 
+## Suggerimento: serie dopo al massimo salgono anche senza la top (2026-11-13 pomeriggio, solo sul computer)
+
+- **Problema visto da Leonardo sul telefono** (Incline chest press, piano 2 × 6–10). Volta scorsa: 30 kg × 12 @1, poi 40 kg × 6 @0. Il suggerimento per la serie 1 era "30 × 12, Keep the weight, ±0 reps". Motivo: la top (la prima serie a RIR 0) era la serie 2 da 40 kg, sotto il massimo, quindi non saliva; la serie da 30 kg è una "serie dopo" e poteva salire solo insieme alla top.
+- **Regola aggiunta** (con l'ok di Leonardo, solo in `suggest()` in `app/src/logic.js`): se la prima serie a RIR 1-2 della volta scorsa ha fatto il **massimo del range o di più**, le serie dopo salgono di un salto (dal loro peso vecchio) con le rep al minimo, **anche se la top non sale**. Il resto non cambia. Con la seduta del 9/11 adesso: serie 1 → un salto sopra 30 (salto della macchina) × 6, "Range done: add weight"; serie 2 → 40 × 7. Scritta anche in `DECISIONI.md`.
+- **Non cambiato**: senza nessuna serie a RIR 0 (o senza RIR) non sale niente, come deciso. Una serie sopra il massimo in quel caso resta con "Tieni il peso".
+- **Test**: 1 prova nuova in `app/tests/unit/logic.test.js` (la seduta del 9/11, più i casi "esattamente al massimo → sale" e "una rep sotto → +1 rep"). `npm test` **158 verdi**, `npm run test:locale` **25 verdi**, `npm run test:e2e` **167 ok, 0 no** (solo database locale).
+- **Niente commit, push o deploy**: si aspetta l'ok di Leonardo dopo il diff. L'app online resta la "13/11/2026 12:40".
+
 ## Suggerimento: doppia progressione con serie top (2026-11-13, richiesta di Leonardo, pubblicata con il suo ok)
 
 - **Push e deploy (12:40, con l'ok di Leonardo)**: prima il commit `bbbc800`, solo STATO.md. Poi `git push origin claude/app-v1`: `c30d071..bbbc800`, fast-forward, senza force, partiti solo `a8b5c79` e `bbbc800`. Con `wrangler deployments list` ho confermato che la versione attiva prima del deploy era `9e86e97a-0c7b-48c8-b3f4-8e1f8f100181`. Poi `npm run build`.
@@ -528,6 +536,8 @@ Problema segnalato da Leonardo: nella vecchia app le serie restavano e la settim
 
 ## Prossimo passo
 
+Serie dopo al massimo (2026-11-13 pomeriggio, solo sul computer, non committato): Leonardo guarda il diff e decide commit, push e deploy.
+
 Suggerimento con serie top online (2026-11-13, 12:40):
 1. Sul telefono aprire l'app con internet, aspettare qualche secondo, chiuderla del tutto e riaprirla.
 2. Nel menu "..." → Account, in fondo, deve comparire **"Versione 13/11/2026 12:40"**. Se compare ancora 11:59, chiudere e riaprire ancora una volta.
@@ -568,6 +578,8 @@ Pelle ALLENAMENTO online: aprire l'app con internet, aspettare qualche secondo, 
 Poi: Leonardo installa l'app sul telefono, accede e registra una seduta vera (prova con i dati veri).
 
 ## Da decidere o fare per Leonardo
+
+- **Serie dopo al massimo salgono anche senza la top** (solo sul computer, non committato): ok per commit, push e deploy dopo aver visto il diff.
 
 - **Suggerimento con serie top** (commit `a8b5c79`, su GitHub e **pubblicato**, versione "13/11/2026 12:40"): (1) provarlo sul telefono (vedi "Prossimo passo"); (2) "+1-2 rep" fatto come **+1 rep**; (3) le serie dopo salgono di un salto **dal loro peso** (non fino al peso della top); (4) casella del peso: **fatto** (`draftFor` parte dal peso suggerito per quella serie); per le serie extra oltre il piano resta il peso della serie appena fatta; (5) le serie dopo che salgono dicono "Range chiuso: più peso", come la top.
 

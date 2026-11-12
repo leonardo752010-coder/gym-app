@@ -84,6 +84,14 @@ describe('suggerimento (doppia progressione con serie top)', () => {
     // serie dopo più leggera della top: sale dal suo peso, non da quello della top
     expect(wr(suggest(pe(), last([[80, 10, 0], [75, 9, 1]]), 'kg'))).toEqual([[82.5, 6, 'up'], [77.5, 6, 'up']]);
   });
+  it('serie a RIR 1-2 al massimo (o oltre) sale anche se la top non sale (seduta del 9/11: 30×12 @1, 40×6 @0)', () => {
+    const s = suggest(pe(), last([[30, 12, 1], [40, 6, 0]]), 'kg');
+    expect(s.topped).toBe(false);
+    expect(s.sets).toEqual([{ n: 1, weight: 32.5, reps: 6, why: 'up' }, { n: 2, weight: 40, reps: 7, why: 'reps' }]);
+    // esattamente al massimo: sale; una rep sotto: peso vecchio e una rep in più
+    expect(wr(suggest(pe(), last([[80, 7, 0], [70, 10, 2]]), 'kg'))).toEqual([[80, 8, 'reps'], [72.5, 6, 'up']]);
+    expect(wr(suggest(pe(), last([[80, 7, 0], [70, 9, 2]]), 'kg'))).toEqual([[80, 8, 'reps'], [70, 10, 'reps']]);
+  });
   it('serie dopo vicino al minimo: peso vecchio, una rep in più', () => {
     const s = suggest(pe({ sets: 3 }), last([[80, 10, 0], [80, 6 + SOGLIA - 1, 2], [80, 6, 2]]), 'kg');
     expect(wr(s)).toEqual([[82.5, 6, 'up'], [80, 8, 'reps'], [80, 8, 'reps']]);

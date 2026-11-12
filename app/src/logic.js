@@ -249,7 +249,8 @@ export function setWeightIn(s, unit) {
  *   Altrimenti: stesso peso, una rep in più.
  * - Serie dopo: guardano la prima serie a RIR 1-2 della volta scorsa (fatta col peso vecchio).
  *   Se la top sale e quella serie aveva almeno REP_SOPRA_MINIMO_PER_SALIRE rep sopra il minimo:
- *   un salto di peso anche per loro, rep al minimo. Altrimenti: peso vecchio, una rep in più.
+ *   un salto di peso anche per loro, rep al minimo. Se quella serie aveva fatto il massimo del range (o di più):
+ *   un salto di peso comunque, anche se la top non sale. Altrimenti: peso vecchio, una rep in più.
  *   Senza una serie a RIR 1-2: ognuna resta col suo peso vecchio, una rep in più.
  * - Nessuna serie a RIR 0 (o RIR mancante, dati vecchi): stesso peso e una rep in più, niente salita.
  * "Una rep in più" va al minimo se si era sotto, e mai oltre il massimo (al massimo: 'hold').
@@ -285,7 +286,8 @@ export function suggest(pe, last, unit) {
     if (n === topN) out.push(topped ? goUp(n, topW, top.reps) : oneMore(n, topW, top.reps));
     else if (ref) {
       const refW = setWeightIn(ref, unit);
-      out.push(topped && ref.reps >= min + REP_SOPRA_MINIMO_PER_SALIRE ? goUp(n, refW, ref.reps) : oneMore(n, refW, ref.reps));
+      const refAtMax = max != null && ref.reps >= max;   // al massimo del range (o oltre): sale anche se la top no
+      out.push(refAtMax || (topped && ref.reps >= min + REP_SOPRA_MINIMO_PER_SALIRE) ? goUp(n, refW, ref.reps) : oneMore(n, refW, ref.reps));
     } else { const ls = lastOf(n); out.push(oneMore(n, setWeightIn(ls, unit), ls.reps)); }
   }
   return { topped, sets: out };
