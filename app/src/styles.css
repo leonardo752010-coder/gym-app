@@ -756,10 +756,32 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #exv#exv .last .lv span{white-space:nowrap;padding:0 12px;border-left:1px solid var(--sk-ctl,var(--line))}
 #exv#exv .last .lv em{margin-left:0;font-size:13px;color:var(--mu)}
 
-/* ---------- Progressi: Storico (filtri) ---------- */
+/* ---------- Progressi: Storico (filtri) e Grafico ---------- */
+/* selettore Storico / Grafico: due metà uguali, tocco alto 44 px */
+.ptabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:2px 0 12px;border-radius:14px;background:var(--chip)}
+.ptabs button{min-height:44px;border-radius:11px;font-size:15px;font-weight:800;color:var(--mu)}
+.ptabs button.on{background:var(--card);color:var(--tx);box-shadow:0 0 0 1px var(--line)}
 /* filtri: due tendine affiancate (una sotto l'altra sotto i 360 px) */
 .pfil{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px}
+.pfil.one{grid-template-columns:1fr}
 .pf{display:flex;flex-direction:column;gap:4px;min-width:0}
 .pf span{font-size:12px;font-weight:700;color:var(--mu)}
 .pf select{width:100%;min-width:0;min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--sk-ctl,var(--line));background:var(--card);color:var(--tx);font:inherit;font-size:15px;font-weight:700;text-overflow:ellipsis}
 @media (max-width:359px){ .pfil{grid-template-columns:1fr} }
+.cmac{margin:-4px 0 10px;font-size:13px;font-weight:600;color:var(--vt,var(--mu))}
+/* grafico: etichette a sinistra, area con linee leggere, punti da toccare (disegno 12 px, tocco 40 × 40 px) */
+.chart{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 12px 10px;margin:0 0 12px}
+.cty{margin:0 0 8px;font-size:12px;font-weight:700;color:var(--mu)}
+.cbox{display:grid;grid-template-columns:44px 1fr;height:200px}
+.cyl{position:relative}
+.cyl span{position:absolute;right:8px;transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--mu);white-space:nowrap}
+.cplot{position:relative;min-width:0}
+.cplot svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cplot line{stroke:var(--line);stroke-width:1}
+.cplot polyline{fill:none;stroke:var(--ac);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.cpt{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;padding:0;border-radius:50%;display:grid;place-items:center}
+.cpt::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--card);border:3px solid var(--ac)}
+.cpt.on::after{width:16px;height:16px;background:var(--ac);box-shadow:0 0 0 4px var(--acSoft)}
+.cxl{display:flex;justify-content:space-between;margin:6px 0 0 44px;font-size:12px;font-weight:700;color:var(--mu)}
+.chint{margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--mu)}
+.cday .hex .lv span.bst{color:var(--vt,var(--ac))}

@@ -148,6 +148,42 @@ export function lastPerformance(idx, pe, { excludeSessionId = null, onOrBefore =
   };
 }
 
+/**
+ * e1RM (massimale stimato) di una serie: kg × (1 + (reps + RIR) / 30). RIR mancante = 0.
+ * null se mancano kg o reps (o non sono numeri validi). Nessun arrotondamento: lo fa chi mostra il numero.
+ */
+export function e1rm(kg, reps, rir) {
+  if (kg == null || kg === '' || reps == null || reps === '') return null;
+  const w = Number(kg), r = Number(reps), x = rir == null || rir === '' ? 0 : Number(rir);
+  if (!Number.isFinite(w) || !Number.isFinite(r) || !Number.isFinite(x) || w < 0 || r < 0) return null;
+  return w * (1 + (r + x) / 30);
+}
+
+/**
+ * Punti del grafico per un esercizio su UNA macchina (machineId null = senza macchina; macchine diverse non si mischiano).
+ * Un punto per seduta: l'e1RM della serie migliore (riscaldamento escluso, serie senza kg o reps saltate).
+ * Dalla più vecchia. Ogni punto ha anche le serie di quel giorno (per il tocco sul punto). Solo lettura.
+ */
+export function e1rmPoints(idx, exerciseId, machineId) {
+  const bySession = new Map();
+  for (const se of idx.sesEx.values()) {
+    if (se.exercise_id !== exerciseId || (se.machine_id || null) !== (machineId || null)) continue;
+    const s = idx.sessions.get(se.session_id);
+    if (!s) continue;
+    const sets = setsOf(idx, se.id).filter(isWorking);
+    if (!sets.length) continue;
+    const p = bySession.get(s.id) || { sessionId: s.id, date: s.session_date, start: s.started_at || s.created_at || '', best: null, bestSet: null, sets: [] };
+    for (const x of sets) {
+      p.sets.push(x);
+      const v = e1rm(x.weight_kg, x.reps, x.rir);
+      if (v != null && (p.best == null || v > p.best)) { p.best = v; p.bestSet = x; }
+    }
+    bySession.set(s.id, p);
+  }
+  return [...bySession.values()].filter((p) => p.best != null)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.start).localeCompare(String(b.start))));
+}
+
 function num(v) { return v == null || v === '' ? null : Number(v); }
 
 /** Arrotonda per evitare 82.49999. */

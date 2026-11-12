@@ -111,3 +111,28 @@ export function filterHistory(list, { day = '', exercise = '' } = {}) {
   }
   return out;
 }
+
+/**
+ * Scelte del grafico: una per esercizio + macchina (macchine diverse non si mischiano), con il numero di sedute.
+ * `multi` = quell'esercizio è stato fatto su più di una macchina (allora la macchina si mostra nel nome).
+ * Ordine: l'esercizio fatto più di recente per primo.
+ */
+export function chartChoices(list) {
+  const map = new Map();
+  for (const s of list) {
+    for (const e of s.exercises) {
+      if (!e.exerciseId) continue;
+      const key = e.exerciseId + '|' + (e.machineId || '');
+      const c = map.get(key) || { key, exerciseId: e.exerciseId, machineId: e.machineId, name: e.name, machine: e.machine, sessions: new Set(), last: '' };
+      c.sessions.add(s.id);
+      if (!c.name) c.name = e.name;
+      if (s.date > c.last) c.last = s.date;
+      map.set(key, c);
+    }
+  }
+  const perEx = new Map();
+  for (const c of map.values()) perEx.set(c.exerciseId, (perEx.get(c.exerciseId) || 0) + 1);
+  return [...map.values()]
+    .map(({ sessions, ...c }) => ({ ...c, count: sessions.size, multi: perEx.get(c.exerciseId) > 1 }))
+    .sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : 0) || a.key.localeCompare(b.key));
+}

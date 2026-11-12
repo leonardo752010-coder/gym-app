@@ -24,9 +24,9 @@ import logoHead from './assets/logo/logo-gorilla.webp';
 const LOGO = (cls) => '<img class="' + cls + '" src="' + logoFull + '" width="720" height="668" alt="Gym · Import &amp; Track">';
 import {
   localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
-  restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable,
+  restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable, e1rmPoints, LB,
 } from './logic.js';
-import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory } from './pages.js';
+import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 
@@ -60,8 +60,8 @@ const S = {
   sync: { state: 'ok', pending: 0, failed: 0 }, lastRefresh: 0, persisted: null, pendingRender: false,
   starter: null, pick: null,   // starter: record sul telefono (vedi starter.js); pick: carta toccata, non ancora confermata
   page: START_PAGE,            // pagina della barra in basso: 'program' | 'track' | 'progress' (vedi pages.js)
-  // Progressi: filtri dello Storico (workout, esercizio). Solo in memoria.
-  prog: { day: '', ex: '' },
+  // Progressi: sezione (Storico / Grafico), filtri dello storico, esercizio+macchina del grafico, punto toccato. Solo in memoria.
+  prog: { tab: 'history', day: '', ex: '', chart: '', pt: '' },
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -560,14 +560,18 @@ function renderProgram() {
 }
 
 /**
- * Progressi: Storico. Solo lettura, solo dati già sul telefono (funziona offline).
- * Le sedute come prima, con filtro per workout e per esercizio (si possono usare insieme).
+ * Progressi: due sezioni (Storico / Grafico). Solo lettura, solo dati già sul telefono (funziona offline).
+ * Storico: le sedute come prima, con filtro per workout e per esercizio (si possono usare insieme).
+ * Grafico: un esercizio su una macchina, un punto per seduta (e1RM della serie migliore); tocco su un punto → serie di quel giorno.
  */
 function renderProgress() {
-  const T = S.T;
-  const list = historyList(indexRows(S.local.list()), plan());
+  const T = S.T, P = S.prog;
+  const idx = indexRows(S.local.list());
+  const list = historyList(idx, plan());
   if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
-  $('wrap').innerHTML = historyView(list);
+  const tabs = '<div class="ptabs" role="tablist">' + ['history', 'chart'].map((t) => '<button role="tab" data-ptab="' + t + '" id="ptab-' + t + '" class="' + (P.tab === t ? 'on' : '') +
+    '" aria-selected="' + (P.tab === t) + '">' + esc(t === 'history' ? T.histTab : T.chartTab) + '</button>').join('') + '</div>';
+  $('wrap').innerHTML = tabs + (P.tab === 'chart' ? chartView(idx, list) : historyView(list));
 }
 
 const macTxt = (m, id) => (m ? machineLabel(m) || tr(m.name, S.lang) || m.code : id ? S.T.otherMachine : '');
@@ -594,6 +598,49 @@ function historyView(list) {
         (macTxt(e.machine, e.machineId) ? '<span class="m">' + esc(macTxt(e.machine, e.machineId)) + '</span>' : '') +
         '<div class="lv">' + e.sets.map((x) => '<span>' + setTxt(x) + '</span>').join('') + '</div></div>').join('') + '</section>';
   }).join('');
+}
+
+/** e1RM nell'unità mostrata, con un decimale (80 kg × 8 @2 → 106,7). */
+const e1Txt = (kg) => String(Math.round((S.unit === 'lb' ? kg / LB : kg) * 10) / 10).replace('.', ',');
+
+function chartView(idx, list) {
+  const T = S.T, P = S.prog, choices = chartChoices(list);
+  if (!choices.length) return '<div class="load" id="chartNone">' + esc(T.chartNone) + '</div>';
+  if (!choices.some((c) => c.key === P.chart)) { P.chart = choices[0].key; P.pt = ''; }   // di base: l'esercizio fatto più di recente
+  const c = choices.find((x) => x.key === P.chart);
+  const label = (x) => (tr(x.name, S.lang) || '—') + (x.multi ? ' · ' + (macTxt(x.machine, x.machineId) || T.noMachine) : '');
+  const items = choices.map((x) => ({ v: x.key, t: label(x) })).sort((a, b) => a.t.localeCompare(b.t, T.locale));
+  let h = '<div class="pfil one">' + pfSelect('cEx', T.fExercise, null, items, P.chart) + '</div>';
+  if (c.machineId) h += '<p class="cmac" id="chartMachine">' + esc(macTxt(c.machine, c.machineId)) + '</p>';
+  const pts = e1rmPoints(idx, c.exerciseId, c.machineId);
+  if (P.pt && !pts.some((p) => p.sessionId === P.pt)) P.pt = '';
+  const sel = pts.find((p) => p.sessionId === P.pt) || pts[pts.length - 1] || null;
+  if (pts.length < 2) return h + '<div class="load" id="chartFew">' + esc(T.chartFew) + '</div>' + (sel ? pointCard(sel, list) : '');
+  // asse Y: dal minimo al massimo con un po' di margine; asse X: un punto per seduta, in ordine, a distanza uguale
+  const vals = pts.map((p) => p.best);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = hi - lo > 0 ? (hi - lo) * 0.15 : Math.max(hi * 0.05, 1);
+  lo = Math.max(0, lo - pad); hi += pad;
+  const X = (i) => 6 + (88 * i) / (pts.length - 1), Y = (v) => 8 + 84 * (1 - (v - lo) / (hi - lo));
+  const ticks = [hi, (hi + lo) / 2, lo];
+  h += '<div class="chart" id="chart"><p class="cty">' + esc(T.e1rm) + ' (' + S.unit + ')</p><div class="cbox">' +
+    '<div class="cyl" aria-hidden="true">' + ticks.map((t) => '<span style="top:' + Y(t) + '%">' + e1Txt(t) + '</span>').join('') + '</div>' +
+    '<div class="cplot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' +
+    ticks.map((t) => '<line x1="0" x2="100" y1="' + Y(t) + '" y2="' + Y(t) + '" vector-effect="non-scaling-stroke"/>').join('') +
+    '<polyline points="' + pts.map((p, i) => X(i) + ',' + Y(p.best)).join(' ') + '" vector-effect="non-scaling-stroke"/></svg>' +
+    pts.map((p, i) => '<button class="cpt' + (p === sel ? ' on' : '') + '" data-pt="' + esc(p.sessionId) + '" style="left:' + X(i) + '%;top:' + Y(p.best) + '%"' +
+      ' aria-pressed="' + (p === sel) + '" aria-label="' + esc(T.pointAria(shortDate(p.date), e1Txt(p.best) + ' ' + S.unit)) + '"></button>').join('') +
+    '</div></div><div class="cxl" aria-hidden="true"><span>' + esc(shortDate(pts[0].date)) + '</span><span>' + esc(shortDate(pts[pts.length - 1].date)) + '</span></div>' +
+    '<p class="chint">' + esc(T.chartHint) + '</p></div>';
+  return h + pointCard(sel, list);
+}
+
+/** Serie del giorno toccato nel grafico: data, workout, e1RM migliore e le serie (kg × reps @RIR). */
+function pointCard(p, list) {
+  const T = S.T, s = list.find((x) => x.id === p.sessionId);
+  return '<section class="hses cday" id="chartDay"><div class="hsH"><b>' + esc(shortDate(p.date)) + '</b><span>' + esc(s ? s.dayName : '') + '</span>' +
+    '<small class="live">e1RM ' + esc(e1Txt(p.best)) + ' ' + S.unit + '</small></div>' +
+    '<div class="hex"><div class="lv">' + p.sets.map((x) => '<span' + (x === p.bestSet ? ' class="bst" title="' + esc(T.best) + '"' : '') + '>' + setTxt(x) + '</span>').join('') + '</div></div></section>';
 }
 
 const exName = (pe) => tr(pe.exercise && pe.exercise.name, S.lang) || '—';
@@ -899,6 +946,9 @@ document.addEventListener('click', (ev) => {
   // tasti con un loro gestore: menu e tendine (.sheet), timer, luna
   if (b.closest('.sheet') || ['tMinus', 'tPlus', 'tStop', 'themeBtn'].includes(b.id)) return;
   if (b.id === 'notesBtn') { S.openNotes = !S.openNotes; render(); return; }
+  // Progressi: sezione Storico / Grafico, punto del grafico (solo cose da vedere, niente dati cambiati)
+  if (b.dataset.ptab) { if (S.prog.tab !== b.dataset.ptab) { S.prog.tab = b.dataset.ptab; render(); } return; }
+  if (b.dataset.pt) { S.prog.pt = b.dataset.pt; render(); return; }
   if (b.id === 'dayBtn') { openDays(); return; }
   if (b.id === 'hBack') { if (setPage('program')) { render(); scrollTo(0, 0); } return; }   // freccia indietro: a Programma (come il tasto in basso)
   if (b.id === 'moreBtn') { openMore(); return; }
@@ -938,11 +988,12 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'endPage') { askEnd(); return; }
   if (b.id === 'reopen') { reopen(b.dataset.sid); return; }
 });
-// filtri dello Storico (tendine di Progressi)
+// filtri dello Storico e scelta del grafico (tendine di Progressi)
 document.addEventListener('change', (ev) => {
   const id = ev.target.id;
   if (id === 'fDay') S.prog.day = ev.target.value;
   else if (id === 'fEx') S.prog.ex = ev.target.value;
+  else if (id === 'cEx') { S.prog.chart = ev.target.value; S.prog.pt = ''; }
   else return;
   render();
 });
