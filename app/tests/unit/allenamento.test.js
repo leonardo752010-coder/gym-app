@@ -117,9 +117,10 @@ describe('layout nel codice', () => {
     expect(main).toMatch(/await updateSet\(S\.local, S\.edit\.id, values\)/);
   });
 
-  it('niente tasto Storico e niente foto della macchina (non esistono dati per farli)', () => {
-    expect(Object.keys(LANGS.it).filter((k) => /^(history|storico)(Btn)?$/i.test(k))).toEqual([]);   // nessun testo per un tasto Storico
-    expect(main).not.toMatch(/photo|foto|histBtn|T\.history\b/i);
+  it('niente foto della macchina (non esiste il dato); il tasto Storico c\'è (chiesto da Leonardo il 2026-11-13: ultime 3 volte)', () => {
+    expect(main).not.toMatch(/photo|foto/i);
+    expect(main).toMatch(/id="histBtn"/);
+    expect(LANGS.it.histBtn).toBeTruthy();
   });
 
   it('area di tocco (non il disegno): almeno 40 × 40 px per − / + e RIR, almeno 44 px per frecce, timer, salva, tendine', () => {

@@ -126,10 +126,20 @@ const isWorking = (s) => s.set_type !== 'warmup';
  * sulla stessa macchina se il piano ne indica una. Solo serie non cancellate e non di riscaldamento.
  * excludeSessionId: un id o una lista di id (le sedute in corso).
  */
-export function lastPerformance(idx, pe, { excludeSessionId = null, onOrBefore = null } = {}) {
+export function lastPerformance(idx, pe, opts = {}) {
+  return lastPerformances(idx, pe, opts, 1)[0] || null;
+}
+
+/**
+ * Le ultime `count` volte (dalla più recente) con le stesse regole di lastPerformance: stessa macchina se il
+ * piano ne indica una, sedute escluse fuori, solo serie non cancellate e non di riscaldamento.
+ * Un esercizio fatto due volte nella stessa seduta conta una volta sola (la più recente), come prima.
+ * Serve al tasto "History" dell'esercizio. Solo lettura.
+ */
+export function lastPerformances(idx, pe, { excludeSessionId = null, onOrBefore = null } = {}, count = 3) {
   const mac = machineOf(pe);
   const excl = new Set([].concat(excludeSessionId ?? []));
-  let best = null;
+  const bySession = new Map();
   for (const se of idx.sesEx.values()) {
     if (se.exercise_id !== pe.exercise_id) continue;
     if (mac && se.machine_id !== mac) continue;
@@ -139,13 +149,13 @@ export function lastPerformance(idx, pe, { excludeSessionId = null, onOrBefore =
     const sets = setsOf(idx, se.id).filter(isWorking);
     if (!sets.length) continue;
     const when = s.session_date + '|' + (sets[sets.length - 1].performed_at || '');
-    if (!best || when > best.when) best = { when, date: s.session_date, sessionId: s.id, sets };
+    const cur = bySession.get(s.id);
+    if (!cur || when > cur.when) bySession.set(s.id, { when, date: s.session_date, sessionId: s.id, machineId: se.machine_id || null, sets });
   }
-  if (!best) return null;
-  return {
-    date: best.date, sessionId: best.sessionId,
+  return [...bySession.values()].sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0)).slice(0, Math.max(0, count)).map((best) => ({
+    date: best.date, sessionId: best.sessionId, machineId: best.machineId,
     sets: best.sets.map((s, i) => ({ n: i + 1, kg: num(s.weight_kg), reps: s.reps, rir: s.rir == null ? null : num(s.rir), input_weight: num(s.input_weight), input_unit: s.input_unit })),
-  };
+  }));
 }
 
 /**

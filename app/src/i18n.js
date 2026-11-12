@@ -45,14 +45,15 @@ const it = {
   // schermata della serie (grafica nuova): obiettivo, confronto con la volta scorsa, tabella, tasto viola
   goal: 'Obiettivo', vsLast: 'vs volta scorsa', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + ' rep',
   weightCol: (u) => 'Peso (' + u + ')', complete: 'Completa serie', rirTap: 'RIR, tocca per cambiare',
-  // Progressi: Storico (con filtri) e Grafico
-  histTab: 'Storico', chartTab: 'Grafico', fWorkout: 'Workout', fExercise: 'Esercizio',
+  // Progressi: Storico (con filtri) e Grafico; tasto "Storico" nell'esercizio (ultime 3 volte)
+  histTab: 'Storico', chartTab: 'Grafico', histBtn: 'Storico', fWorkout: 'Workout', fExercise: 'Esercizio',
   allWorkouts: 'Tutti i workout', allExercises: 'Tutti gli esercizi', noMatch: 'Nessuna seduta con questi filtri.',
   otherMachine: 'altra macchina', noMachine: 'senza macchina',
   chartNone: 'Nessun esercizio con serie salvate sul telefono.',
   chartFew: 'Servono almeno 2 sedute di questo esercizio (su questa macchina) per disegnare il grafico.',
   e1rm: 'e1RM stimato', chartHint: 'Un punto per seduta: la serie migliore, peso × (1 + (rep + RIR) / 30). Tocca un punto per vedere le serie.',
   pointAria: (d, v) => d + ': e1RM ' + v, best: 'migliore',
+  histTitle: 'Ultime 3 volte', histNone: 'Nessuna volta precedente per questo esercizio.',
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -89,13 +90,14 @@ const en = {
   more: 'More', chooseDay: 'Choose workout', exercises: 'Exercises', notesBtn: 'Notes', closeTimer: 'Close timer',
   goal: 'Target', vsLast: 'vs. last time', repDiff: (n) => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n) + (Math.abs(n) === 1 ? ' rep' : ' reps'),
   weightCol: (u) => 'Weight (' + u + ')', complete: 'Complete set', rirTap: 'RIR, tap to change',
-  histTab: 'History', chartTab: 'Chart', fWorkout: 'Workout', fExercise: 'Exercise',
+  histTab: 'History', chartTab: 'Chart', histBtn: 'History', fWorkout: 'Workout', fExercise: 'Exercise',
   allWorkouts: 'All workouts', allExercises: 'All exercises', noMatch: 'No sessions with these filters.',
   otherMachine: 'other machine', noMachine: 'no machine',
   chartNone: 'No exercise with sets saved on this phone.',
   chartFew: 'At least 2 sessions of this exercise (on this machine) are needed to draw the chart.',
   e1rm: 'Estimated e1RM', chartHint: 'One point per session: the best set, weight × (1 + (reps + RIR) / 30). Tap a point to see the sets.',
   pointAria: (d, v) => d + ': e1RM ' + v, best: 'best',
+  histTitle: 'Last 3 times', histNone: 'No previous time for this exercise.',
 };
 export const LANGS = { it, en };
 

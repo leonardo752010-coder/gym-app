@@ -756,7 +756,7 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #exv#exv .last .lv span{white-space:nowrap;padding:0 12px;border-left:1px solid var(--sk-ctl,var(--line))}
 #exv#exv .last .lv em{margin-left:0;font-size:13px;color:var(--mu)}
 
-/* ---------- Progressi: Storico (filtri) e Grafico ---------- */
+/* ---------- Progressi: Storico (filtri) e Grafico; riquadro "Storico" dell'esercizio ---------- */
 /* selettore Storico / Grafico: due metà uguali, tocco alto 44 px */
 .ptabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:2px 0 12px;border-radius:14px;background:var(--chip)}
 .ptabs button{min-height:44px;border-radius:11px;font-size:15px;font-weight:800;color:var(--mu)}
@@ -785,3 +785,8 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .cxl{display:flex;justify-content:space-between;margin:6px 0 0 44px;font-size:12px;font-weight:700;color:var(--mu)}
 .chint{margin:8px 0 0;font-size:12px;line-height:1.4;color:var(--mu)}
 .cday .hex .lv span.bst{color:var(--vt,var(--ac))}
+/* riquadro "Storico" (ultime 3 volte) */
+.hsheet .hsub{margin:0 0 12px}
+.hsheet .hlist{margin:0 0 14px}
+.hsheet .hex:first-child{border-top:0}
+.hsheet .hex > b{font-size:13px;color:var(--mu)}

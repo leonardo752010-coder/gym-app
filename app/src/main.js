@@ -23,7 +23,7 @@ import logoFull from './assets/logo/logo-silverback.webp';
 import logoHead from './assets/logo/logo-gorilla.webp';
 const LOGO = (cls) => '<img class="' + cls + '" src="' + logoFull + '" width="720" height="668" alt="Gym · Import &amp; Track">';
 import {
-  localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, suggest, stepWeight,
+  localDate, addDays, indexRows, openSessions, setsInSessions, lastPerformance, lastPerformances, suggest, stepWeight,
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable, e1rmPoints, LB,
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
@@ -86,6 +86,7 @@ const ICON_WATCH = SVG('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.
 const ICON_CLOSE = SVG('<path d="M6 6l12 12M18 6L6 18"/>', 2.4);
 const ICON_CHECK = SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 3);
 const ICON_NOTE = SVG('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>');
+const ICON_HIST = SVG('<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4v4h4M12 7.5V12l3 2"/>');
 // schermata della serie: freccia su (obiettivo), calendario (volta scorsa), nuvola (stato online), icone dei chip
 const ICON_UP = SVG('<path d="M12 19V5M6 11l6-6 6 6"/>', 2.6);
 const ICON_CAL = SVG('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
@@ -438,10 +439,11 @@ function exView(v, exs, pe) {
     h += '<div class="mac"><b>' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</b>' + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
       (pe.alt_machine ? ' <span>· ' + T.alt + ': ' + esc(machineLabel(pe.alt_machine) || pe.alt_machine.code) + '</span>' : '') + '</div>';
   }
-  // chip con icona: schema, RIR, muscolo (viola), Note (solo se l'esercizio del piano ha una nota: è un tasto)
+  // chip con icona: schema, RIR, muscolo (viola), Note (solo se l'esercizio del piano ha una nota: è un tasto), Storico (ultime 3 volte)
   const noteBtn = pe.notes ? '<button class="mini' + (S.openNotes ? ' on' : '') + '" id="notesBtn" aria-expanded="' + S.openNotes + '"><span>' + ICON_NOTE + esc(T.notesBtn) + '</span></button>' : '';
+  const histBtn = '<button class="mini" id="histBtn" aria-haspopup="dialog"><span>' + ICON_HIST + esc(T.histBtn) + '</span></button>';
   h += '<div class="chips"><span>' + ICON_SETS + pe.sets + ' × ' + esc(range(pe)) + '</span>' +
-    (rirTxt(pe) ? '<span>' + ICON_GAUGE + 'RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span class="mu">' + ICON_MUSCLE + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + noteBtn + '</div>';
+    (rirTxt(pe) ? '<span>' + ICON_GAUGE + 'RIR ' + esc(rirTxt(pe)) + '</span>' : '') + (pe.muscle ? '<span class="mu">' + ICON_MUSCLE + esc(tr(pe.muscle, S.lang)) + '</span>' : '') + noteBtn + histBtn + '</div>';
   if (pe.notes && S.openNotes) h += '<p class="notes open" id="notes">' + esc(pe.notes) + '</p>';
 
   // scheda obiettivo: suggerimento di oggi (stessa suggest()), badge "vs volta scorsa" solo se c'è una volta scorsa
@@ -641,6 +643,20 @@ function pointCard(p, list) {
   return '<section class="hses cday" id="chartDay"><div class="hsH"><b>' + esc(shortDate(p.date)) + '</b><span>' + esc(s ? s.dayName : '') + '</span>' +
     '<small class="live">e1RM ' + esc(e1Txt(p.best)) + ' ' + S.unit + '</small></div>' +
     '<div class="hex"><div class="lv">' + p.sets.map((x) => '<span' + (x === p.bestSet ? ' class="bst" title="' + esc(T.best) + '"' : '') + '>' + setTxt(x) + '</span>').join('') + '</div></div></section>';
+}
+
+/** Tasto "Storico" dell'esercizio: le ultime 3 volte (stessa regola della "Volta scorsa"); si chiude e si torna subito alla serie. */
+function openHist() {
+  const pe = curPe(); if (!pe) return;
+  const T = S.T, v = view();
+  const list = lastPerformances(v.idx, pe, { excludeSessionId: v.sessions.map((s) => s.id), onOrBefore: S.date }, 3);
+  const mac = pe.machine ? macTxt(pe.machine, pe.machine.id) : '';
+  sheetBox('pick hsheet', '<h2>' + esc(T.histTitle) + '</h2><p class="hsub">' + esc(exName(pe)) + (mac ? ' · ' + esc(mac) : '') + '</p>' +
+    (list.length ? '<div class="hlist" id="histList">' + list.map((p) => '<div class="hex"><b>' + esc(shortDate(p.date)) + '</b><div class="lv">' +
+      p.sets.map((x) => '<span>' + setTxt(x) + '</span>').join('') + '</div></div>').join('') + '</div>'
+      : '<p class="hsub" id="histNone">' + esc(T.histNone) + '</p>') +
+    '<div class="stack"><button class="p" id="hClose">' + esc(T.close) + '</button></div>');
+  $('hClose').onclick = closeSheet;
 }
 
 const exName = (pe) => tr(pe.exercise && pe.exercise.name, S.lang) || '—';
@@ -946,6 +962,7 @@ document.addEventListener('click', (ev) => {
   // tasti con un loro gestore: menu e tendine (.sheet), timer, luna
   if (b.closest('.sheet') || ['tMinus', 'tPlus', 'tStop', 'themeBtn'].includes(b.id)) return;
   if (b.id === 'notesBtn') { S.openNotes = !S.openNotes; render(); return; }
+  if (b.id === 'histBtn') { openHist(); return; }
   // Progressi: sezione Storico / Grafico, punto del grafico (solo cose da vedere, niente dati cambiati)
   if (b.dataset.ptab) { if (S.prog.tab !== b.dataset.ptab) { S.prog.tab = b.dataset.ptab; render(); } return; }
   if (b.dataset.pt) { S.prog.pt = b.dataset.pt; render(); return; }
