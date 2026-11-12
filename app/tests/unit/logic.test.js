@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { indexRows, findSession, findSessionExercise, lastPerformance, suggest, stepWeight, defaultDay, restFor, looksWrong, kgToUnit, setWeightIn, addDays } from '../../src/logic.js';
+import { indexRows, findSession, findSessionExercise, lastPerformance, suggest, REP_SOPRA_MINIMO_PER_SALIRE, stepWeight, defaultDay, restFor, looksWrong, kgToUnit, setWeightIn, addDays } from '../../src/logic.js';
 
 const S = (id, date, extra = {}) => ({ table: 'sessions', data: { id, session_date: date, deleted_at: null, ...extra } });
 const SE = (id, sid, ex, extra = {}) => ({ table: 'session_exercises', data: { id, session_id: sid, exercise_id: ex, machine_id: null, plan_exercise_id: null, deleted_at: null, ...extra } });
@@ -50,31 +50,76 @@ describe('volta scorsa', () => {
   });
 });
 
-describe('suggerimento (doppia progressione)', () => {
-  const last = (sets) => ({ date: '2026-11-01', sets: sets.map(([kg, reps], i) => ({ n: i + 1, kg, reps })) });
+describe('suggerimento (doppia progressione con serie top)', () => {
+  // serie della volta scorsa: [kg, rep, rir] (rir assente = dato vecchio senza RIR)
+  const last = (sets) => ({ date: '2026-11-01', sets: sets.map(([kg, reps, rir], i) => ({ n: i + 1, kg, reps, rir: rir ?? null })) });
+  const wr = (s) => s.sets.map((x) => [x.weight, x.reps, x.why]);
+  const SOGLIA = REP_SOPRA_MINIMO_PER_SALIRE;
 
-  it('range chiuso in tutte le serie: un salto di peso in più, reps al minimo', () => {
-    const s = suggest(pe({ machine: MAC_A }), last([[80, 10], [80, 10]]), 'kg');
-    expect(s.topped).toBe(true);
-    expect(s.sets).toEqual([{ n: 1, weight: 85, reps: 6, why: 'up' }, { n: 2, weight: 85, reps: 6, why: 'up' }]);
+  it('soglia delle serie dopo: costante, 2 rep', () => {
+    expect(REP_SOPRA_MINIMO_PER_SALIRE).toBe(2);
   });
-  it('range non chiuso: stesso peso, una rep in più', () => {
-    const s = suggest(pe(), last([[80, 8], [80, 10]]), 'kg');
+  it('top (RIR 0) al massimo: un salto della macchina e rep al minimo; mai "±0 rep"', () => {
+    const s = suggest(pe({ machine: MAC_A, sets: 3 }), last([[80, 10, 0], [80, 9, 2], [80, 8, 2]]), 'kg');
+    expect(s.topped).toBe(true);
+    expect(s.sets[0]).toEqual({ n: 1, weight: 85, reps: 6, why: 'up' });
+  });
+  it('top sotto il massimo: stesso peso, una rep in più (anche le serie dopo, col peso vecchio)', () => {
+    const s = suggest(pe(), last([[80, 8, 0], [80, 9, 2]]), 'kg');
     expect(s.topped).toBe(false);
-    expect(s.sets[0]).toEqual({ n: 1, weight: 80, reps: 9, why: 'reps' });
-    expect(s.sets[1]).toEqual({ n: 2, weight: 80, reps: 10, why: 'hold' });
+    expect(wr(s)).toEqual([[80, 9, 'reps'], [80, 10, 'reps']]);
+  });
+  it('nessuna serie a RIR 0: stesso peso e una rep in più, niente salita (anche con tutte al massimo)', () => {
+    const s = suggest(pe(), last([[80, 10, 2], [80, 10, 1]]), 'kg');
+    expect(s.topped).toBe(false);
+    expect(wr(s)).toEqual([[80, 10, 'hold'], [80, 10, 'hold']]);
+    expect(wr(suggest(pe(), last([[80, 9, 1], [80, 8, 2]]), 'kg'))).toEqual([[80, 10, 'reps'], [80, 9, 'reps']]);
+  });
+  it('RIR mancante (dati vecchi): come senza serie a RIR 0', () => {
+    expect(wr(suggest(pe({ machine: MAC_A }), last([[80, 10], [80, 8]]), 'kg'))).toEqual([[80, 10, 'hold'], [80, 9, 'reps']]);
+  });
+  it('serie dopo, 2+ rep sopra il minimo a RIR 1-2: salgono anche loro (un salto dal loro peso), rep al minimo', () => {
+    const s = suggest(pe({ machine: MAC_A, sets: 3 }), last([[80, 10, 0], [80, 6 + SOGLIA, 2], [80, 6, 1]]), 'kg');
+    expect(wr(s)).toEqual([[85, 6, 'up'], [85, 6, 'up'], [85, 6, 'up']]);
+    // serie dopo più leggera della top: sale dal suo peso, non da quello della top
+    expect(wr(suggest(pe(), last([[80, 10, 0], [75, 9, 1]]), 'kg'))).toEqual([[82.5, 6, 'up'], [77.5, 6, 'up']]);
+  });
+  it('serie dopo vicino al minimo: peso vecchio, una rep in più', () => {
+    const s = suggest(pe({ sets: 3 }), last([[80, 10, 0], [80, 6 + SOGLIA - 1, 2], [80, 6, 2]]), 'kg');
+    expect(wr(s)).toEqual([[82.5, 6, 'up'], [80, 8, 'reps'], [80, 8, 'reps']]);
+  });
+  it('si guarda la PRIMA serie a RIR 1-2 (RIR 3 o più non conta)', () => {
+    const s = suggest(pe({ sets: 3 }), last([[80, 10, 0], [80, 9, 3], [80, 7, 1], [80, 10, 2]]), 'kg');
+    expect(wr(s)).toEqual([[82.5, 6, 'up'], [80, 8, 'reps'], [80, 8, 'reps']]);
+  });
+  it('nessuna serie a RIR 1-2: le serie dopo restano col loro peso vecchio, una rep in più', () => {
+    const s = suggest(pe({ sets: 3 }), last([[80, 10, 0], [80, 9, 3], [77.5, 8, 0]]), 'kg');
+    expect(wr(s)).toEqual([[82.5, 6, 'up'], [80, 10, 'reps'], [77.5, 9, 'reps']]);
+  });
+  it('la top è la prima a RIR 0 anche se non è la serie 1', () => {
+    const s = suggest(pe(), last([[80, 7, 1], [80, 10, 0]]), 'kg');
+    expect(s.topped).toBe(true);
+    expect(wr(s)).toEqual([[80, 8, 'reps'], [82.5, 6, 'up']]);
+  });
+  it('riscaldamento fuori dalla regola: una serie di riscaldamento a RIR 0 non è la top', () => {
+    const idx = indexRows([S('s1', '2026-11-01'), SE('se1', 's1', 'ex1'),
+      ST('w', 'se1', 1, 40, 12, { set_type: 'warmup', rir: 0 }), ST('a', 'se1', 2, 80, 10, { rir: 2 }), ST('b', 'se1', 3, 80, 10, { rir: 1 })]);
+    expect(wr(suggest(pe(), lastPerformance(idx, pe()), 'kg'))).toEqual([[80, 10, 'hold'], [80, 10, 'hold']]);
+  });
+  it('macchina già al peso più alto: la top tiene peso e rep', () => {
+    expect(wr(suggest(pe({ machine: MAC_B, sets: 1 }), last([[30, 10, 0]]), 'kg'))).toEqual([[30, 10, 'hold']]);
   });
   it('sotto il minimo: punta al minimo', () => {
-    expect(suggest(pe(), last([[80, 4]]), 'kg').sets[0].reps).toBe(6);
+    expect(suggest(pe(), last([[80, 4, 0]]), 'kg').sets[0].reps).toBe(6);
   });
   it('usa la lista dei pesi della macchina', () => {
-    expect(suggest(pe({ machine: MAC_B, sets: 1 }), last([[15, 10]]), 'kg').sets[0].weight).toBe(22.5);
+    expect(suggest(pe({ machine: MAC_B, sets: 1 }), last([[15, 10, 0]]), 'kg').sets[0].weight).toBe(22.5);
   });
   it('senza volta scorsa: nessun suggerimento', () => {
     expect(suggest(pe(), null, 'kg')).toBeNull();
   });
   it('in libbre usa il peso scritto in libbre', () => {
-    const l = { sets: [{ n: 1, kg: 9.072, reps: 10, input_weight: 20, input_unit: 'lb' }] };
+    const l = { sets: [{ n: 1, kg: 9.072, reps: 10, rir: 0, input_weight: 20, input_unit: 'lb' }] };
     expect(suggest(pe({ sets: 1 }), l, 'lb').sets[0].weight).toBe(25);
   });
 });

@@ -105,12 +105,12 @@ describe('piano e volta scorsa', () => {
     expect(snap.homeClubId).toBe(A.club);
   });
 
-  it('panca: ultima seduta, serie cancellata esclusa, range chiuso → +2,5 kg', () => {
+  it('panca: ultima seduta, serie cancellata esclusa, top (RIR 0) al massimo → +2,5 kg; serie dopo a RIR 2 con 10 rep → sale anche lei', () => {
     const p = pe(snap, 'Upper A', 0);
     const last = lastPerformance(idx, p, { onOrBefore: today });
     expect(last.date).toBe(addDays(today, -2));
-    expect(last.sets.map((s) => [s.kg, s.reps])).toEqual([[80, 10], [80, 10]]);
-    expect(suggest(p, last, 'kg').sets[0]).toEqual({ n: 1, weight: 82.5, reps: 6, why: 'up' });
+    expect(last.sets.map((s) => [s.kg, s.reps, s.rir])).toEqual([[80, 10, 0], [80, 10, 2]]);
+    expect(suggest(p, last, 'kg').sets).toEqual([{ n: 1, weight: 82.5, reps: 6, why: 'up' }, { n: 2, weight: 82.5, reps: 6, why: 'up' }]);
   });
 
   it('alzate nel giorno Upper B: la volta scorsa è quella di Upper A (stesso esercizio e macchina)', () => {

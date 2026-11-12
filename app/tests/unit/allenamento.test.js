@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from '../../src/allenamento.js';
 import { LANGS } from '../../src/i18n.js';
+import { suggest, setWeightIn } from '../../src/logic.js';
 
 const read = (f) => fs.readFileSync(new URL('../../' + f, import.meta.url), 'utf8');
 const main = read('src/main.js'), css = read('src/styles.css');
@@ -165,5 +166,32 @@ describe('layout nel codice', () => {
       expect(LANGS.it[k], k).toBeTruthy();
       expect(LANGS.en[k], k).toBeTruthy();
     }
+  });
+});
+
+describe('casella del peso della serie da salvare (draftFor)', () => {
+  // la funzione vera di main.js, fatta girare con lo stato minimo che usa
+  const draftFor = (sugg, done, pe = { id: 'pe1', sets: 2, reps_min: 6, reps_max: 10, rir_min: 1 }) => {
+    const src = main.slice(main.indexOf('function draftFor('));
+    const fn = src.slice(0, src.search(/\r?\n\}\r?\n/)) + '\n}';
+    const S = { drafts: {}, dayId: 'd1', unit: 'kg' };
+    return new Function('S', 'setWeightIn', fn + '\nreturn draftFor;')(S, setWeightIn)(null, pe, done, sugg);
+  };
+  const pe = { id: 'pe1', exercise_id: 'ex1', sets: 2, reps_min: 6, reps_max: 10, rir_min: 1, machine: null };
+  const done82 = [{ id: 'a', set_number: 1, weight_kg: 82.5, reps: 6, rir: 0 }];
+
+  it('top che sale e serie dopo che restano al peso vecchio: la casella della serie 2 mostra il peso vecchio', () => {
+    const s = suggest(pe, { sets: [{ n: 1, kg: 80, reps: 10, rir: 0 }, { n: 2, kg: 80, reps: 7, rir: 2 }] }, 'kg');
+    expect(s.sets.map((x) => [x.weight, x.reps])).toEqual([[82.5, 6], [80, 8]]);
+    expect(draftFor(s, [])).toMatchObject({ n: 1, weight: 82.5, reps: 6 });
+    expect(draftFor(s, done82)).toMatchObject({ n: 2, weight: 80, reps: 8 });   // non 82,5 (la serie appena fatta)
+  });
+
+  it('serie extra oltre il piano, o nessun suggerimento: il peso della serie appena fatta', () => {
+    const s = suggest(pe, { sets: [{ n: 1, kg: 80, reps: 10, rir: 0 }, { n: 2, kg: 80, reps: 7, rir: 2 }] }, 'kg');
+    const two = [...done82, { id: 'b', set_number: 2, weight_kg: 77.5, reps: 8, rir: 2 }];
+    expect(draftFor(s, two).weight).toBe(77.5);
+    expect(draftFor(null, done82).weight).toBe(82.5);
+    expect(draftFor(null, []).weight).toBe('');
   });
 });

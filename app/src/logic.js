@@ -3,6 +3,12 @@
 
 export const LB = 0.45359237;
 
+/**
+ * Suggerimento, serie dopo la top: se la volta scorsa la prima serie a RIR 1-2 ha fatto almeno
+ * questo numero di rep sopra il minimo del range, oggi sale anche lei al peso nuovo (vedi suggest()).
+ */
+export const REP_SOPRA_MINIMO_PER_SALIRE = 2;
+
 /** Data locale del telefono come 'AAAA-MM-GG'. */
 export function localDate(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
@@ -237,30 +243,50 @@ export function setWeightIn(s, unit) {
 }
 
 /**
- * Doppia progressione di base.
- * - Se nella volta scorsa tutte le serie hanno raggiunto il massimo del range: più peso (un salto), reps al minimo.
- * - Altrimenti: stesso peso, una ripetizione in più (fino al massimo del range).
+ * Doppia progressione con serie top (il riscaldamento è già fuori: lastPerformance lo esclude).
+ * - Serie top = la prima serie a RIR 0 della volta scorsa; oggi resta allo stesso numero di serie.
+ *   Se aveva fatto il massimo del range: un salto di peso (della macchina) e rep al minimo.
+ *   Altrimenti: stesso peso, una rep in più.
+ * - Serie dopo: guardano la prima serie a RIR 1-2 della volta scorsa (fatta col peso vecchio).
+ *   Se la top sale e quella serie aveva almeno REP_SOPRA_MINIMO_PER_SALIRE rep sopra il minimo:
+ *   un salto di peso anche per loro, rep al minimo. Altrimenti: peso vecchio, una rep in più.
+ *   Senza una serie a RIR 1-2: ognuna resta col suo peso vecchio, una rep in più.
+ * - Nessuna serie a RIR 0 (o RIR mancante, dati vecchi): stesso peso e una rep in più, niente salita.
+ * "Una rep in più" va al minimo se si era sotto, e mai oltre il massimo (al massimo: 'hold').
  * Restituisce un suggerimento per ogni serie del piano (nell'unità mostrata).
  */
 export function suggest(pe, last, unit) {
   if (!last || !last.sets.length) return null;
   const max = pe.reps_max ?? null, min = pe.reps_min ?? max;
   const sets = last.sets;
-  const topped = max != null && sets.every((s) => s.reps >= max);
   const count = Math.max(pe.sets || 0, 1);
+  const rirIn = (s, lo, hi) => s.rir != null && s.rir !== '' && Number(s.rir) >= lo && Number(s.rir) <= hi;
+  const oneMore = (n, w, reps) => {
+    if (max != null && reps >= max) return { n, weight: w, reps, why: 'hold' };
+    const target = min != null && reps < min ? min : reps + 1;
+    return { n, weight: w, reps: max != null ? Math.min(target, max) : target, why: 'reps' };
+  };
+  const goUp = (n, w, reps) => {
+    const up = stepWeight(w, pe.machine, unit, +1);
+    return up > w ? { n, weight: up, reps: min, why: 'up' } : { n, weight: w, reps, why: 'hold' };
+  };
+  const lastOf = (n) => sets[n - 1] || sets[sets.length - 1];
+
+  const ti = sets.findIndex((s) => rirIn(s, 0, 0));
   const out = [];
+  if (ti < 0) {
+    for (let n = 1; n <= count; n++) { const ls = lastOf(n); out.push(oneMore(n, setWeightIn(ls, unit), ls.reps)); }
+    return { topped: false, sets: out };
+  }
+  const top = sets[ti], topN = Math.min(ti + 1, count), topW = setWeightIn(top, unit);
+  const topped = max != null && top.reps >= max;
+  const ref = sets.find((s) => rirIn(s, 1, 2));
   for (let n = 1; n <= count; n++) {
-    const ls = sets[n - 1] || sets[sets.length - 1];
-    const w = setWeightIn(ls, unit);
-    if (topped) {
-      const up = stepWeight(w, pe.machine, unit, +1);
-      out.push({ n, weight: up, reps: min ?? ls.reps, why: up > w ? 'up' : 'hold' });
-    } else if (max != null && ls.reps >= max) {
-      out.push({ n, weight: w, reps: ls.reps, why: 'hold' });
-    } else {
-      const target = min != null && ls.reps < min ? min : ls.reps + 1;
-      out.push({ n, weight: w, reps: max != null ? Math.min(target, max) : target, why: 'reps' });
-    }
+    if (n === topN) out.push(topped ? goUp(n, topW, top.reps) : oneMore(n, topW, top.reps));
+    else if (ref) {
+      const refW = setWeightIn(ref, unit);
+      out.push(topped && ref.reps >= min + REP_SOPRA_MINIMO_PER_SALIRE ? goUp(n, refW, ref.reps) : oneMore(n, refW, ref.reps));
+    } else { const ls = lastOf(n); out.push(oneMore(n, setWeightIn(ls, unit), ls.reps)); }
   }
   return { topped, sets: out };
 }

@@ -674,9 +674,12 @@ function draftFor(v, pe, done, sugg) {
   if (S.drafts[key]) return S.drafts[key];
   const prev = done[done.length - 1];
   const sg = sugg ? sugg.sets[Math.min(n, sugg.sets.length) - 1] : null;
+  // peso: quello suggerito per questa serie (anche dalla serie 2 in poi: la top può salire e le serie dopo no);
+  // senza suggerimento per questa serie (prima volta, o serie extra oltre il piano) quello della serie appena fatta
+  const own = sugg && n <= sugg.sets.length ? sg : null;
   const rir0 = pe.rir_min != null ? Math.min(4, Math.round(pe.rir_min)) : 0;
   const d = { key, n, pe: pe.id,
-    weight: prev ? setWeightIn(prev, S.unit) : sg ? sg.weight : '',
+    weight: own ? own.weight : prev ? setWeightIn(prev, S.unit) : sg ? sg.weight : '',
     reps: sg ? sg.reps : prev ? prev.reps : (pe.reps_min || ''),
     rir: prev && prev.rir != null ? Number(prev.rir) : rir0 };
   S.drafts[key] = d;

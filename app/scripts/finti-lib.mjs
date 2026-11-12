@@ -93,7 +93,7 @@ export async function createFakeAthlete(admin, { email, password, today, history
     [-7, 'Lower A', true, [['la_hack', [[100, 8, 1], [100, 7, 0]]], ['la_legext_a', [[60, 13, 0]]], ['la_legext_b', [[40, 12, 0]]], ['la_polpacci', [[90, 12, 1]]]]],
     [-5, 'Upper B', false, [['ub_alzate', [[12.5, 20, 0], [12.5, 19, 0]]], ['ub_lat', [[60, 9, 1], [60, 8, 1]]], ['ub_panca', [[80, 9, 2], [80, 8, 2]]]]],
     [-3, 'Lower B', false, [['lb_curl', [[45, 12, 0], [45, 11, 0]]], ['lb_hack', [[90, 11, 1]]]]],
-    [-2, 'Upper A', false, [['ua_panca', [[80, 10, 2], [80, 10, 2], [999, 1, 0, true]]], ['ua_lat', [[60, 9, 1], [60, 8, 1]]], ['ua_alzate', [[15, 14, 0], [15, 12, 0]]]]],
+    [-2, 'Upper A', false, [['ua_panca', [[80, 10, 0], [80, 10, 2], [999, 1, 0, true]]], ['ua_lat', [[60, 9, 1], [60, 8, 1]]], ['ua_alzate', [[15, 14, 0], [15, 12, 0]]]]],
     [-1, 'Lower A', false, [['la_hack', [[100, 9, 1], [100, 8, 0]]], ['la_legext_a', [[65, 12, 0]]], ['la_polpacci', [[90, 13, 1]]]]],
   ];
   const peById = Object.fromEntries(Object.entries(pe).map(([k, v]) => [k, v]));
