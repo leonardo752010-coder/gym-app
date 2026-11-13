@@ -101,7 +101,7 @@ describe('punti del grafico', () => {
 describe('Storico con filtri', () => {
   it('scelte dei filtri: workout nell\'ordine del piano (poi quelli fuori piano), esercizi una volta sola', () => {
     const o = historyFilterOptions(list, PLAN);
-    expect(o.days.map((d) => d.key)).toEqual(['d:dA', 'd:dB', 'n:Vecchio']);
+    expect(o.days.map((d) => d.key)).toEqual(['t:upper a', 't:lower a', 't:vecchio']);
     expect(o.days.map((d) => d.name)).toEqual(['Upper A', 'Lower A', 'Vecchio']);
     expect(o.exercises.map((e) => e.id).sort()).toEqual(['bench', 'row', 'squat']);
     expect(o.exercises.find((e) => e.id === 'bench').name.it).toBe('Panca');
@@ -113,8 +113,31 @@ describe('Storico con filtri', () => {
   });
 
   it('filtro per workout', () => {
-    expect(filterHistory(list, { day: 'd:dA' }).map((s) => s.id)).toEqual(['s4', 's3', 's1']);
-    expect(filterHistory(list, { day: 'n:Vecchio' }).map((s) => s.id)).toEqual(['s0']);
+    expect(filterHistory(list, { day: 't:upper a' }).map((s) => s.id)).toEqual(['s4', 's3', 's1']);
+    expect(filterHistory(list, { day: 't:vecchio' }).map((s) => s.id)).toEqual(['s0']);
+  });
+
+  it('workout per tipo (nome): sedute vecchie senza giorno + nuove con giorno = una voce; maiuscole e spazi non contano', () => {
+    const r2 = [
+      S('o1', '2026-10-30', { day_name: 'Lower B (Ham)' }), SE('g1', 'o1', 'squat', null), ST('q1', 'g1', 1, 100, 5, 2), ST('q2', 'g1', 2, 100, 5, 2),
+      S('o2', '2026-10-31', { day_name: ' upper a ' }), SE('g2', 'o2', 'bench', 'm1'), ST('q3', 'g2', 1, 80, 8, 2), ST('q4', 'g2', 2, 80, 8, 2),
+      S('o3', '2026-11-02', { day_name: 'Fuori piano' }), SE('g3', 'o3', 'row', null), ST('q5', 'g3', 1, 60, 10, 2),
+      S('o4', '2026-11-04', { day_name: 'Upper A' }), SE('g4', 'o4', 'row', null), ST('q6', 'g4', 1, 60, 10, 2),
+      S('n1', '2026-11-09', { plan_day_id: 'dA', day_name: 'Upper A' }), SE('h1', 'n1', 'bench', 'm1'), ST('q7', 'h1', 1, 85, 6, 1), ST('q8', 'h1', 2, 85, 6, 1), ST('q9', 'h1', 3, 85, 6, 1),
+      S('n2', '2026-11-10', { plan_day_id: 'dB', day_name: 'Lower A' }), SE('h2', 'n2', 'squat', null), ST('q10', 'h2', 1, 100, 5, 2),
+      S('n3', '2026-11-11', { day_name: 'Lower B (Ham)' }), SE('h3', 'n3', 'squat', null), ST('q11', 'h3', 1, 100, 5, 2),
+    ];
+    const l2 = historyList(indexRows(r2), PLAN);
+    const o = historyFilterOptions(l2, PLAN);
+    // prima i giorni del piano (nome del piano), poi i fuori piano nell'ordine in cui compaiono la prima volta (non alfabetico)
+    expect(o.days.map((d) => d.name)).toEqual(['Upper A', 'Lower A', 'Lower B (Ham)', 'Fuori piano']);
+    const ua = filterHistory(l2, { day: 't:upper a' });
+    expect(ua.map((s) => s.id)).toEqual(['n1', 'o4', 'o2']);
+    expect(ua.reduce((a, s) => a + s.setCount, 0)).toBe(3 + 1 + 2);
+    expect(filterHistory(l2, { day: 't:lower b (ham)' }).map((s) => s.id)).toEqual(['n3', 'o1']);
+    // esercizi del tipo scelto: da tutte le sedute di quel tipo, senza doppioni
+    expect(filterHistory(l2, { day: 't:upper a', exercise: 'row' }).map((s) => s.id)).toEqual(['o4']);
+    expect(o.exercises.map((e) => e.id).sort()).toEqual(['bench', 'row', 'squat']);
   });
 
   it('filtro per esercizio: cronologia di quell\'esercizio dalla più recente, con macchina e serie; conteggio delle serie rifatto', () => {
@@ -128,13 +151,13 @@ describe('Storico con filtri', () => {
   });
 
   it('i due filtri insieme', () => {
-    expect(filterHistory(list, { day: 'd:dA', exercise: 'row' }).map((s) => s.id)).toEqual(['s1']);
-    expect(filterHistory(list, { day: 'd:dB', exercise: 'bench' })).toEqual([]);
+    expect(filterHistory(list, { day: 't:upper a', exercise: 'row' }).map((s) => s.id)).toEqual(['s1']);
+    expect(filterHistory(list, { day: 't:lower a', exercise: 'bench' })).toEqual([]);
   });
 
   it('non cambia le righe né la lista', () => {
     const r = JSON.stringify(rows), l = JSON.stringify(list);
-    filterHistory(list, { day: 'd:dA', exercise: 'bench' }); historyFilterOptions(list, PLAN); chartChoices(list); e1rmPoints(idx, 'bench', 'm1');
+    filterHistory(list, { day: 't:upper a', exercise: 'bench' }); historyFilterOptions(list, PLAN); chartChoices(list); e1rmPoints(idx, 'bench', 'm1');
     expect(JSON.stringify(rows)).toBe(r);
     expect(JSON.stringify(list)).toBe(l);
   });
