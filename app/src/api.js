@@ -77,6 +77,19 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       try { if (st) { st.removeItem(AUTH_KEY); st.removeItem(AUTH_KEY + '-user'); } } catch (e) { /* niente */ }
     },
 
+    /**
+     * Modifica di un esercizio del piano (solo online): aggiorna SOLO la riga di plan_exercises con questo id.
+     * values = le colonne controllate da validatePlanEdit (serie, rep, RIR, recupero, note). Ritorna la riga salvata.
+     * Nessuna riga aggiornata (esercizio di un altro atleta, o non più esistente): errore 'not-allowed'.
+     */
+    async updatePlanExercise(id, values) {
+      const r = await wrap(sb.from('plan_exercises').update(values).eq('id', id)
+        .select('id, sets, sets_max, reps_min, reps_max, rir_min, rir_max, rest_seconds, notes'));
+      if (r.error) return r;
+      if (!r.data || r.data.length !== 1) return { error: { code: 'not-allowed', message: 'plan exercise not updated' } };
+      return { data: r.data[0] };
+    },
+
     upsert(table, rows) {
       return wrap(sb.from(table).upsert(rows, { onConflict: 'id', defaultToNull: true }));
     },

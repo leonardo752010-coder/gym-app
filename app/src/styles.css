@@ -796,3 +796,21 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .hsheet .hlist{margin:0 0 14px}
 .hsheet .hex:first-child{border-top:0}
 .hsheet .hex > b{font-size:13px;color:var(--mu)}
+/* Programma: tasto "Modifica" di un esercizio e finestra di modifica (serie, rep, RIR, recupero, note) */
+.pex .peEd{flex:none;align-self:center;min-height:44px;min-width:44px;padding:0 14px;border-radius:12px;background:var(--chip);color:var(--tx);font-size:13px;font-weight:700}
+.pesheet .hsub{margin:0 0 14px;color:var(--mu);font-weight:700}
+.pegrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;margin:0 0 10px}
+.pef{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pef.wide{grid-column:1 / -1}
+.pef span{font-size:13px;font-weight:700;color:var(--mu)}
+.pef small{font-size:11px;color:var(--mu);font-weight:600}
+.pef input,.pef textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--card2);color:var(--tx);font:inherit;outline:0}
+.pef input{height:48px;padding:0 12px;font-size:18px;font-weight:700}
+.pef textarea{padding:10px 12px;font-size:15px;line-height:1.4;resize:vertical;min-height:72px}
+.pef input:focus,.pef textarea:focus{border-color:var(--ac)}
+.peErr{color:var(--sk-bad,var(--ac));font-size:14px;font-weight:700;line-height:1.4;margin:10px 0 0}
+.peErr p,.sheet .peErr p{margin:0 0 6px;color:inherit}
+.sheet .peNet{margin:10px 0 0;font-size:14px;font-weight:700;color:var(--mu)}
+.sheet .peNet:empty,.peErr:empty{display:none}
+.pesheet .row{margin-top:14px}
+.sheet .row button:disabled{opacity:.45}

@@ -54,6 +54,22 @@ const it = {
   e1rm: 'e1RM stimato', chartHint: 'Un punto per seduta: la serie migliore, peso × (1 + (rep + RIR) / 30). Tocca un punto per vedere le serie.',
   pointAria: (d, v) => d + ': e1RM ' + v, best: 'migliore',
   histTitle: 'Ultime 3 volte', histNone: 'Nessuna volta precedente per questo esercizio.',
+  // Programma: modifica di un esercizio del piano (solo online)
+  peEdit: 'Modifica', peEditAria: (n) => 'Modifica ' + n, peEditTitle: 'Modifica esercizio', peSave: 'Salva', peSaving: 'Salvo…',
+  peSets: 'Serie', peSetsMax: 'Serie max', peRepsMin: 'Rep min', peRepsMax: 'Rep max', peRirMin: 'RIR min', peRirMax: 'RIR max',
+  peRest: 'Recupero (secondi)', peNotes: 'Note', peSetsHint: '0 = fuori dal volume', peOptional: 'vuoto = nessuno',
+  peNeedNet: 'Serve internet per modificare il piano.', peSaved: 'Piano aggiornato', peSaveErr: 'Non salvato: ',
+  peDenied: 'Non salvato: questo esercizio non si può modificare da questo account.',
+  peErr: {
+    sets: 'Serie: un numero intero da 0 a 20 (0 = fuori dal volume).',
+    setsMax: 'Serie max: lascia vuoto, oppure un numero intero da 1 a 20.',
+    setsMaxLow: 'Serie max non può essere meno di Serie.',
+    reps: 'Rep min e Rep max: numeri interi da 1 a 200, tutti e due.',
+    repsOrder: 'Rep min non può essere più di Rep max.',
+    rir: 'RIR: un numero da 0 a 10 (al massimo un decimale), oppure vuoto.',
+    rirOrder: 'RIR min non può essere più di RIR max.',
+    rest: 'Recupero: secondi interi da 0 a 3600, oppure vuoto.',
+  },
 };
 const en = {
   workout: 'WORKOUT', today: 'Today', loading: 'Loading your plan…', locale: 'en-NZ', dayNight: 'Day / night',
@@ -98,6 +114,22 @@ const en = {
   e1rm: 'Estimated e1RM', chartHint: 'One point per session: the best set, weight × (1 + (reps + RIR) / 30). Tap a point to see the sets.',
   pointAria: (d, v) => d + ': e1RM ' + v, best: 'best',
   histTitle: 'Last 3 times', histNone: 'No previous time for this exercise.',
+  // Program: editing an exercise of the plan (online only)
+  peEdit: 'Edit', peEditAria: (n) => 'Edit ' + n, peEditTitle: 'Edit exercise', peSave: 'Save', peSaving: 'Saving…',
+  peSets: 'Sets', peSetsMax: 'Max sets', peRepsMin: 'Min reps', peRepsMax: 'Max reps', peRirMin: 'Min RIR', peRirMax: 'Max RIR',
+  peRest: 'Rest (seconds)', peNotes: 'Notes', peSetsHint: '0 = not counted in volume', peOptional: 'empty = none',
+  peNeedNet: 'You need internet to edit the plan.', peSaved: 'Plan updated', peSaveErr: 'Not saved: ',
+  peDenied: 'Not saved: this exercise cannot be edited from this account.',
+  peErr: {
+    sets: 'Sets: a whole number from 0 to 20 (0 = not counted in volume).',
+    setsMax: 'Max sets: leave empty, or a whole number from 1 to 20.',
+    setsMaxLow: 'Max sets cannot be less than Sets.',
+    reps: 'Min reps and Max reps: whole numbers from 1 to 200, both of them.',
+    repsOrder: 'Min reps cannot be more than Max reps.',
+    rir: 'RIR: a number from 0 to 10 (one decimal at most), or empty.',
+    rirOrder: 'Min RIR cannot be more than Max RIR.',
+    rest: 'Rest: whole seconds from 0 to 3600, or empty.',
+  },
 };
 export const LANGS = { it, en };
 

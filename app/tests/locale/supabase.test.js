@@ -10,6 +10,7 @@ import { flush } from '../../src/sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
 import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
 import { historyList } from '../../src/pages.js';
+import { validatePlanEdit, applyPlanEdit, findPlanExercise } from '../../src/modifica.js';
 import { loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from '../../src/starter.js';
 
 const S = localStatus();
@@ -425,5 +426,62 @@ describe('macchine dello storico dalla libreria macchine (database locale)', () 
     // come deciso: con la macchina nuova la "Volta scorsa" riparte (quella sulla macchina vecchia non conta)
     const last = lastPerformance(idx, snap.plan.days.find((d) => d.name === 'Lower A').exercises.find((p) => p.id === A.pe.la_legext_a), { onOrBefore: today });
     expect(last && last.machineId).toBe(A.M['legext-b']);
+  });
+});
+
+describe('Programma → Modifica: serie, rep e RIR di un esercizio (database locale, regole di accesso vere)', () => {
+  const peRows = async () => (await admin.from('plan_exercises').select('*').eq('user_id', A.userId).order('id')).data;
+  const targets = async (peId) => (await admin.from('session_exercises')
+    .select('id, target_sets, target_reps_min, target_reps_max, target_rir_min, target_rir_max, rest_seconds').eq('plan_exercise_id', peId).order('id')).data;
+  const NEW = { sets: 3, sets_max: 4, reps_min: 8, reps_max: 12, rir_min: 1, rir_max: 2, rest_seconds: 120, notes: 'Nota cambiata dalla prova' };
+  let before, oldTargets;
+
+  beforeAll(async () => { before = await peRows(); oldTargets = await targets(A.pe.ua_panca); });
+
+  it('a) modifica di serie, rep e RIR: il piano cambia, solo quella riga', async () => {
+    const d = await device(A.email, passA);
+    const old = (await d.api.snapshot(A.userId)).data.plan;
+    expect(findPlanExercise(old, A.pe.ua_panca)).toMatchObject({ sets: 2, reps_min: 6, reps_max: 10, rir_min: 2, rir_max: 3 });
+    const { values, errors } = validatePlanEdit({ sets: '3', sets_max: '4', reps_min: '8', reps_max: '12', rir_min: '1', rir_max: '2', rest_seconds: '120', notes: NEW.notes });
+    expect(errors).toEqual([]);
+    expect(values).toEqual(NEW);
+    const r = await d.api.updatePlanExercise(A.pe.ua_panca, values);
+    expect(r.error).toBeUndefined();
+    // la copia sul telefono aggiornata con la risposta è uguale al piano scaricato di nuovo
+    const local = findPlanExercise(applyPlanEdit(old, A.pe.ua_panca, r.data), A.pe.ua_panca);
+    const fresh = findPlanExercise((await d.api.snapshot(A.userId)).data.plan, A.pe.ua_panca);
+    expect(fresh).toMatchObject(NEW);
+    expect(local).toEqual(fresh);
+    // nel database cambia solo la riga di quell'esercizio
+    const after = await peRows();
+    expect(after.filter((x) => x.id !== A.pe.ua_panca)).toEqual(before.filter((x) => x.id !== A.pe.ua_panca));
+    expect(after.find((x) => x.id === A.pe.ua_panca)).toMatchObject({ ...NEW, rir_min: 1, rir_max: 2, exercise_id: A.E.panca, plan_day_id: A.days.UA });
+  });
+
+  it('b) le sedute vecchie di quell\'esercizio hanno ancora il loro obiettivo originale', async () => {
+    expect(oldTargets.length).toBeGreaterThan(0);
+    expect(oldTargets.every((t) => t.target_sets === 2 && t.target_reps_min === 6 && t.target_reps_max === 10)).toBe(true);
+    expect(await targets(A.pe.ua_panca)).toEqual(oldTargets);
+  });
+
+  it('c) valori non validi: rifiutati dall\'app prima di partire, e dal database se arrivassero', async () => {
+    for (const bad of [{ reps_min: '12', reps_max: '8' }, { rir_min: '3', rir_max: '1' }, { sets: '3', sets_max: '2' }, { sets: '-1' }]) {
+      expect(validatePlanEdit({ sets: '3', sets_max: '', reps_min: '8', reps_max: '12', rir_min: '1', rir_max: '2', rest_seconds: '', notes: '', ...bad }).errors.length).toBeGreaterThan(0);
+    }
+    const d = await device(A.email, passA);
+    const now = await peRows();
+    for (const bad of [{ reps_min: 12, reps_max: 8 }, { rir_min: 3, rir_max: 1 }, { sets: 3, sets_max: 2 }, { sets: -1 }]) {
+      const r = await d.api.updatePlanExercise(A.pe.ua_panca, { ...NEW, ...bad });
+      expect(r.error && r.error.code, JSON.stringify(bad)).toBe('23514');
+    }
+    expect(await peRows()).toEqual(now);
+  });
+
+  it('d) un atleta non può modificare il piano di un altro atleta', async () => {
+    const b = await device(B.email, passB);
+    const now = await peRows();
+    const r = await b.api.updatePlanExercise(A.pe.ua_panca, { ...NEW, sets: 9 });
+    expect(r.error && r.error.code).toBe('not-allowed');
+    expect(await peRows()).toEqual(now);
   });
 });

@@ -10,7 +10,8 @@ import './styles.css';
 import { supabaseConfig } from './config.js';
 import { makeApi, storedUser, HISTORY_DAYS } from './api.js';
 import { openStore, Local, getKv, setKv } from './store.js';
-import { flush } from './sync.js';
+import { flush, isOffline } from './sync.js';
+import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise } from './modifica.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
 import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
 import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from './starter.js';
@@ -565,8 +566,65 @@ function renderProgram() {
       const sub = !active(pe) ? T.listOff : pe.sets + ' × ' + range(pe) + ' ' + T.rep + (rirTxt(pe) ? ' · RIR ' + rirTxt(pe) : '');
       return '<li class="' + (active(pe) ? '' : 'off') + '"><span class="n">' + (i + 1) + '</span><span class="t">' +
         (pe.superset_label ? '<span class="ss">SUPERSET ' + esc(pe.superset_label) + '</span>' : '') + '<b>' + esc(exName(pe)) + '</b><span>' + esc(sub) + '</span>' +
-        (m ? '<span class="m">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</span>' : '') + '</span></li>';
+        (m ? '<span class="m">' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</span>' : '') + '</span>' +
+        '<button class="peEd" data-pedit="' + esc(pe.id) + '" aria-label="' + esc(T.peEditAria(exName(pe))) + '">' + esc(T.peEdit) + '</button></li>';
     }).join('') + '</ol></section>').join('') + VER('verProgram');
+}
+
+/**
+ * Programma → "Modifica": finestra con serie, serie max, rep, RIR, recupero e note dell'esercizio del piano.
+ * Controlli prima di salvare (validatePlanEdit); si salva SOLO online, solo la riga di plan_exercises di quell'esercizio.
+ * Le sedute vecchie non si toccano (hanno la loro copia dell'obiettivo). Dopo: copia del piano sul telefono e Programma
+ * aggiornati, senza ricaricare l'app.
+ */
+function openPlanEdit(peId) {
+  const T = S.T, pe = findPlanExercise(plan(), peId);
+  if (!pe) return;
+  const f = planEditForm(pe);
+  const lab = { sets: T.peSets, sets_max: T.peSetsMax, reps_min: T.peRepsMin, reps_max: T.peRepsMax, rir_min: T.peRirMin, rir_max: T.peRirMax, rest_seconds: T.peRest };
+  const hint = { sets: T.peSetsHint, sets_max: T.peOptional, rir_min: T.peOptional, rir_max: T.peOptional, rest_seconds: T.peOptional };
+  const input = ({ key, kind }) => '<label class="pef' + (key === 'rest_seconds' ? ' wide' : '') + '"><span>' + esc(lab[key]) + '</span>' +
+    '<input id="pe_' + key + '" type="text" inputmode="' + (kind === 'dec' ? 'decimal' : 'numeric') + '" autocomplete="off" value="' + esc(f[key]) + '">' +
+    (hint[key] ? '<small>' + esc(hint[key]) + '</small>' : '') + '</label>';
+  sheetBox('pesheet', '<form id="peForm" novalidate><h2>' + esc(T.peEditTitle) + '</h2><p class="hsub" id="peName">' + esc(exName(pe)) + '</p>' +
+    '<div class="pegrid">' + PLAN_EDIT_FIELDS.filter((x) => x.kind !== 'text').map(input).join('') + '</div>' +
+    '<label class="pef wide"><span>' + esc(T.peNotes) + '</span><textarea id="pe_notes" rows="3">' + esc(f.notes) + '</textarea></label>' +
+    '<div class="peErr" id="peErr" role="alert" aria-live="assertive"></div><p class="peNet" id="peNet" aria-live="polite"></p>' +
+    '<div class="row"><button type="button" id="peCancel">' + esc(T.cancel) + '</button><button type="submit" class="p" id="peSave" data-pe="' + esc(pe.id) + '">' + esc(T.peSave) + '</button></div></form>');
+  $('peCancel').onclick = closeSheet;
+  $('peForm').onsubmit = (ev) => { ev.preventDefault(); savePlanEdit(pe.id); };
+  peNetState();
+}
+
+/** Tasto Salva della finestra: spento senza internet, con la scritta "Serve internet per modificare il piano". */
+function peNetState() {
+  const b = $('peSave'); if (!b || b.dataset.busy) return;
+  const on = navigator.onLine;
+  b.disabled = !on;
+  $('peNet').textContent = on ? '' : S.T.peNeedNet;
+}
+
+async function savePlanEdit(peId) {
+  const T = S.T, b = $('peSave');
+  if (!b || b.dataset.busy) return;
+  const form = {};
+  for (const { key } of PLAN_EDIT_FIELDS) form[key] = $('pe_' + key).value;
+  const { values, errors } = validatePlanEdit(form);
+  $('peErr').innerHTML = errors.map((k) => '<p>' + esc(T.peErr[k]) + '</p>').join('');
+  if (errors.length) return;
+  if (!navigator.onLine) { peNetState(); return; }
+  b.dataset.busy = '1'; b.disabled = true; b.textContent = T.peSaving;
+  const r = await api.updatePlanExercise(peId, values);
+  if (!$('peSave')) return;   // finestra chiusa nel frattempo
+  delete b.dataset.busy; b.textContent = T.peSave; peNetState();
+  if (r.error) {
+    if (isOffline(r.error)) { b.disabled = true; $('peNet').textContent = T.peNeedNet; }
+    else $('peErr').innerHTML = '<p>' + esc(r.error.code === 'not-allowed' ? T.peDenied : T.peSaveErr + (r.error.message || r.error.code)) + '</p>';
+    return;
+  }
+  S.snap = { ...S.snap, plan: applyPlanEdit(S.snap.plan, peId, r.data) };
+  await setKv(S.store, 'snap:' + S.user.id, S.snap);
+  closeSheet(); buzz(20); toast(T.peSaved); render();
 }
 
 /**
@@ -982,6 +1040,8 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'moreBtn') { openMore(); return; }
   if (b.id === 'exList') { openExList(); return; }
   if (b.dataset.page) { if (setPage(b.dataset.page)) { render(); scrollTo(0, 0); } return; }
+  // Programma: "Modifica" di un esercizio (tasto a parte; il tocco sul giorno apre Allenamento come prima)
+  if (b.dataset.pedit) { openPlanEdit(b.dataset.pedit); return; }
   const pe = curPe();
   // giorno toccato nelle schede di Track o in Program: si apre quel giorno in Track (come le schede di sempre)
   if (b.dataset.day) { chooseDay(b.dataset.day); return; }
@@ -1050,8 +1110,8 @@ addEventListener('popstate', (ev) => {
 });
 
 // rete e ritorno sull'app: si invia la coda appena possibile
-addEventListener('online', () => { log('online'); S.sync.offline = false; syncNow(true); refresh(); });
-addEventListener('offline', () => { S.sync.offline = true; setSync(); });
+addEventListener('online', () => { log('online'); S.sync.offline = false; peNetState(); syncNow(true); refresh(); });
+addEventListener('offline', () => { S.sync.offline = true; setSync(); peNetState(); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden || !S.user) return;
   if (S.date !== localDate()) safeRender();

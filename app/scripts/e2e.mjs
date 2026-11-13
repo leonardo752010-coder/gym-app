@@ -327,6 +327,51 @@ try {
     (await page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('gym.') && k !== 'gym.timer').sort()))) === lsBefore);
   { const n = (await serverSets()).length; check('online ancora 1 serie dopo il giro delle pagine', n === 1, n + ''); }
 
+  console.log('3c. Programma → Modifica: serie, rep e RIR di un esercizio (solo online)');
+  {
+    const curlRow = async () => (await admin.from('plan_exercises').select('sets, sets_max, reps_min, reps_max, rir_min, rir_max, rest_seconds, notes').eq('id', ref.pe.lb_curl).single()).data;
+    const fill = async (v) => { for (const [k, x] of Object.entries(v)) await page.fill('#pe_' + k, x); };
+    const openCurl = async () => { await page.click('.pday:has-text("Lower B") li:has-text("Leg curl seduto") .peEd'); await page.waitForSelector('.sheet.pesheet'); };
+    const original = await curlRow();
+    await page.click('[data-page=program]'); await page.waitForSelector('#planName');
+    await page.evaluate(() => { window.__noReload = 1; });
+    check('Programma: un tasto Modifica per ogni esercizio', (await page.$$('.pex li')).length > 0 && (await page.$$('.pex li')).length === (await page.$$('.pex li .peEd')).length);
+    { const r = await page.$eval('.pex li .peEd', (b) => { const x = b.getBoundingClientRect(); return { w: Math.round(x.width), h: Math.round(x.height), t: b.textContent }; });
+      check('tasto Modifica piccolo ma toccabile (≥ 44 px), scritto "Modifica"', r.w >= 44 && r.h >= 44 && r.t === 'Modifica', JSON.stringify(r)); }
+    await openCurl();
+    check('tocco su Modifica: si apre la finestra, si resta in Programma', (await tabOn()) === 'Programma' && (await page.textContent('#peName')) === 'Leg curl seduto');
+    const vals = await page.evaluate(() => Object.fromEntries(['sets', 'sets_max', 'reps_min', 'reps_max', 'rir_min', 'rir_max', 'rest_seconds', 'notes'].map((k) => [k, document.getElementById('pe_' + k).value])));
+    check('finestra già compilata con i valori del piano', JSON.stringify(vals) === JSON.stringify({ sets: '2', sets_max: '', reps_min: '8', reps_max: '12', rir_min: '0', rir_max: '1', rest_seconds: '', notes: '' }), JSON.stringify(vals));
+    check('online: tasto Salva acceso, nessuna scritta di rete', !(await page.isDisabled('#peSave')) && (await page.textContent('#peNet')) === '');
+    await fill({ reps_min: '12', reps_max: '8', rir_min: '3', rir_max: '1' });
+    await page.click('#peSave');
+    await page.waitForSelector('#peErr p');
+    { const t = await page.textContent('#peErr');
+      check('valori sbagliati: messaggi chiari, finestra aperta, niente salvato', /Rep min non può essere più di Rep max/.test(t) && /RIR min non può essere più di RIR max/.test(t) && !!(await page.$('.pesheet')) &&
+        JSON.stringify(await curlRow()) === JSON.stringify(original), t); }
+    await page.screenshot({ path: path.join(out, '19-modifica-errore.png') });
+    await fill({ sets: '3', sets_max: '4', reps_min: '10', reps_max: '14', rir_min: '1', rir_max: '2', rest_seconds: '90', notes: 'Prova e2e' });
+    await page.click('#peSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    { const li = (await page.textContent('.pday:has-text("Lower B") li:has-text("Leg curl seduto")')).replace(/\s+/g, ' ');
+      const row = await curlRow();
+      check('Salva: piano online cambiato (solo questa riga)', row.sets === 3 && row.sets_max === 4 && row.reps_min === 10 && row.reps_max === 14 && Number(row.rir_min) === 1 && Number(row.rir_max) === 2 && row.rest_seconds === 90 && row.notes === 'Prova e2e', JSON.stringify(row));
+      check('Salva: Programma aggiornato subito, senza ricaricare l\'app', /3 × 10–14 rep · RIR 1–2/.test(li) && (await page.evaluate(() => window.__noReload)) === 1, li);
+      const kv = await page.evaluate(async () => { const g = window.__gym.S; const pe = g.snap.plan.days.flatMap((d) => d.exercises).find((p) => p.exercise && /curl/i.test(JSON.stringify(p.exercise.name))); return pe && [pe.sets, pe.reps_min, pe.reps_max]; });
+      check('Salva: copia del piano sul telefono aggiornata', JSON.stringify(kv) === '[3,10,14]', JSON.stringify(kv)); }
+    // si rimette com'era (le prove dopo usano Lower B)
+    await openCurl();
+    await fill({ sets: '2', sets_max: '', reps_min: '8', reps_max: '12', rir_min: '0', rir_max: '1', rest_seconds: '', notes: '' });
+    await page.screenshot({ path: path.join(out, '21-modifica.png') });
+    await page.click('#peSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    check('rimesso com\'era: piano online uguale a prima', JSON.stringify(await curlRow()) === JSON.stringify(original));
+    check('la modifica del piano non tocca le serie né la coda', (await localRows()) === rowsBefore && (await serverSets()).length === 1);
+    await openCurl(); await page.click('#peCancel');
+    check('Annulla chiude la finestra senza salvare', !(await page.$('.pesheet')) && JSON.stringify(await curlRow()) === JSON.stringify(original));
+    await page.click('[data-page=track]'); await page.waitForSelector('#exv');
+  }
+
   console.log('4. Offline: registrare, riaprire l\'app, modificare');
   // Senza rete: il browser offline (la pagina deve arrivare dalla cache) e in più ogni richiesta a Supabase bloccata
   // (il browser di prova lascia passare le richieste del service worker anche offline).
@@ -348,6 +393,12 @@ try {
   await page.click('[data-page=program]');
   await page.waitForSelector('#planName');
   check('senza rete: Programma si apre', (await page.$$('.pday')).length === 4);
+  await page.click('.pex li .peEd');
+  await page.waitForSelector('.sheet.pesheet');
+  check('senza rete: Modifica si apre ma Salva è spento, con "Serve internet per modificare il piano."',
+    (await page.isDisabled('#peSave')) && (await page.textContent('#peNet')) === 'Serve internet per modificare il piano.', await page.textContent('#peNet'));
+  await page.screenshot({ path: path.join(out, '20-modifica-offline.png') });
+  await page.click('#peCancel');
   await page.click('[data-page=track]');
   await page.waitForSelector('#exv');
   await page.screenshot({ path: path.join(out, '03-offline.png'), fullPage: true });
