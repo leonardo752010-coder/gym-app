@@ -774,6 +774,11 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .pf span{font-size:12px;font-weight:700;color:var(--mu)}
 .pf select{width:100%;min-width:0;min-height:44px;padding:0 10px;border-radius:12px;border:1px solid var(--sk-ctl,var(--line));background:var(--card);color:var(--tx);font:inherit;font-size:15px;font-weight:700;text-overflow:ellipsis}
 @media (max-width:359px){ .pfil{grid-template-columns:1fr} }
+/* tasto "Esporta storico": largo quanto la pagina, stile dei tasti grigi (.mini) */
+.expBtn{display:flex;width:100%;justify-content:center;margin:0 0 12px}
+.expBtn span{display:inline-flex;align-items:center;gap:8px}
+.expBtn svg{width:18px;height:18px;flex:none}
+.load + .expBtn{margin-top:12px}
 .cmac{margin:-4px 0 10px;font-size:13px;font-weight:600;color:var(--vt,var(--mu))}
 /* grafico: etichette a sinistra, area con linee leggere, punti da toccare (disegno 12 px, tocco 40 × 40 px) */
 .chart{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 12px 10px;margin:0 0 12px}

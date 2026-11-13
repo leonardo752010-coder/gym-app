@@ -74,7 +74,7 @@ export function historyList(idx, plan, names = null, machines = null) {
     const day = s.plan_day_id && P.days.get(s.plan_day_id);
     const dayName = day ? day.name : s.day_name || '';
     out.push({
-      id: s.id, date: s.session_date, dayName, dayKey: dayKeyOf(s.plan_day_id, dayName), ended: !!s.ended_at,
+      id: s.id, date: s.session_date, dayName, dayKey: dayKeyOf(s.plan_day_id, dayName), planDayId: s.plan_day_id || null, ended: !!s.ended_at,
       start: s.started_at || s.created_at || '', exercises,
       setCount: exercises.reduce((a, e) => a + e.sets.length, 0),
     });

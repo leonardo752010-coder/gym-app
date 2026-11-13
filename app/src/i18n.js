@@ -48,6 +48,7 @@ const it = {
   // Progressi: Storico (con filtri) e Grafico; tasto "Storico" nell'esercizio (ultime 3 volte)
   histTab: 'Storico', chartTab: 'Grafico', histBtn: 'Storico', fWorkout: 'Workout', fExercise: 'Esercizio',
   allWorkouts: 'Tutti i workout', allExercises: 'Tutti gli esercizi', noMatch: 'Nessuna seduta con questi filtri.',
+  exportBtn: 'Esporta storico', exportEmpty: 'Non ci sono ancora allenamenti da esportare', exportErr: 'Export non riuscito: ',
   otherMachine: 'altra macchina', noMachine: 'senza macchina',
   chartNone: 'Nessun esercizio con serie salvate sul telefono.',
   chartFew: 'Servono almeno 2 sedute di questo esercizio (su questa macchina) per disegnare il grafico.',
@@ -129,6 +130,7 @@ const en = {
   weightCol: (u) => 'Weight (' + u + ')', complete: 'Complete set', rirTap: 'RIR, tap to change',
   histTab: 'History', chartTab: 'Chart', histBtn: 'History', fWorkout: 'Workout', fExercise: 'Exercise',
   allWorkouts: 'All workouts', allExercises: 'All exercises', noMatch: 'No sessions with these filters.',
+  exportBtn: 'Export history', exportEmpty: 'No workouts to export yet', exportErr: 'Export failed: ',
   otherMachine: 'other machine', noMachine: 'no machine',
   chartNone: 'No exercise with sets saved on this phone.',
   chartFew: 'At least 2 sessions of this exercise (on this machine) are needed to draw the chart.',

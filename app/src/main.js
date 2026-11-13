@@ -29,6 +29,7 @@ import {
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable, e1rmPoints, LB,
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
+import { historyCsvRows, toCsv, exportFileName } from './esporta.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 import { machineKind, machineIcon } from './macchine.js';
@@ -92,6 +93,7 @@ const ICON_NOTE = SVG('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path 
 const ICON_HIST = SVG('<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4v4h4M12 7.5V12l3 2"/>');
 // schermata della serie: freccia su (obiettivo), calendario (volta scorsa), nuvola (stato online), icone dei chip
 const ICON_UP = SVG('<path d="M12 19V5M6 11l6-6 6 6"/>', 2.6);
+const ICON_EXPORT = SVG('<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4.5 15.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>');
 const ICON_CAL = SVG('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>');
 const ICON_CLOUD = (ok) => SVG('<path d="M7 18.5h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.3 9.2 4.7 4.7 0 0 0 7 18.5z"/>' + (ok ? '<path d="M9.3 13.6l2 2 3.6-3.8"/>' : ''));
 const ICON_SETS = SVG('<path d="M4 7h16M4 12h16M4 17h10"/>');
@@ -786,7 +788,7 @@ function renderProgress() {
   const T = S.T, P = S.prog;
   const idx = indexRows(S.local.list());
   const list = historyList(idx, plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
-  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
+  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>' + exportBtn(); return; }
   const tabs = '<div class="ptabs" role="tablist">' + ['history', 'chart'].map((t) => '<button role="tab" data-ptab="' + t + '" id="ptab-' + t + '" class="' + (P.tab === t ? 'on' : '') +
     '" aria-selected="' + (P.tab === t) + '">' + esc(t === 'history' ? T.histTab : T.chartTab) + '</button>').join('') + '</div>';
   $('wrap').innerHTML = tabs + (P.tab === 'chart' ? chartView(idx, list) : historyView(list));
@@ -808,7 +810,7 @@ function historyView(list) {
   const shown = filterHistory(list, { day: P.day, exercise: P.ex });
   if (!shown.length) return h + '<div class="load" id="noMatch">' + esc(T.noMatch) + '</div>';
   h += '<p class="pgNote">' + esc(T.historyNote) + '</p>';
-  return h + shown.map((s) => {
+  return h + exportBtn() + shown.map((s) => {
     const live = !s.ended && s.date === S.date;
     return '<section class="hses" data-ses="' + esc(s.id) + '"><div class="hsH"><b>' + esc(shortDate(s.date)) + '</b><span>' + esc(s.dayName) + '</span>' +
       '<small' + (live ? ' class="live"' : '') + '>' + esc(live ? T.inProgress : T.setCount(s.setCount)) + '</small></div>' +
@@ -816,6 +818,35 @@ function historyView(list) {
         (macTxt(e.machine, e.machineId) ? '<span class="m">' + esc(macTxt(e.machine, e.machineId)) + '</span>' : '') +
         '<div class="lv">' + e.sets.map((x) => '<span>' + setTxt(x) + '</span>').join('') + '</div></div>').join('') + '</section>';
   }).join('');
+}
+
+/** Tasto "Esporta storico" (Progressi → Storico). */
+const exportBtn = () => '<button class="mini expBtn" id="exportBtn"><span>' + ICON_EXPORT + esc(S.T.exportBtn) + '</span></button>';
+
+/**
+ * Export di TUTTO lo storico sul telefono (stessa lista dello Storico, senza i filtri attivi) in CSV per Excel.
+ * Sul telefono (schermo touch che sa condividere file) apre il menu di condivisione; altrimenti scarica il file.
+ * Storico vuoto: solo il messaggio, nessun file. Non scrive niente, né sul telefono né online.
+ */
+async function exportHistory() {
+  const T = S.T;
+  const list = historyList(indexRows(S.local.list()), plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
+  const rows = historyCsvRows(list, plan(), { lang: S.lang });
+  if (!rows.length) { toast(T.exportEmpty); return; }
+  const name = exportFileName(localDate());
+  try {
+    const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+    const file = typeof File === 'function' ? new File([blob], name, { type: 'text/csv' }) : null;
+    const touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    if (file && touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }   // menu chiuso senza scegliere: niente; altri errori → si scarica
+    }
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; a.hidden = true;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { toast(T.exportErr + (e && e.message || e), true); }
 }
 
 /** e1RM nell'unità mostrata, con un decimale (80 kg × 8 @2 → 106,7). */
@@ -1185,6 +1216,7 @@ document.addEventListener('click', (ev) => {
   // Progressi: sezione Storico / Grafico, punto del grafico (solo cose da vedere, niente dati cambiati)
   if (b.dataset.ptab) { if (S.prog.tab !== b.dataset.ptab) { S.prog.tab = b.dataset.ptab; render(); } return; }
   if (b.dataset.pt) { S.prog.pt = b.dataset.pt; render(); return; }
+  if (b.id === 'exportBtn') { exportHistory(); return; }
   if (b.id === 'dayBtn') { openDays(); return; }
   if (b.id === 'hBack') { if (setPage('program')) { render(); scrollTo(0, 0); } return; }   // freccia indietro: a Programma (come il tasto in basso)
   if (b.id === 'moreBtn') { openMore(); return; }
