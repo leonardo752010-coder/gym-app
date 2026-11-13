@@ -380,3 +380,50 @@ describe('nomi dello storico dalla libreria esercizi (database locale)', () => {
     expect(list).toEqual(before);
   });
 });
+
+describe('macchine dello storico dalla libreria macchine (database locale)', () => {
+  const progress = async () => {
+    const d = await device(A.email, passA);
+    const snap = await d.api.snapshot(A.userId);
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    expect(snap.error).toBeUndefined();
+    expect(hist.error).toBeUndefined();
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    const idx = indexRows(d.local.list());
+    return { snap: snap.data, hist, idx, list: historyList(idx, snap.data.plan, hist.exerciseNames, hist.machineInfo), old: historyList(idx, snap.data.plan, hist.exerciseNames) };
+  };
+  const rowsOf = (list, exId) => list.flatMap((s) => s.exercises.filter((e) => e.exerciseId === exId).map((e) => ({ date: s.date, machineId: e.machineId, machine: e.machine })));
+  const planMachines = (snap) => snap.plan.days.flatMap((d) => d.exercises).map((p) => p.machine && p.machine.id).filter(Boolean);
+
+  it('lo storico scarica le macchine della libreria; le righe non cambiano forma', async () => {
+    const { hist } = await progress();
+    expect(hist.machineInfo[A.M.lat]).toMatchObject({ code: 'prova-app-m-lat', brand: 'Marca Finta', model: 'Lat Pulldown', brand_code: 'MF-20' });
+    expect(hist.data.find((x) => x.table === 'session_exercises').data).not.toHaveProperty('machine');
+  });
+
+  it('a) macchina tolta dal piano: le vecchie sedute mostrano la macchina vera', async () => {
+    const before = rowsOf((await progress()).list, A.E.lat);
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.every((e) => e.machineId === A.M.lat && e.machine.brand_code === 'MF-20')).toBe(true);
+    await admin.from('plan_exercise_machines').update({ machine_id: null }).in('plan_exercise_id', [A.pe.ua_lat, A.pe.ub_lat]).throwOnError();
+    const { snap, list, old } = await progress();
+    expect(planMachines(snap)).not.toContain(A.M.lat);   // la macchina non è più nel piano
+    expect(rowsOf(list, A.E.lat)).toEqual(before);
+    expect(rowsOf(old, A.E.lat).every((e) => e.machine === null)).toBe(true);   // com'era prima: "altra macchina"
+  });
+
+  it('b) macchina cambiata nella riga del piano: le vecchie sedute mostrano la macchina con cui sono state fatte', async () => {
+    const before = rowsOf((await progress()).list, A.E.legext).filter((e) => e.machineId === A.M['legext-a']);
+    expect(before.length).toBe(2);   // -7 (importata) e -1
+    await admin.from('plan_exercise_machines').update({ machine_id: A.M['legext-b'] }).eq('plan_exercise_id', A.pe.la_legext_a).throwOnError();
+    const { snap, list, old, idx } = await progress();
+    expect(snap.plan.days.find((d) => d.name === 'Lower A').exercises.find((p) => p.id === A.pe.la_legext_a).machine.id).toBe(A.M['legext-b']);
+    const after = rowsOf(list, A.E.legext).filter((e) => e.machineId === A.M['legext-a']);
+    expect(after).toEqual(before);
+    expect(after.every((e) => e.machine.model === 'Leg Extension' && e.machine.brand_code === 'MF-50')).toBe(true);
+    expect(rowsOf(old, A.E.legext).filter((e) => e.machineId === A.M['legext-a']).every((e) => e.machine === null)).toBe(true);
+    // come deciso: con la macchina nuova la "Volta scorsa" riparte (quella sulla macchina vecchia non conta)
+    const last = lastPerformance(idx, snap.plan.days.find((d) => d.name === 'Lower A').exercises.find((p) => p.id === A.pe.la_legext_a), { onOrBefore: today });
+    expect(last && last.machineId).toBe(A.M['legext-b']);
+  });
+});

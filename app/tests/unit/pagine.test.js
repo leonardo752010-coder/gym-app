@@ -118,6 +118,23 @@ describe('storico per Progress', () => {
     expect(s1.exercises.map((e) => e.name.it)).toEqual(['Panca', 'Lat']);
   });
 
+  it('macchina dalla libreria (machine_id della seduta): anche se è uscita dal piano', () => {
+    const lib = { m1: { id: 'm1', code: 'MF-10', brand: 'Marca', model: 'Press (libreria)' }, m9: { id: 'm9', code: 'OLD-9', brand: 'Vecchia', model: 'Row' } };
+    const rows2 = [...rows, S('s6', '2026-11-09', { day_name: 'Vecchio giorno' }), SE('f0', 's6', 'ex1', { machine_id: 'm9' }), ST('v1', 'f0', 1, 40, 10)];
+    const l = historyList(indexRows(rows2), PLAN, null, lib);
+    expect(l.find((s) => s.id === 's6').exercises[0].machine).toMatchObject({ id: 'm9', brand: 'Vecchia', model: 'Row' });
+    expect(l.find((s) => s.id === 's1').exercises[0].machine.model).toBe('Press (libreria)');
+    // senza la libreria: macchina fuori dal piano → null (la pagina mostra "altra macchina"), come prima
+    expect(historyList(indexRows(rows2), PLAN).find((s) => s.id === 's6').exercises[0].machine).toBeNull();
+  });
+
+  it('la riga del piano oggi ha un\'altra macchina: lo storico tiene quella con cui la seduta è stata fatta', () => {
+    const NEW = { id: 'm2', code: 'NEW-2', brand: 'Nuova', model: 'Press 2' };
+    const plan2 = { ...PLAN, days: PLAN.days.map((d) => ({ ...d, exercises: d.exercises.map((pe) => (pe.id === 'pe1' ? { ...pe, machine: NEW } : pe)) })) };
+    const s1 = historyList(indexRows(rows), plan2, null, { m1: MAC }).find((s) => s.id === 's1');
+    expect(s1.exercises[0]).toMatchObject({ machineId: 'm1', machine: { code: 'MF-10' } });
+  });
+
   it('senza piano sul telefono funziona lo stesso', () => {
     expect(historyList(indexRows(rows), null).map((s) => s.id)).toEqual(['s5', 's2', 's1']);
     expect(historyList(indexRows([]), PLAN)).toEqual([]);

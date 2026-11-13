@@ -171,9 +171,10 @@ async function refresh() {
       return;
     }
     await S.local.mergeServer(hist.data, addDays(localDate(), -HISTORY_DAYS));
-    // Nomi della libreria esercizi per lo storico: si tengono anche quelli vecchi (sedute oltre i 120 giorni ancora sul telefono).
-    const oldNames = (S.snap && S.snap.userId === uid && S.snap.exerciseNames) || {};
-    S.snap = { ...snap.data, exerciseNames: { ...oldNames, ...hist.exerciseNames }, fetchedAt: new Date().toISOString(), userId: uid };
+    // Nomi degli esercizi e macchine dalla libreria per lo storico: si tengono anche quelli vecchi (sedute oltre i 120 giorni ancora sul telefono).
+    const old = (S.snap && S.snap.userId === uid && S.snap) || {};
+    S.snap = { ...snap.data, exerciseNames: { ...old.exerciseNames, ...hist.exerciseNames }, machineInfo: { ...old.machineInfo, ...hist.machineInfo },
+      fetchedAt: new Date().toISOString(), userId: uid };
     await setKv(S.store, 'snap:' + uid, S.snap);
     if (!ls.get('unit')) S.unit = (S.snap.profile && S.snap.profile.weight_unit) || 'kg';
     S.lastRefresh = Date.now();
@@ -576,7 +577,7 @@ function renderProgram() {
 function renderProgress() {
   const T = S.T, P = S.prog;
   const idx = indexRows(S.local.list());
-  const list = historyList(idx, plan(), S.snap && S.snap.exerciseNames);
+  const list = historyList(idx, plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
   if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
   const tabs = '<div class="ptabs" role="tablist">' + ['history', 'chart'].map((t) => '<button role="tab" data-ptab="' + t + '" id="ptab-' + t + '" class="' + (P.tab === t ? 'on' : '') +
     '" aria-selected="' + (P.tab === t) + '">' + esc(t === 'history' ? T.histTab : T.chartTab) + '</button>').join('') + '</div>';

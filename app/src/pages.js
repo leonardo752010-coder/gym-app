@@ -44,11 +44,15 @@ function planIndex(plan) {
  * Nome dell'esercizio: dalla libreria esercizi tramite exercise_id (`names`, scaricati con lo storico), così resta
  * giusto anche se l'esercizio è uscito dal piano, è archiviato o la riga del piano oggi punta a un altro esercizio.
  * Se il nome non c'è (per esempio prima del primo scaricamento), quello dello stesso exercise_id nel piano
- * (anche lui viene dalla libreria). Nessuno dei due: nome vuoto (la pagina mostra "—"). Macchine dal piano, come prima.
+ * (anche lui viene dalla libreria). Nessuno dei due: nome vuoto (la pagina mostra "—").
+ * Macchina: dalla libreria macchine tramite il machine_id salvato nella seduta (`machines`, scaricate con lo storico),
+ * così è quella con cui la seduta è stata fatta anche se è uscita dal piano o la riga del piano oggi ne ha un'altra.
+ * Se manca, la stessa macchina (stesso id) nel piano; nessuna delle due: null (la pagina mostra "altra macchina").
  */
-export function historyList(idx, plan, names = null) {
+export function historyList(idx, plan, names = null, machines = null) {
   const P = planIndex(plan);
   const libName = (id) => (names && id && names[id]) || null;
+  const libMachine = (id) => (machines && id && machines[id]) || null;
   const out = [];
   for (const s of idx.sessions.values()) {
     const exercises = [];
@@ -62,7 +66,7 @@ export function historyList(idx, plan, names = null) {
         exerciseId: se.exercise_id,
         machineId: se.machine_id || null,
         name: libName(se.exercise_id) || (pe && pe.exercise ? pe.exercise.name : null),
-        machine: (se.machine_id && P.machines.get(se.machine_id)) || null,
+        machine: libMachine(se.machine_id) || (se.machine_id && P.machines.get(se.machine_id)) || null,
         sets,
       });
     }
