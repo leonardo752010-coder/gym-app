@@ -11,7 +11,7 @@ import { supabaseConfig } from './config.js';
 import { makeApi, storedUser, HISTORY_DAYS } from './api.js';
 import { openStore, Local, getKv, setKv } from './store.js';
 import { flush, isOffline } from './sync.js';
-import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise } from './modifica.js';
+import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove } from './modifica.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
 import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
 import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from './starter.js';
@@ -572,28 +572,49 @@ function renderProgram() {
 }
 
 /**
- * Programma → "Modifica": finestra con serie, serie max, rep, RIR, recupero e note dell'esercizio del piano.
- * Controlli prima di salvare (validatePlanEdit); si salva SOLO online, solo la riga di plan_exercises di quell'esercizio.
- * Le sedute vecchie non si toccano (hanno la loro copia dell'obiettivo). Dopo: copia del piano sul telefono e Programma
- * aggiornati, senza ricaricare l'app.
+ * Programma → "Modifica": finestra con giorno e posizione (Su / Giù), serie, serie max, rep, RIR, recupero e note.
+ * Controlli prima di salvare (validatePlanEdit); si salva SOLO online. Senza spostamento: solo la riga di plan_exercises
+ * di quell'esercizio (updatePlanExercise). Con spostamento: tutte le righe che cambiano posizione in UNA richiesta
+ * (planMoveRows + savePlanRows): o va tutto, o non cambia niente. L'id dell'esercizio nel piano resta lo stesso,
+ * le sedute vecchie non si toccano. Dopo: copia del piano sul telefono e Programma aggiornati, senza ricaricare l'app.
  */
 function openPlanEdit(peId) {
-  const T = S.T, pe = findPlanExercise(plan(), peId);
-  if (!pe) return;
+  const T = S.T, p = plan(), pe = findPlanExercise(p, peId), fromDay = dayOfExercise(p, peId);
+  if (!pe || !fromDay) return;
+  const order = orderForDay(p, peId, fromDay);
+  S.peMv = { peId, fromDay, dayId: fromDay, order, orig: order.map((x) => x.id).join(',') };
   const f = planEditForm(pe);
   const lab = { sets: T.peSets, sets_max: T.peSetsMax, reps_min: T.peRepsMin, reps_max: T.peRepsMax, rir_min: T.peRirMin, rir_max: T.peRirMax, rest_seconds: T.peRest };
   const hint = { sets: T.peSetsHint, sets_max: T.peOptional, rir_min: T.peOptional, rir_max: T.peOptional, rest_seconds: T.peOptional };
   const input = ({ key, kind }) => '<label class="pef' + (key === 'rest_seconds' ? ' wide' : '') + '"><span>' + esc(lab[key]) + '</span>' +
     '<input id="pe_' + key + '" type="text" inputmode="' + (kind === 'dec' ? 'decimal' : 'numeric') + '" autocomplete="off" value="' + esc(f[key]) + '">' +
     (hint[key] ? '<small>' + esc(hint[key]) + '</small>' : '') + '</label>';
+  const days = p.days.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === fromDay ? ' selected' : '') + '>' + esc(d.name) + '</option>').join('');
   sheetBox('pesheet', '<form id="peForm" novalidate><h2>' + esc(T.peEditTitle) + '</h2><p class="hsub" id="peName">' + esc(exName(pe)) + '</p>' +
+    '<div class="pemove"><label class="pef wide"><span>' + esc(T.peDay) + '</span><select id="pe_day"' + (pe.superset_id ? ' disabled' : '') + '>' + days + '</select></label>' +
+    '<div class="pepos"><span id="pePos"></span><button type="button" id="peUp" aria-label="' + esc(T.peUpAria) + '">' + esc(T.peUp) + '</button>' +
+    '<button type="button" id="peDown" aria-label="' + esc(T.peDownAria) + '">' + esc(T.peDown) + '</button></div>' +
+    (pe.superset_id ? '<small class="pess" id="peSs">' + esc(T.peSsHint) + '</small>' : '') + '</div>' +
     '<div class="pegrid">' + PLAN_EDIT_FIELDS.filter((x) => x.kind !== 'text').map(input).join('') + '</div>' +
     '<label class="pef wide"><span>' + esc(T.peNotes) + '</span><textarea id="pe_notes" rows="3">' + esc(f.notes) + '</textarea></label>' +
     '<div class="peErr" id="peErr" role="alert" aria-live="assertive"></div><p class="peNet" id="peNet" aria-live="polite"></p>' +
     '<div class="row"><button type="button" id="peCancel">' + esc(T.cancel) + '</button><button type="submit" class="p" id="peSave" data-pe="' + esc(pe.id) + '">' + esc(T.peSave) + '</button></div></form>');
   $('peCancel').onclick = closeSheet;
+  $('pe_day').onchange = (ev) => { const o = orderForDay(plan(), peId, ev.target.value); if (o) { S.peMv.dayId = ev.target.value; S.peMv.order = o; } peMoveUi(); };
+  $('peUp').onclick = () => { const o = moveInDay(S.peMv.order, peId, -1); if (o) { S.peMv.order = o; peMoveUi(); } };
+  $('peDown').onclick = () => { const o = moveInDay(S.peMv.order, peId, 1); if (o) { S.peMv.order = o; peMoveUi(); } };
   $('peForm').onsubmit = (ev) => { ev.preventDefault(); savePlanEdit(pe.id); };
+  peMoveUi();
   peNetState();
+}
+
+/** Posizione scelta nel giorno ("Posizione 2 di 4") e tasti Su / Giù accesi solo se lo spostamento si può fare. */
+function peMoveUi() {
+  const m = S.peMv; if (!m || !$('pePos')) return;
+  const i = m.order.findIndex((x) => x.id === m.peId);
+  $('pePos').textContent = S.T.pePos(i + 1, m.order.length);
+  $('peUp').disabled = !moveInDay(m.order, m.peId, -1);
+  $('peDown').disabled = !moveInDay(m.order, m.peId, 1);
 }
 
 /** Tasto Salva della finestra: spento senza internet, con la scritta "Serve internet per modificare il piano". */
@@ -605,25 +626,43 @@ function peNetState() {
 }
 
 async function savePlanEdit(peId) {
-  const T = S.T, b = $('peSave');
-  if (!b || b.dataset.busy) return;
+  const T = S.T, b = $('peSave'), m = S.peMv;
+  if (!b || b.dataset.busy || !m || m.peId !== peId) return;
   const form = {};
   for (const { key } of PLAN_EDIT_FIELDS) form[key] = $('pe_' + key).value;
   const { values, errors } = validatePlanEdit(form);
   $('peErr').innerHTML = errors.map((k) => '<p>' + esc(T.peErr[k]) + '</p>').join('');
   if (errors.length) return;
   if (!navigator.onLine) { peNetState(); return; }
+  const moved = m.dayId !== m.fromDay || m.order.map((x) => x.id).join(',') !== m.orig;
   b.dataset.busy = '1'; b.disabled = true; b.textContent = T.peSaving;
-  const r = await api.updatePlanExercise(peId, values);
+  let r, newPlan = null;
+  if (!moved) {
+    r = await api.updatePlanExercise(peId, values);
+    if (!r.error) newPlan = applyPlanEdit(S.snap.plan, peId, r.data);
+  } else {
+    // righe aggiornate dal server (anche archiviate) dei due giorni, poi UNA richiesta con tutte le righe che cambiano
+    r = await api.planDayRows([...new Set([m.fromDay, m.dayId])]);
+    if (!r.error) {
+      const mv = planMoveRows(r.data, peId, m.dayId, m.order.map((x) => x.id), values);
+      if (mv.error) r = { error: { code: 'move', key: mv.error } };
+      else {
+        r = await api.savePlanRows(mv.rows);
+        if (!r.error) newPlan = applyPlanMove(S.snap.plan, peId, r.data);
+      }
+    }
+  }
   if (!$('peSave')) return;   // finestra chiusa nel frattempo
   delete b.dataset.busy; b.textContent = T.peSave; peNetState();
   if (r.error) {
     if (isOffline(r.error)) { b.disabled = true; $('peNet').textContent = T.peNeedNet; }
-    else $('peErr').innerHTML = '<p>' + esc(r.error.code === 'not-allowed' ? T.peDenied : T.peSaveErr + (r.error.message || r.error.code)) + '</p>';
+    else $('peErr').innerHTML = '<p>' + esc(r.error.code === 'move' ? T.peErr[r.error.key] : r.error.code === 'not-allowed' ? T.peDenied
+      : T.peSaveErr + (r.error.message || r.error.code)) + '</p>';
     return;
   }
-  S.snap = { ...S.snap, plan: applyPlanEdit(S.snap.plan, peId, r.data) };
+  S.snap = { ...S.snap, plan: newPlan };
   await setKv(S.store, 'snap:' + S.user.id, S.snap);
+  S.peMv = null;
   closeSheet(); buzz(20); toast(T.peSaved); render();
 }
 

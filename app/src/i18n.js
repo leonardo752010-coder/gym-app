@@ -60,6 +60,8 @@ const it = {
   peRest: 'Recupero (secondi)', peNotes: 'Note', peSetsHint: '0 = fuori dal volume', peOptional: 'vuoto = nessuno',
   peNeedNet: 'Serve internet per modificare il piano.', peSaved: 'Piano aggiornato', peSaveErr: 'Non salvato: ',
   peDenied: 'Non salvato: questo esercizio non si può modificare da questo account.',
+  peDay: 'Giorno', pePos: (i, n) => 'Posizione ' + i + ' di ' + n, peUp: '↑ Su', peDown: '↓ Giù',
+  peUpAria: 'Sposta su nel giorno', peDownAria: 'Sposta giù nel giorno', peSsHint: 'In superserie: si sposta solo dentro la superserie, e non in un altro giorno.',
   peErr: {
     sets: 'Serie: un numero intero da 0 a 20 (0 = fuori dal volume).',
     setsMax: 'Serie max: lascia vuoto, oppure un numero intero da 1 a 20.',
@@ -69,6 +71,9 @@ const it = {
     rir: 'RIR: un numero da 0 a 10 (al massimo un decimale), oppure vuoto.',
     rirOrder: 'RIR min non può essere più di RIR max.',
     rest: 'Recupero: secondi interi da 0 a 3600, oppure vuoto.',
+    superset: 'Questo esercizio è in una superserie: non si può spostare in un altro giorno.',
+    full: 'Il giorno scelto è pieno (al massimo 100 esercizi).',
+    missing: 'Questo esercizio non è più nel piano: aggiorna l\'app e riprova.',
   },
 };
 const en = {
@@ -120,6 +125,8 @@ const en = {
   peRest: 'Rest (seconds)', peNotes: 'Notes', peSetsHint: '0 = not counted in volume', peOptional: 'empty = none',
   peNeedNet: 'You need internet to edit the plan.', peSaved: 'Plan updated', peSaveErr: 'Not saved: ',
   peDenied: 'Not saved: this exercise cannot be edited from this account.',
+  peDay: 'Day', pePos: (i, n) => 'Position ' + i + ' of ' + n, peUp: '↑ Up', peDown: '↓ Down',
+  peUpAria: 'Move up in the day', peDownAria: 'Move down in the day', peSsHint: 'In a superset: it moves only inside the superset, and not to another day.',
   peErr: {
     sets: 'Sets: a whole number from 0 to 20 (0 = not counted in volume).',
     setsMax: 'Max sets: leave empty, or a whole number from 1 to 20.',
@@ -129,6 +136,9 @@ const en = {
     rir: 'RIR: a number from 0 to 10 (one decimal at most), or empty.',
     rirOrder: 'Min RIR cannot be more than Max RIR.',
     rest: 'Rest: whole seconds from 0 to 3600, or empty.',
+    superset: 'This exercise is in a superset: it cannot move to another day.',
+    full: 'The chosen day is full (100 exercises at most).',
+    missing: 'This exercise is no longer in the plan: refresh the app and try again.',
   },
 };
 export const LANGS = { it, en };

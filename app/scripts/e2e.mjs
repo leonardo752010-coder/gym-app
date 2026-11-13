@@ -369,6 +369,45 @@ try {
     check('la modifica del piano non tocca le serie né la coda', (await localRows()) === rowsBefore && (await serverSets()).length === 1);
     await openCurl(); await page.click('#peCancel');
     check('Annulla chiude la finestra senza salvare', !(await page.$('.pesheet')) && JSON.stringify(await curlRow()) === JSON.stringify(original));
+
+    // Giorno e Su / Giù
+    const dayRows = async () => (await admin.from('plan_exercises').select('id, plan_day_id, position').eq('user_id', ref.userId).order('plan_day_id').order('position')).data;
+    const namesIn = async (day) => page.$$eval('.pday:has-text("' + day + '") .pex li .t b', (b) => b.map((x) => x.textContent));
+    const startRows = await dayRows(), startLB = await namesIn('Lower B'), startLA = await namesIn('Lower A');
+    await openCurl();
+    check('finestra: campo Giorno con il giorno dell\'esercizio, "Posizione 1 di 2", Su spento e Giù acceso',
+      (await page.$eval('#pe_day', (x) => x.options[x.selectedIndex].text)) === 'Lower B' && (await page.textContent('#pePos')) === 'Posizione 1 di 2' &&
+      (await page.isDisabled('#peUp')) && !(await page.isDisabled('#peDown')), await page.textContent('#pePos'));
+    { const r = await page.$$eval('#peUp, #peDown', (bs) => bs.map((b) => { const x = b.getBoundingClientRect(); return [Math.round(x.width), Math.round(x.height), b.textContent]; }));
+      check('tasti Su e Giù toccabili (≥ 44 px)', r.every(([w, h]) => w >= 44 && h >= 44), JSON.stringify(r)); }
+    await page.click('#peDown');
+    check('Giù: "Posizione 2 di 2", Giù spento', (await page.textContent('#pePos')) === 'Posizione 2 di 2' && (await page.isDisabled('#peDown')));
+    await page.selectOption('#pe_day', { label: 'Lower A' });
+    { const n = startLA.length + 1;
+      check('altro giorno: l\'esercizio va in fondo ("Posizione ' + n + ' di ' + n + '")', (await page.textContent('#pePos')) === 'Posizione ' + n + ' di ' + n, await page.textContent('#pePos')); }
+    await page.screenshot({ path: path.join(out, '22-modifica-giorno.png') });
+    await page.click('#peSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    { const la = await namesIn('Lower A'), lb = await namesIn('Lower B'), rows = await dayRows();
+      const curl = rows.find((r) => r.id === ref.pe.lb_curl);
+      const byDay = (d) => rows.filter((r) => r.plan_day_id === d).map((r) => r.position);
+      check('Salva: Leg curl in fondo a Lower A, tolto da Lower B, subito in Programma', la.at(-1) === 'Leg curl seduto' && !lb.includes('Leg curl seduto') && la.length === startLA.length + 1, JSON.stringify([la, lb]));
+      check('online: stesso id, giorno nuovo, posizioni 1, 2, 3… senza buchi nei due giorni', curl.plan_day_id === ref.days.LA &&
+        [ref.days.LA, ref.days.LB].every((d) => byDay(d).every((p, i) => p === i + 1)), JSON.stringify(rows.filter((r) => [ref.days.LA, ref.days.LB].includes(r.plan_day_id)))); }
+    // si rimette com'era: di nuovo in Lower B, poi Su fino al primo posto
+    await page.click('.pday:has-text("Lower A") li:has-text("Leg curl seduto") .peEd'); await page.waitForSelector('.sheet.pesheet');
+    await page.selectOption('#pe_day', { label: 'Lower B' });
+    await page.click('#peUp');
+    check('ritorno: "Posizione 1 di 2" in Lower B', (await page.textContent('#pePos')) === 'Posizione 1 di 2');
+    await page.click('#peSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    check('rimesso com\'era: giorni e posizioni online uguali a prima, Programma uguale a prima',
+      JSON.stringify(await dayRows()) === JSON.stringify(startRows) && JSON.stringify(await namesIn('Lower B')) === JSON.stringify(startLB) && JSON.stringify(await namesIn('Lower A')) === JSON.stringify(startLA));
+    // esercizio in superserie: Giorno spento, con la spiegazione
+    await page.click('.pday:has-text("Upper B") li:has-text("Lat machine") .peEd'); await page.waitForSelector('.sheet.pesheet');
+    check('superserie: tendina Giorno spenta e spiegazione', (await page.isDisabled('#pe_day')) && /superserie/.test(await page.textContent('#peSs')));
+    await page.click('#peCancel');
+    check('lo spostamento non tocca le serie né la coda', (await localRows()) === rowsBefore && (await serverSets()).length === 1);
     await page.click('[data-page=track]'); await page.waitForSelector('#exv');
   }
 

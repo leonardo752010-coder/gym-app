@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise } from '../../src/modifica.js';
+import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove, PE_COLUMNS } from '../../src/modifica.js';
 import { LANGS } from '../../src/i18n.js';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -111,7 +111,7 @@ describe('solo online, solo la riga del piano', () => {
 
   it('il salvataggio aggiorna solo plan_exercises, per id, e solo le colonne della finestra', () => {
     const api = read('src/api.js');
-    const fn = api.slice(api.indexOf('async updatePlanExercise'), api.indexOf('upsert(table, rows)'));
+    const fn = api.slice(api.indexOf('async updatePlanExercise'), api.indexOf('planDayRows('));
     expect(fn).toMatch(/from\('plan_exercises'\)\.update\(values\)\.eq\('id', id\)/);
     expect(fn).not.toMatch(/sessions|session_exercises|sets\(|upsert|delete/);
   });
@@ -120,5 +120,87 @@ describe('solo online, solo la riga del piano', () => {
     const main = read('src/main.js');
     expect(main).toMatch(/b\.disabled = !on;/);
     expect(main).toMatch(/T\.peNeedNet/);
+  });
+});
+
+describe('spostamento: Su / Giù dentro il giorno', () => {
+  const O = (s) => s.split(' ').map((t) => { const [id, ss] = t.split(':'); return { id, superset_id: ss || null }; });
+  const ids = (o) => o && o.map((x) => x.id).join(' ');
+
+  it('esercizi normali: scambio con il vicino; ai bordi non si muove', () => {
+    expect(ids(moveInDay(O('a b c'), 'b', -1))).toBe('b a c');
+    expect(ids(moveInDay(O('a b c'), 'b', 1))).toBe('a c b');
+    expect(moveInDay(O('a b c'), 'a', -1)).toBeNull();
+    expect(moveInDay(O('a b c'), 'c', 1)).toBeNull();
+    expect(moveInDay(O('a b c'), 'x', 1)).toBeNull();
+  });
+
+  it('un esercizio normale scavalca una superserie intera (la superserie resta unita)', () => {
+    expect(ids(moveInDay(O('x s1:S s2:S y'), 'x', 1))).toBe('s1 s2 x y');
+    expect(ids(moveInDay(O('x s1:S s2:S y'), 'y', -1))).toBe('x y s1 s2');
+  });
+
+  it('un esercizio di una superserie si muove solo dentro la sua superserie', () => {
+    expect(ids(moveInDay(O('x s1:S s2:S y'), 's1', 1))).toBe('x s2 s1 y');
+    expect(moveInDay(O('x s1:S s2:S y'), 's1', -1)).toBeNull();
+    expect(moveInDay(O('x s1:S s2:S y'), 's2', 1)).toBeNull();
+  });
+});
+
+describe('spostamento: giorno e righe da scrivere', () => {
+  const D1 = 'd1', D2 = 'd2';
+  const R = (id, day, position, extra = {}) => ({ id, user_id: 'u', plan_day_id: day, position, exercise_id: 'ex-' + id, superset_id: null, sets: 2, sets_max: null,
+    reps_min: 8, reps_max: 12, rir_min: 1, rir_max: 2, rest_seconds: null, set_type: 'normal', progression_method: 'double-progression', progression_settings: {}, notes: null, archived_at: null, ...extra });
+  const rows = [R('a', D1, 1), R('b', D1, 2), R('arch', D1, 3, { archived_at: '2026-11-01T00:00:00Z' }), R('c', D1, 4), R('p', D2, 1), R('q', D2, 2)];
+  const pos = (out) => Object.fromEntries(out.map((r) => [r.id, r.plan_day_id + '#' + r.position]));
+
+  it('in un altro giorno: in fondo al giorno nuovo; giorno vecchio senza buchi (archiviati in fondo)', () => {
+    const { rows: out } = planMoveRows(rows, 'b', D2, ['p', 'q', 'b'], { sets: 3 });
+    expect(pos(out)).toEqual({ b: 'd2#3', c: 'd1#2' });   // a resta 1, c da 4 a 2, l'archiviato era già 3 (in fondo)
+    expect(out.find((r) => r.id === 'b')).toMatchObject({ id: 'b', exercise_id: 'ex-b', sets: 3, plan_day_id: D2, position: 3 });
+    expect(Object.keys(out[0]).sort()).toEqual([...PE_COLUMNS].sort());
+  });
+
+  it('nel giorno di partenza e in quello di arrivo: posizioni 1, 2, 3… senza doppioni', () => {
+    const { rows: out } = planMoveRows(rows, 'a', D2, ['p', 'a', 'q']);
+    const after = rows.map((r) => out.find((x) => x.id === r.id) || r);
+    for (const d of [D1, D2]) {
+      const ps = after.filter((r) => r.plan_day_id === d).map((r) => r.position).sort((x, y) => x - y);
+      expect(ps, d).toEqual(ps.map((_, i) => i + 1));
+    }
+  });
+
+  it('Su / Giù nello stesso giorno: cambiano solo le righe che cambiano posizione (più l\'esercizio)', () => {
+    const { rows: out } = planMoveRows(rows, 'c', D1, ['a', 'c', 'b']);
+    expect(pos(out)).toEqual({ b: 'd1#3', c: 'd1#2', arch: 'd1#4' });   // l'archiviato va in fondo, dopo i 3 attivi
+  });
+
+  it('esercizio che il telefono non conosceva (aggiunto da un altro telefono): resta, dopo quelli scelti', () => {
+    const more = [...rows, R('new', D2, 3)];
+    const { rows: out } = planMoveRows(more, 'a', D2, ['p', 'q', 'a']);
+    expect(pos(out)).toMatchObject({ a: 'd2#3', new: 'd2#4' });
+  });
+
+  it('superserie: non cambia giorno; esercizio sparito; giorno pieno', () => {
+    expect(planMoveRows([R('s', D1, 1, { superset_id: 'S' }), R('p', D2, 1)], 's', D2, ['p', 's']).error).toBe('superset');
+    expect(planMoveRows(rows, 'zzz', D2, ['zzz']).error).toBe('missing');
+    const big = [R('m', D1, 1), ...Array.from({ length: 100 }, (_, i) => R('f' + i, D2, i + 1))];
+    expect(planMoveRows(big, 'm', D2, [...big.slice(1).map((r) => r.id), 'm']).error).toBe('full');
+  });
+
+  it('copia sul telefono: esercizio nel giorno nuovo, ordini aggiornati, piano di partenza intatto', () => {
+    const P = { id: 'p', days: [
+      { id: D1, name: 'A', exercises: [{ id: 'a', position: 1, sets: 2 }, { id: 'b', position: 2, sets: 2 }, { id: 'c', position: 4, sets: 2 }] },
+      { id: D2, name: 'B', exercises: [{ id: 'p', position: 1, sets: 1 }, { id: 'q', position: 2, sets: 1 }] },
+    ] };
+    expect(dayOfExercise(P, 'b')).toBe(D1);
+    expect(orderForDay(P, 'b', D2).map((x) => x.id)).toEqual(['p', 'q', 'b']);
+    expect(orderForDay(P, 'b', D1).map((x) => x.id)).toEqual(['a', 'b', 'c']);
+    const { rows: out } = planMoveRows(rows, 'b', D2, ['p', 'q', 'b'], { sets: 3, sets_max: null, reps_min: 8, reps_max: 12, rir_min: 1, rir_max: 2, rest_seconds: null, notes: null });
+    const P2 = applyPlanMove(P, 'b', out);
+    expect(P2.days[0].exercises.map((x) => x.id + '#' + x.position)).toEqual(['a#1', 'c#2']);
+    expect(P2.days[1].exercises.map((x) => x.id + '#' + x.position)).toEqual(['p#1', 'q#2', 'b#3']);
+    expect(findPlanExercise(P2, 'b').sets).toBe(3);
+    expect(dayOfExercise(P, 'b')).toBe(D1);
   });
 });

@@ -10,7 +10,7 @@ import { flush } from '../../src/sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
 import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
 import { historyList } from '../../src/pages.js';
-import { validatePlanEdit, applyPlanEdit, findPlanExercise } from '../../src/modifica.js';
+import { validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, planMoveRows, applyPlanMove } from '../../src/modifica.js';
 import { loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from '../../src/starter.js';
 
 const S = localStatus();
@@ -483,5 +483,110 @@ describe('Programma → Modifica: serie, rep e RIR di un esercizio (database loc
     const r = await b.api.updatePlanExercise(A.pe.ua_panca, { ...NEW, sets: 9 });
     expect(r.error && r.error.code).toBe('not-allowed');
     expect(await peRows()).toEqual(now);
+  });
+});
+
+describe('Programma → Modifica: spostare un esercizio (giorno, Su / Giù) sul database locale', () => {
+  const allRows = async () => (await admin.from('plan_exercises').select('*').eq('user_id', A.userId).order('id')).data;
+  const dayPositions = (rows, dayId) => rows.filter((r) => r.plan_day_id === dayId).map((r) => r.position).sort((a, b) => a - b);
+  const gapless = (rows) => Object.values(A.days).every((d) => { const p = dayPositions(rows, d); return p.every((x, i) => x === i + 1); });
+  const NOVALS = (pe) => ({ sets: pe.sets, sets_max: pe.sets_max, reps_min: pe.reps_min, reps_max: pe.reps_max, rir_min: pe.rir_min, rir_max: pe.rir_max, rest_seconds: pe.rest_seconds, notes: pe.notes });
+  // fa quello che fa l'app quando si tocca Salva dopo aver scelto giorno / Su / Giù
+  const move = async (d, plan, peId, toDayId, order) => {
+    const fromDay = plan.days.find((x) => x.exercises.some((p) => p.id === peId)).id;
+    const r = await d.api.planDayRows([...new Set([fromDay, toDayId])]);
+    expect(r.error).toBeUndefined();
+    const mv = planMoveRows(r.data, peId, toDayId, order.map((x) => x.id), NOVALS(findPlanExercise(plan, peId)));
+    expect(mv.error).toBeUndefined();
+    return { rows: mv.rows, saved: await d.api.savePlanRows(mv.rows) };
+  };
+  const latHistory = async (d) => {
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    const snap = (await d.api.snapshot(A.userId)).data;
+    const list = historyList(indexRows(d.local.list()), snap.plan, hist.exerciseNames, hist.machineInfo);
+    const ses = (await admin.from('session_exercises').select('*').eq('plan_exercise_id', A.pe.ua_lat).order('id')).data;
+    return { lat: list.flatMap((s) => s.exercises.filter((e) => e.exerciseId === A.E.lat).map((e) => ({ date: s.date, day: s.dayName, name: e.name, machine: e.machine, sets: e.sets }))), ses };
+  };
+
+  it('a) e b) sposto un esercizio in un altro giorno: in fondo al giorno nuovo, giorno vecchio senza buchi, stesso id, storico identico', async () => {
+    const d = await device(A.email, passA);
+    const plan = (await d.api.snapshot(A.userId)).data.plan;
+    const before = await latHistory(d);
+    const la = plan.days.find((x) => x.name === 'Lower A');
+    const { saved } = await move(d, plan, A.pe.ua_lat, A.days.LA, orderForDay(plan, A.pe.ua_lat, A.days.LA));
+    expect(saved.error).toBeUndefined();
+    const rows = await allRows();
+    const lat = rows.find((r) => r.id === A.pe.ua_lat);
+    expect(lat).toMatchObject({ id: A.pe.ua_lat, plan_day_id: A.days.LA, position: Math.max(...dayPositions(rows, A.days.LA)), exercise_id: A.E.lat });
+    expect(dayPositions(rows, A.days.LA).length).toBe(la.exercises.length + 1);
+    expect(gapless(rows)).toBe(true);
+    // la copia sul telefono è uguale al piano scaricato di nuovo (giorni e ordine)
+    const fresh = (await d.api.snapshot(A.userId)).data.plan;
+    const local = applyPlanMove(plan, A.pe.ua_lat, saved.data);
+    expect(local.days.map((x) => x.exercises.map((p) => p.id))).toEqual(fresh.days.map((x) => x.exercises.map((p) => p.id)));
+    expect(fresh.days.find((x) => x.name === 'Lower A').exercises.at(-1).id).toBe(A.pe.ua_lat);
+    // b) storico dell'esercizio spostato identico (lista di Progressi e righe delle sedute)
+    const after = await latHistory(d);
+    expect(after.lat.length).toBeGreaterThan(0);
+    expect(after.ses.length).toBeGreaterThan(0);
+    expect(after).toEqual(before);
+  });
+
+  it('c) Su e Giù cambiano l’ordine senza errori sul vincolo (anche scavalcando una superserie)', async () => {
+    const d = await device(A.email, passA);
+    let plan = (await d.api.snapshot(A.userId)).data.plan;
+    const ua = () => plan.days.find((x) => x.name === 'Upper A').exercises.map((p) => p.id);
+    const startUA = ua();
+    const second = startUA[1];
+    let o = moveInDay(orderForDay(plan, second, A.days.UA), second, -1);   // il secondo sale al primo posto (scambio di posizioni)
+    let r = await move(d, plan, second, A.days.UA, o);
+    expect(r.saved.error).toBeUndefined();
+    plan = (await d.api.snapshot(A.userId)).data.plan;
+    expect(ua()).toEqual([second, startUA[0], ...startUA.slice(2)]);
+    o = moveInDay(orderForDay(plan, second, A.days.UA), second, 1);        // e torna giù
+    r = await move(d, plan, second, A.days.UA, o);
+    expect(r.saved.error).toBeUndefined();
+    plan = (await d.api.snapshot(A.userId)).data.plan;
+    expect(ua()).toEqual(startUA);
+    // Upper B: superserie (alzate + lat) poi panca; la panca sale e scavalca tutta la superserie
+    expect(plan.days.find((x) => x.name === 'Upper B').exercises.map((p) => p.id)).toEqual([A.pe.ub_alzate, A.pe.ub_lat, A.pe.ub_panca]);
+    o = moveInDay(orderForDay(plan, A.pe.ub_panca, A.days.UB), A.pe.ub_panca, -1);
+    r = await move(d, plan, A.pe.ub_panca, A.days.UB, o);
+    expect(r.saved.error).toBeUndefined();
+    plan = (await d.api.snapshot(A.userId)).data.plan;
+    expect(plan.days.find((x) => x.name === 'Upper B').exercises.map((p) => p.id)).toEqual([A.pe.ub_panca, A.pe.ub_alzate, A.pe.ub_lat]);
+    expect(gapless(await allRows())).toBe(true);
+  });
+
+  it('se lo spostamento fallisce a metà, il piano torna com’era (una sola richiesta, tutto o niente)', async () => {
+    const d = await device(A.email, passA);
+    const plan = (await d.api.snapshot(A.userId)).data.plan;
+    const now = await allRows();
+    const r = await d.api.planDayRows([A.days.UA, A.days.LB]);
+    const mv = planMoveRows(r.data, A.pe.ua_alzate, A.days.LB, orderForDay(plan, A.pe.ua_alzate, A.days.LB).map((x) => x.id), NOVALS(findPlanExercise(plan, A.pe.ua_alzate)));
+    expect(mv.rows.length).toBeGreaterThan(1);
+    const bad = mv.rows.map((x, i) => (i === mv.rows.length - 1 ? { ...x, reps_min: 20, reps_max: 5 } : x));   // l'ultima riga non va bene
+    const s = await d.api.savePlanRows(bad);
+    expect(s.error).toBeTruthy();
+    expect(await allRows()).toEqual(now);
+    // e un esercizio in superserie non può cambiare giorno
+    const r2 = await d.api.planDayRows([A.days.UB, A.days.LB]);
+    expect(planMoveRows(r2.data, A.pe.ub_lat, A.days.LB, [A.pe.ub_lat]).error).toBe('superset');
+  });
+
+  it('d) un altro atleta non può spostare gli esercizi del piano di A', async () => {
+    const a = await device(A.email, passA);
+    const plan = (await a.api.snapshot(A.userId)).data.plan;
+    const r = await a.api.planDayRows([A.days.UA, A.days.LB]);
+    const mv = planMoveRows(r.data, A.pe.ua_alzate, A.days.LB, [A.pe.ua_alzate], NOVALS(findPlanExercise(plan, A.pe.ua_alzate)));
+    const now = await allRows();
+    const b = await device(B.email, passB);
+    expect((await b.api.planDayRows([A.days.UA, A.days.LB])).data).toEqual([]);   // B non vede le righe di A
+    const s1 = await b.api.savePlanRows(mv.rows);                                     // righe di A così come sono
+    expect(s1.error).toBeTruthy();
+    const s2 = await b.api.savePlanRows(mv.rows.map((x) => ({ ...x, user_id: B.userId })));   // provando a prenderle
+    expect(s2.error).toBeTruthy();
+    expect(await allRows()).toEqual(now);
   });
 });

@@ -1,5 +1,6 @@
 // Tutto quello che passa da Supabase (accesso, lettura del piano e dello storico, invio della coda).
 import { createClient } from '@supabase/supabase-js';
+import { PE_COLUMNS } from './modifica.js';
 
 export const AUTH_KEY = 'gym-auth';
 export const HISTORY_DAYS = 120;
@@ -88,6 +89,23 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       if (r.error) return r;
       if (!r.data || r.data.length !== 1) return { error: { code: 'not-allowed', message: 'plan exercise not updated' } };
       return { data: r.data[0] };
+    },
+
+    /** Righe complete (anche archiviate) di plan_exercises di questi giorni del piano: servono a ricalcolare le posizioni. */
+    planDayRows(dayIds) {
+      return wrap(sb.from('plan_exercises').select(PE_COLUMNS.join(', ')).in('plan_day_id', dayIds));
+    },
+
+    /**
+     * Spostamento di un esercizio (solo online): TUTTE le righe che cambiano in UNA richiesta (upsert sull'id).
+     * Una richiesta = una transazione: il vincolo "stesso giorno, stessa posizione" è rinviabile e si controlla
+     * alla fine; se una riga viene rifiutata non cambia niente. rows = righe complete da planMoveRows.
+     */
+    async savePlanRows(rows) {
+      const r = await wrap(sb.from('plan_exercises').upsert(rows, { onConflict: 'id' }).select(PE_COLUMNS.join(', ')));
+      if (r.error) return r;
+      if (!r.data || r.data.length !== rows.length) return { error: { code: 'not-allowed', message: 'plan exercises not updated' } };
+      return { data: r.data };
     },
 
     upsert(table, rows) {
