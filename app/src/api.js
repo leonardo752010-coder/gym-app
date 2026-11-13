@@ -128,25 +128,31 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       return wrap(sb.from('profiles').update({ starter: value }).eq('id', userId).is('starter', null).select('starter'));
     },
 
-    /** Sedute degli ultimi HISTORY_DAYS giorni con esercizi e serie (anche quelle cancellate, per allineare il telefono). */
+    /**
+     * Sedute degli ultimi HISTORY_DAYS giorni con esercizi e serie (anche quelle cancellate, per allineare il telefono).
+     * exerciseNames: { exercise_id: nome } presi dalla libreria esercizi (non dal piano), così lo storico ha il nome
+     * vero anche di un esercizio uscito dal piano o archiviato. Le righe restano uguali a prima (il nome non ci entra).
+     */
     async history(userId, fromDate) {
       const r = await wrap(sb.from('sessions').select(`id, user_id, session_date, started_at, ended_at, club_id, plan_id, plan_day_id, day_name, notes, deleted_at, created_at,
           session_exercises(id, session_id, user_id, position, exercise_id, machine_id, plan_exercise_id, skipped, target_sets, target_reps_min,
             target_reps_max, target_rir_min, target_rir_max, rest_seconds, notes, deleted_at, created_at,
+            exercise:exercises(id, name),
             sets(id, session_exercise_id, user_id, set_number, set_type, weight_kg, reps, rir, input_weight, input_unit, performed_at, notes, deleted_at, created_at))`)
         .eq('user_id', userId).gte('session_date', fromDate).order('session_date', { ascending: false }).limit(1000));
       if (r.error) return r;
-      const rows = [];
+      const rows = [], exerciseNames = {};
       for (const s of r.data) {
         const { session_exercises: ses, ...sd } = s;
         rows.push({ table: 'sessions', data: sd });
         for (const se of ses || []) {
-          const { sets, ...sed } = se;
+          const { sets, exercise, ...sed } = se;
+          if (exercise && exercise.id && exercise.name) exerciseNames[exercise.id] = exercise.name;
           rows.push({ table: 'session_exercises', data: sed });
           for (const st of sets || []) rows.push({ table: 'sets', data: st });
         }
       }
-      return { data: rows };
+      return { data: rows, exerciseNames };
     },
   };
 }

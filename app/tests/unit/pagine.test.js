@@ -103,6 +103,21 @@ describe('storico per Progress', () => {
     expect(s2.exercises[0].name).toBeNull();
   });
 
+  it('nome dalla libreria esercizi (exercise_id): anche fuori dal piano, e prima di quello del piano', () => {
+    const names = { exOld: { it: 'Pulley basso', en: 'Seated row' }, ex2: { it: 'Lat (libreria)' } };
+    const l = historyList(indexRows(rows), PLAN, names);
+    expect(l.find((s) => s.id === 's2').exercises[0].name.it).toBe('Pulley basso');
+    expect(l.find((s) => s.id === 's1').exercises.map((e) => e.name.it)).toEqual(['Panca', 'Lat (libreria)']);
+    // senza piano sul telefono il nome c'è lo stesso
+    expect(historyList(indexRows(rows), null, names).find((s) => s.id === 's2').exercises[0].name.it).toBe('Pulley basso');
+  });
+
+  it('la riga del piano oggi punta a un altro esercizio: lo storico tiene il nome del suo exercise_id', () => {
+    const plan2 = { ...PLAN, days: PLAN.days.map((d) => ({ ...d, exercises: d.exercises.map((pe) => (pe.id === 'pe2' ? { ...pe, exercise_id: 'exNew', exercise: { name: { it: 'Pulley' } } } : pe)) })) };
+    const s1 = historyList(indexRows(rows), plan2, { ex2: { it: 'Lat' } }).find((s) => s.id === 's1');
+    expect(s1.exercises.map((e) => e.name.it)).toEqual(['Panca', 'Lat']);
+  });
+
   it('senza piano sul telefono funziona lo stesso', () => {
     expect(historyList(indexRows(rows), null).map((s) => s.id)).toEqual(['s5', 's2', 's1']);
     expect(historyList(indexRows([]), PLAN)).toEqual([]);

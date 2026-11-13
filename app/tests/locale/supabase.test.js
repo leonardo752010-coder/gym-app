@@ -9,6 +9,7 @@ import { openStore, Local } from '../../src/store.js';
 import { flush } from '../../src/sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
 import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
+import { historyList } from '../../src/pages.js';
 import { loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from '../../src/starter.js';
 
 const S = localStatus();
@@ -334,5 +335,48 @@ describe('CHOOSE YOUR STARTER sul database locale (regole di accesso vere)', () 
     const snap = await d.api.snapshot(A.userId);
     expect(snap.error).toBeUndefined();
     expect(snap.data.profile).not.toHaveProperty('starter');
+  });
+});
+
+describe('nomi dello storico dalla libreria esercizi (database locale)', () => {
+  // Scarica piano e storico come fa l'app e rifà la lista di Progressi con i nomi della libreria.
+  const progress = async () => {
+    const d = await device(A.email, passA);
+    const snap = await d.api.snapshot(A.userId);
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    expect(snap.error).toBeUndefined();
+    expect(hist.error).toBeUndefined();
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    return { snap: snap.data, names: hist.exerciseNames, list: historyList(indexRows(d.local.list()), snap.data.plan, hist.exerciseNames) };
+  };
+  const curlOf = (list) => list.flatMap((s) => s.exercises.filter((e) => e.exerciseId === A.E.curl).map((e) => ({ date: s.date, name: e.name })));
+
+  it('lo storico scarica i nomi della libreria; le righe non cambiano forma', async () => {
+    const { names } = await progress();
+    expect(names[A.E.curl]).toEqual({ it: 'Leg curl seduto', en: 'Seated leg curl' });
+    const r = await (await device(A.email, passA)).api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    expect(r.data.find((x) => x.table === 'session_exercises').data).not.toHaveProperty('exercise');
+  });
+
+  it('a) esercizio archiviato nel piano: le sue sedute vecchie mostrano il nome vero', async () => {
+    const before = curlOf((await progress()).list);
+    expect(before.length).toBeGreaterThan(0);
+    await admin.from('plan_exercises').update({ archived_at: new Date().toISOString() }).eq('id', A.pe.lb_curl).throwOnError();
+    const { snap, list } = await progress();
+    expect(snap.plan.days.flatMap((d) => d.exercises).some((p) => p.exercise_id === A.E.curl)).toBe(false);   // fuori dal piano
+    const after = curlOf(list);
+    expect(after).toEqual(before);
+    expect(after.every((e) => e.name && e.name.it === 'Leg curl seduto')).toBe(true);
+    // senza i nomi della libreria (com'era prima) sarebbe "—"
+    const d = await device(A.email, passA); await pull(d);
+    expect(curlOf(historyList(indexRows(d.local.list()), snap.plan)).every((e) => e.name === null)).toBe(true);
+  });
+
+  it('b) esercizio spostato in un altro giorno: storico invariato', async () => {
+    const before = (await progress()).list;
+    await admin.from('plan_exercises').update({ plan_day_id: A.days.UA, position: 4 }).eq('id', A.pe.lb_hack).throwOnError();
+    const { snap, list } = await progress();
+    expect(snap.plan.days.find((d) => d.name === 'Upper A').exercises.some((p) => p.id === A.pe.lb_hack)).toBe(true);
+    expect(list).toEqual(before);
   });
 });

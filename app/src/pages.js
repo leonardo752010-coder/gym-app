@@ -24,28 +24,31 @@ export function pageFromState(state) {
   return PAGES.includes(p) ? p : START_PAGE;
 }
 
-/** Esercizi del piano per id e per esercizio (per dare un nome alle righe dello storico). */
+/** Esercizi del piano per esercizio, macchine e giorni (per dare nome e macchina alle righe dello storico). */
 function planIndex(plan) {
-  const byPe = new Map(), byEx = new Map(), machines = new Map(), days = new Map();
+  const byEx = new Map(), machines = new Map(), days = new Map();
   for (const d of (plan && plan.days) || []) {
     days.set(d.id, d);
     for (const pe of d.exercises) {
-      byPe.set(pe.id, pe);
       if (pe.exercise_id && !byEx.has(pe.exercise_id)) byEx.set(pe.exercise_id, pe);
       for (const m of [pe.machine, pe.alt_machine]) if (m && m.id && !machines.has(m.id)) machines.set(m.id, m);
     }
   }
-  return { byPe, byEx, machines, days };
+  return { byEx, machines, days };
 }
 
 /**
  * Storico per la pagina Progress: sedute con almeno una serie, dalla più recente.
  * Comprende anche la seduta di oggi (una serie appena salvata compare subito).
- * Righe cancellate fuori (indexRows le toglie già). Nomi e macchine dal piano sul telefono;
- * un esercizio che non è più nel piano resta con nome vuoto (la pagina mostra "—").
+ * Righe cancellate fuori (indexRows le toglie già).
+ * Nome dell'esercizio: dalla libreria esercizi tramite exercise_id (`names`, scaricati con lo storico), così resta
+ * giusto anche se l'esercizio è uscito dal piano, è archiviato o la riga del piano oggi punta a un altro esercizio.
+ * Se il nome non c'è (per esempio prima del primo scaricamento), quello dello stesso exercise_id nel piano
+ * (anche lui viene dalla libreria). Nessuno dei due: nome vuoto (la pagina mostra "—"). Macchine dal piano, come prima.
  */
-export function historyList(idx, plan) {
+export function historyList(idx, plan, names = null) {
   const P = planIndex(plan);
+  const libName = (id) => (names && id && names[id]) || null;
   const out = [];
   for (const s of idx.sessions.values()) {
     const exercises = [];
@@ -53,12 +56,12 @@ export function historyList(idx, plan) {
     for (const se of ses) {
       const sets = setsOf(idx, se.id);
       if (!sets.length) continue;
-      const pe = (se.plan_exercise_id && P.byPe.get(se.plan_exercise_id)) || P.byEx.get(se.exercise_id) || null;
+      const pe = P.byEx.get(se.exercise_id) || null;
       exercises.push({
         id: se.id,
         exerciseId: se.exercise_id,
         machineId: se.machine_id || null,
-        name: pe && pe.exercise ? pe.exercise.name : null,
+        name: libName(se.exercise_id) || (pe && pe.exercise ? pe.exercise.name : null),
         machine: (se.machine_id && P.machines.get(se.machine_id)) || null,
         sets,
       });
