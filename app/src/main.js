@@ -11,7 +11,8 @@ import { supabaseConfig } from './config.js';
 import { makeApi, storedUser, HISTORY_DAYS } from './api.js';
 import { openStore, Local, getKv, setKv } from './store.js';
 import { flush, isOffline } from './sync.js';
-import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove } from './modifica.js';
+import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove,
+  searchExercises, exactExercise, clubChoices, validateExerciseChange, exerciseChangeArgs, exerciseChangeErrorKey, hasSetsToday, applyExerciseChange } from './modifica.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from './session.js';
 import { LANGS, pickLang, tr, fmtDay } from './i18n.js';
 import { STARTERS, loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from './starter.js';
@@ -591,6 +592,7 @@ function openPlanEdit(peId) {
     (hint[key] ? '<small>' + esc(hint[key]) + '</small>' : '') + '</label>';
   const days = p.days.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === fromDay ? ' selected' : '') + '>' + esc(d.name) + '</option>').join('');
   sheetBox('pesheet', '<form id="peForm" novalidate><h2>' + esc(T.peEditTitle) + '</h2><p class="hsub" id="peName">' + esc(exName(pe)) + '</p>' +
+    '<button type="button" class="chOpen" id="peChange">' + esc(T.chBtn) + '</button>' +
     '<div class="pemove"><label class="pef wide"><span>' + esc(T.peDay) + '</span><select id="pe_day"' + (pe.superset_id ? ' disabled' : '') + '>' + days + '</select></label>' +
     '<div class="pepos"><span id="pePos"></span><button type="button" id="peUp" aria-label="' + esc(T.peUpAria) + '">' + esc(T.peUp) + '</button>' +
     '<button type="button" id="peDown" aria-label="' + esc(T.peDownAria) + '">' + esc(T.peDown) + '</button></div>' +
@@ -598,14 +600,123 @@ function openPlanEdit(peId) {
     '<div class="pegrid">' + PLAN_EDIT_FIELDS.filter((x) => x.kind !== 'text').map(input).join('') + '</div>' +
     '<label class="pef wide"><span>' + esc(T.peNotes) + '</span><textarea id="pe_notes" rows="3">' + esc(f.notes) + '</textarea></label>' +
     '<div class="peErr" id="peErr" role="alert" aria-live="assertive"></div><p class="peNet" id="peNet" aria-live="polite"></p>' +
-    '<div class="row"><button type="button" id="peCancel">' + esc(T.cancel) + '</button><button type="submit" class="p" id="peSave" data-pe="' + esc(pe.id) + '">' + esc(T.peSave) + '</button></div></form>');
+    '<div class="row"><button type="button" id="peCancel">' + esc(T.cancel) + '</button><button type="submit" class="p" id="peSave" data-pe="' + esc(pe.id) + '">' + esc(T.peSave) + '</button></div></form>' +
+    '<div id="peChg" hidden></div>');
   $('peCancel').onclick = closeSheet;
+  $('peChange').onclick = () => openExerciseChange(peId);
   $('pe_day').onchange = (ev) => { const o = orderForDay(plan(), peId, ev.target.value); if (o) { S.peMv.dayId = ev.target.value; S.peMv.order = o; } peMoveUi(); };
   $('peUp').onclick = () => { const o = moveInDay(S.peMv.order, peId, -1); if (o) { S.peMv.order = o; peMoveUi(); } };
   $('peDown').onclick = () => { const o = moveInDay(S.peMv.order, peId, 1); if (o) { S.peMv.order = o; peMoveUi(); } };
   $('peForm').onsubmit = (ev) => { ev.preventDefault(); savePlanEdit(pe.id); };
   peMoveUi();
   peNetState();
+}
+
+/**
+ * "Cambia esercizio" (nella stessa finestra, al posto dei campi; "Indietro" li fa tornare come erano):
+ * ricerca negli esercizi che l'atleta può usare, "Crea nuovo esercizio" dal nome, macchina e alternativa per ogni
+ * palestra. Salva chiama la funzione del database change_plan_exercise: tutto o niente, solo online.
+ * Serie, rep e RIR della riga non cambiano; le sedute vecchie restano col vecchio esercizio.
+ */
+async function openExerciseChange(peId) {
+  const T = S.T, pe = findPlanExercise(plan(), peId);
+  if (!pe || !$('peChg')) return;
+  $('peForm').hidden = true;
+  const box = $('peChg');
+  box.hidden = false;
+  S.peCh = { peId, query: '', exId: null, newName: null, data: null, clubs: [] };
+  box.innerHTML = '<h2>' + esc(T.chTitle) + '</h2><p class="hsub" id="chNow">' + esc(T.chNow(exName(pe))) + '</p>' +
+    '<div id="chBody"><p class="peNet">' + esc(navigator.onLine ? T.chLoading : T.chNeedNet) + '</p></div>' +
+    '<div class="peErr" id="chErr" role="alert" aria-live="assertive"></div><p class="peNet" id="chNet" aria-live="polite"></p>' +
+    '<div class="row"><button type="button" id="chBack">' + esc(T.chBack) + '</button><button type="button" class="p" id="chSave" disabled>' + esc(T.peSave) + '</button></div>';
+  $('chBack').onclick = () => { S.peCh = null; box.hidden = true; box.innerHTML = ''; $('peForm').hidden = false; };
+  $('chSave').onclick = saveExerciseChange;
+  if (!navigator.onLine) { chNetState(); return; }
+  const r = await api.exerciseChoices(S.user.id, peId);
+  if (!S.peCh || S.peCh.peId !== peId || !$('chBody')) return;   // finestra chiusa o "Indietro" nel frattempo
+  if (r.error) {
+    $('chBody').innerHTML = '<p class="peErr">' + esc(isOffline(r.error) ? T.chNeedNet : T.chLoadErr + (r.error.message || r.error.code)) + '</p>';
+    return;
+  }
+  S.peCh.data = r.data;
+  S.peCh.clubs = clubChoices(r.data.userClubs, r.data.rowMachines, r.data.clubMachines);
+  renderChangeBody();
+  chNetState();
+}
+
+function renderChangeBody() {
+  const T = S.T, c = S.peCh, body = $('chBody');
+  if (!c || !body) return;
+  const opt = (v, t, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(t) + '</option>';
+  const macName = (m) => machineLabel(m) || tr(m.name, S.lang) || m.code;
+  const club = (k, i) => '<div class="chClub"><b>' + esc(T.chClub(k.name || '—') + (k.isHome ? ' · ' + T.chHome : '')) + '</b>' +
+    '<label class="pef wide"><span>' + esc(T.chMachine) + '</span><select id="chM' + i + '" data-ci="' + i + '" data-k="machineId">' +
+    opt('', T.chNoMachine, !k.machineId) + k.machines.map((m) => opt(m.id, macName(m), m.id === k.machineId)).join('') + '</select></label>' +
+    '<label class="pef wide"><span>' + esc(T.chAlt) + '</span><select id="chA' + i + '" data-ci="' + i + '" data-k="altId">' +
+    opt('', T.chNoAlt, !k.altId) + k.machines.map((m) => opt(m.id, macName(m), m.id === k.altId)).join('') + '</select></label></div>';
+  body.innerHTML = '<label class="pef wide"><span>' + esc(T.chSearch) + '</span><input id="chQ" type="search" autocomplete="off" value="' + esc(c.query) + '"></label>' +
+    '<p class="chPick" id="chPick" aria-live="polite"></p><div class="chList" id="chList"></div>' +
+    (c.clubs.length ? c.clubs.map(club).join('') : '<p class="pess" id="chNoClub">' + esc(T.chNoClub) + '</p>') +
+    '<p class="pess chKeep">' + esc(T.chKeep) + '</p>';
+  $('chQ').oninput = (ev) => { c.query = ev.target.value; renderChangeList(); };
+  body.querySelectorAll('select[data-ci]').forEach((s) => { s.onchange = () => { c.clubs[Number(s.dataset.ci)][s.dataset.k] = s.value || null; }; });
+  $('chList').onclick = (ev) => {
+    const x = ev.target.closest('button'); if (!x) return;
+    if (x.dataset.chex) { c.exId = x.dataset.chex; c.newName = null; }
+    else if (x.dataset.chnew) { c.exId = null; c.newName = c.query.trim(); }
+    $('chErr').innerHTML = '';
+    renderChangeList();
+  };
+  renderChangeList();
+}
+
+function renderChangeList() {
+  const T = S.T, c = S.peCh;
+  if (!c || !c.data || !$('chList')) return;
+  const list = searchExercises(c.data.exercises, c.query, S.lang), q = c.query.trim();
+  const showNew = q && !exactExercise(c.data.exercises, q);
+  $('chList').innerHTML = list.map((e) => '<button type="button" class="chEx' + (e.id === c.exId ? ' on' : '') + '" data-chex="' + esc(e.id) + '" aria-pressed="' + (e.id === c.exId) + '">' +
+      esc(tr(e.name, S.lang) || e.code) + '</button>').join('') +
+    (!list.length ? '<p class="pess">' + esc(T.chNone) + '</p>' : '') +
+    (showNew ? '<button type="button" class="chEx chNew' + (!c.exId && c.newName === q ? ' on' : '') + '" data-chnew="1" id="chNew">' + esc(T.chCreate(q)) + '</button>' : '');
+  const picked = c.exId ? c.data.exercises.find((e) => e.id === c.exId) : null;
+  $('chPick').textContent = picked ? T.chPicked(tr(picked.name, S.lang) || picked.code) : c.newName ? T.chPickedNew(c.newName) : '';
+}
+
+/** Salva di "Cambia esercizio": spento senza internet (o finché gli esercizi non sono caricati), con la scritta. */
+function chNetState() {
+  const b = $('chSave'); if (!b || b.dataset.busy) return;
+  const on = navigator.onLine;
+  b.disabled = !on || !(S.peCh && S.peCh.data);
+  $('chNet').textContent = on ? '' : S.T.chNeedNet;
+}
+
+async function saveExerciseChange() {
+  const T = S.T, c = S.peCh, b = $('chSave');
+  if (!c || !c.data || !b || b.dataset.busy) return;
+  const choice = { exerciseId: c.exId, newName: c.newName, clubs: c.clubs };
+  const errors = validateExerciseChange(choice);
+  if (!errors.length && hasSetsToday(S.local.list(), c.peId, localDate())) errors.push('today');   // anche serie non ancora inviate
+  $('chErr').innerHTML = errors.map((k) => '<p>' + esc(T.chErr[k]) + '</p>').join('');
+  if (errors.length) return;
+  if (!navigator.onLine) { chNetState(); return; }
+  b.dataset.busy = '1'; b.disabled = true; b.textContent = T.peSaving;
+  const r = await api.changePlanExercise(exerciseChangeArgs(c.peId, choice, localDate()));
+  if (!$('chSave')) return;   // finestra chiusa nel frattempo
+  delete b.dataset.busy; b.textContent = T.peSave; chNetState();
+  if (r.error) {
+    if (isOffline(r.error)) { b.disabled = true; $('chNet').textContent = T.chNeedNet; return; }
+    const k = exerciseChangeErrorKey(r.error);
+    $('chErr').innerHTML = '<p>' + esc(k ? T.chErr[k] : T.peSaveErr + (r.error.message || r.error.code)) + '</p>';
+    return;
+  }
+  const ex = c.exId ? c.data.exercises.find((e) => e.id === c.exId)
+    : { id: r.data.exercise_id, code: '', name: { it: c.newName, en: c.newName }, exercise_muscles: [] };
+  S.snap = { ...S.snap, plan: applyExerciseChange(S.snap.plan, c.peId, { exercise: ex, clubs: c.clubs, homeClubId: S.snap.homeClubId }),
+    exerciseNames: { ...(S.snap.exerciseNames || {}), [ex.id]: ex.name } };
+  await setKv(S.store, 'snap:' + S.user.id, S.snap);
+  S.peCh = null; S.peMv = null;
+  closeSheet(); buzz(20); toast(T.chSaved); render();
 }
 
 /** Posizione scelta nel giorno ("Posizione 2 di 4") e tasti Su / Giù accesi solo se lo spostamento si può fare. */
@@ -1149,8 +1260,8 @@ addEventListener('popstate', (ev) => {
 });
 
 // rete e ritorno sull'app: si invia la coda appena possibile
-addEventListener('online', () => { log('online'); S.sync.offline = false; peNetState(); syncNow(true); refresh(); });
-addEventListener('offline', () => { S.sync.offline = true; setSync(); peNetState(); });
+addEventListener('online', () => { log('online'); S.sync.offline = false; peNetState(); chNetState(); syncNow(true); refresh(); });
+addEventListener('offline', () => { S.sync.offline = true; setSync(); peNetState(); chNetState(); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden || !S.user) return;
   if (S.date !== localDate()) safeRender();

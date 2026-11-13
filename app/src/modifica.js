@@ -219,3 +219,149 @@ export function applyPlanMove(plan, peId, saved) {
     days: plan.days.map((d) => ({ ...d, exercises: moved.filter((m) => m.dayId === d.id).map((m) => m.pe).sort((a, b) => a.position - b.position) })),
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// "Cambia esercizio": scelta di un esercizio esistente (ricerca) o nuovo (solo il nome), e della macchina
+// per ogni palestra del piano. Si salva con la funzione del database public.change_plan_exercise
+// (migrazione 20261113150000), in una sola operazione: tutto o niente. Serie, rep e RIR della riga non cambiano.
+// ---------------------------------------------------------------------------------------------
+
+/** Testo per la ricerca: minuscole, senza accenti, spazi semplici. */
+export function normText(s) {
+  return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+const exLabel = (e, lang) => (e && e.name ? e.name[lang] || e.name.en || e.name.it || Object.values(e.name)[0] || '' : '');
+
+/**
+ * Esercizi che contengono tutte le parole cercate (nel nome italiano, inglese o nel codice), in ordine di nome.
+ * Ricerca vuota: tutti. Al massimo `max` risultati.
+ */
+export function searchExercises(list, query, lang = 'it', max = 40) {
+  const words = normText(query).split(' ').filter(Boolean);
+  const hay = (e) => normText([e.name && e.name.it, e.name && e.name.en, e.code].filter(Boolean).join(' '));
+  return (list || [])
+    .filter((e) => words.every((w) => hay(e).includes(w)))
+    .sort((a, b) => exLabel(a, lang).localeCompare(exLabel(b, lang), lang))
+    .slice(0, max);
+}
+
+/** Esercizio della libreria con esattamente questo nome (senza badare a maiuscole e accenti), o null. */
+export function exactExercise(list, name) {
+  const n = normText(name);
+  if (!n) return null;
+  return (list || []).find((e) => [e.name && e.name.it, e.name && e.name.en].some((x) => x && normText(x) === n)) || null;
+}
+
+/**
+ * Palestre da mostrare nella finestra: quelle dell'atleta (user_clubs) più quelle già usate da questa riga del piano,
+ * la principale per prima. Per ognuna: le macchine di quella palestra e la scelta di adesso (macchina e alternativa).
+ * userClubs = [{ club_id, is_home, club: { id, name } }], rowMachines = [{ club_id, machine_id, alt_machine_id, club }],
+ * clubMachines = [{ club_id, machine: {...} }].
+ */
+export function clubChoices(userClubs, rowMachines, clubMachines) {
+  const by = new Map();
+  const add = (id, name, isHome) => {
+    if (!id) return;
+    const c = by.get(id) || { clubId: id, name: name || '', isHome: false, machines: [], machineId: null, altId: null };
+    if (name && !c.name) c.name = name;
+    if (isHome) c.isHome = true;
+    by.set(id, c);
+  };
+  for (const u of userClubs || []) add(u.club_id, u.club && u.club.name, u.is_home);
+  for (const r of rowMachines || []) add(r.club_id, r.club && r.club.name, false);
+  for (const cm of clubMachines || []) {
+    const c = by.get(cm.club_id);
+    if (c && cm.machine && !c.machines.some((m) => m.id === cm.machine.id)) c.machines.push(cm.machine);
+  }
+  for (const r of rowMachines || []) {
+    const c = by.get(r.club_id);
+    if (!c) continue;
+    c.machineId = c.machines.some((m) => m.id === r.machine_id) ? r.machine_id : null;
+    c.altId = c.machineId && c.machines.some((m) => m.id === r.alt_machine_id) ? r.alt_machine_id : null;
+  }
+  const label = (m) => [m.brand, m.model, m.brand_code].filter(Boolean).join(' ') || m.code || '';
+  for (const c of by.values()) c.machines.sort((a, b) => label(a).localeCompare(label(b)));
+  return [...by.values()].sort((a, b) => (b.isHome - a.isHome) || a.name.localeCompare(b.name));
+}
+
+/**
+ * Controlli prima di salvare il cambio. choice = { exerciseId, newName, clubs: [{ clubId, machineId, altId }] }.
+ * Ritorna le chiavi dei messaggi (testi in i18n.js, gruppo chErr): pick, name, altNoMachine, altSame.
+ */
+export function validateExerciseChange(choice) {
+  const errors = [];
+  const name = choice && choice.newName != null ? String(choice.newName).trim() : null;
+  if (!choice || (!choice.exerciseId && !name)) errors.push('pick');
+  if (name !== null && !choice.exerciseId && (name.length < 1 || name.length > 80)) errors.push('name');
+  for (const c of (choice && choice.clubs) || []) {
+    if (c.altId && !c.machineId) { if (!errors.includes('altNoMachine')) errors.push('altNoMachine'); }
+    else if (c.altId && c.altId === c.machineId) { if (!errors.includes('altSame')) errors.push('altSame'); }
+  }
+  return errors;
+}
+
+/** Argomenti per la funzione del database change_plan_exercise. */
+export function exerciseChangeArgs(peId, choice, today) {
+  const name = choice.exerciseId ? null : String(choice.newName || '').trim();
+  return {
+    p_plan_exercise_id: peId,
+    p_exercise_id: choice.exerciseId || null,
+    p_new_exercise_name: name || null,
+    p_machines: (choice.clubs || []).map((c) => ({ club_id: c.clubId, machine_id: c.machineId || null, alt_machine_id: c.machineId ? c.altId || null : null })),
+    p_today: today,
+  };
+}
+
+/** Errore della funzione del database → chiave del messaggio (gruppo chErr). */
+export function exerciseChangeErrorKey(error) {
+  const code = error && error.code;
+  return { GE001: 'notAllowed', GE002: 'today', GE003: 'machines', GE004: 'exercise', GE005: 'name' }[code] || null;
+}
+
+/**
+ * Sul telefono ci sono serie di OGGI (anche non ancora inviate) per questa riga del piano?
+ * rows = righe del telefono ({ table, data }). Serve a fermare il cambio prima di chiamare il server.
+ */
+export function hasSetsToday(rows, peId, today) {
+  const sessions = new Map(), sesEx = new Map();
+  for (const { table, data } of rows || []) {
+    if (data.deleted_at) continue;
+    if (table === 'sessions') sessions.set(data.id, data);
+    else if (table === 'session_exercises') sesEx.set(data.id, data);
+  }
+  for (const { table, data } of rows || []) {
+    if (table !== 'sets' || data.deleted_at) continue;
+    const se = sesEx.get(data.session_exercise_id);
+    if (!se || se.plan_exercise_id !== peId) continue;
+    const s = sessions.get(se.session_id);
+    if (s && s.session_date === today) return true;
+  }
+  return false;
+}
+
+/**
+ * Copia del piano sul telefono dopo il cambio riuscito: la riga ha il nuovo esercizio (nome e muscolo principale) e la
+ * macchina della palestra principale (homeClubId; altrimenti la prima palestra mandata). Serie, rep, RIR, giorno e
+ * posizione restano. Non cambia il piano di partenza.
+ */
+export function applyExerciseChange(plan, peId, { exercise, clubs, homeClubId }) {
+  if (!plan || !exercise) return plan;
+  const prim = (exercise.exercise_muscles || []).find((m) => m.role === 'primary') || (exercise.exercise_muscles || [])[0];
+  const c = (clubs || []).find((x) => x.clubId === homeClubId) || (clubs || [])[0] || null;
+  const mac = (id) => (c && id ? c.machines.find((m) => m.id === id) || null : null);
+  return {
+    ...plan,
+    days: plan.days.map((d) => ({
+      ...d,
+      exercises: d.exercises.map((pe) => (pe.id !== peId ? pe : {
+        ...pe,
+        exercise_id: exercise.id,
+        exercise: { id: exercise.id, code: exercise.code, name: exercise.name },
+        muscle: prim && prim.muscle ? prim.muscle.name : null,
+        club_id: c ? c.clubId : pe.club_id,
+        machine: c ? mac(c.machineId) : pe.machine,
+        alt_machine: c ? mac(c.altId) : pe.alt_machine,
+      })),
+    })),
+  };
+}

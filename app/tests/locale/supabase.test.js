@@ -10,7 +10,8 @@ import { flush } from '../../src/sync.js';
 import { saveSet, updateSet, deleteSet, closeSession, reopenSession } from '../../src/session.js';
 import { localDate, addDays, indexRows, lastPerformance, suggest, findSession, openSessions } from '../../src/logic.js';
 import { historyList } from '../../src/pages.js';
-import { validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, planMoveRows, applyPlanMove } from '../../src/modifica.js';
+import { validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, planMoveRows, applyPlanMove,
+  clubChoices, exerciseChangeArgs, exerciseChangeErrorKey, hasSetsToday, applyExerciseChange } from '../../src/modifica.js';
 import { loadStarter, needsStarter, chooseStarter, mergeServerStarter, flushStarter } from '../../src/starter.js';
 
 const S = localStatus();
@@ -589,4 +590,241 @@ describe('Programma → Modifica: spostare un esercizio (giorno, Su / Giù) sul 
     expect(s2.error).toBeTruthy();
     expect(await allRows()).toEqual(now);
   });
+});
+
+describe('Programma → Modifica: Cambia esercizio (funzione change_plan_exercise, database locale)', () => {
+  const peRow = async (id) => (await admin.from('plan_exercises').select('*').eq('id', id).single()).data;
+  const pemRows = async (id) => (await admin.from('plan_exercise_machines').select('club_id, machine_id, alt_machine_id').eq('plan_exercise_id', id).order('club_id')).data;
+  const seRows = async (id) => (await admin.from('session_exercises').select('*').eq('plan_exercise_id', id).order('id')).data;
+  const exByName = async (name) => (await admin.from('exercises').select('id, code, created_by, visibility, verified, name').eq('name->>it', name)).data;
+  const snapPe = async (d, id) => findPlanExercise((await d.api.snapshot(A.userId)).data.plan, id);
+  let club2;
+
+  beforeAll(async () => {
+    // seconda palestra di A (solo per queste prove): con la macchina dell'hack, e la riga dell'hack legata anche lì
+    club2 = (await admin.from('clubs').insert({ name: 'Seconda palestra finta', visibility: 'private', verified: false, created_by: A.userId }).select('id').single()).data.id;
+    await admin.from('user_clubs').insert({ user_id: A.userId, club_id: club2, is_home: false }).throwOnError();
+    await admin.from('club_machines').insert([A.M.hack, A.M.curl].map((m) => ({ club_id: club2, machine_id: m, added_by: A.userId }))).throwOnError();
+    await admin.from('plan_exercise_machines').insert({ plan_exercise_id: A.pe.la_hack, user_id: A.userId, club_id: club2, machine_id: A.M.hack }).throwOnError();
+  });
+
+  it('a) b) c) cambio esercizio: la riga ha il nuovo esercizio e le nuove macchine; sedute vecchie uguali; nuovo esercizio senza storico', async () => {
+    const d = await device(A.email, passA);
+    const before = { pe: await peRow(A.pe.la_hack), se: await seRows(A.pe.la_hack) };
+    expect(before.se.length).toBeGreaterThan(0);
+    // la scelta come la vede la finestra
+    const ch = await d.api.exerciseChoices(A.userId, A.pe.la_hack);
+    expect(ch.error).toBeUndefined();
+    const clubs = clubChoices(ch.data.userClubs, ch.data.rowMachines, ch.data.clubMachines);
+    expect(clubs.map((c) => c.clubId)).toEqual([A.club, club2]);   // la principale per prima
+    expect(clubs[0].machineId).toBe(A.M.hack);
+    const curl = ch.data.exercises.find((e) => e.id === A.E.curl);
+    expect(curl.name.it).toBe('Leg curl seduto');
+    clubs[0].machineId = A.M.curl; clubs[0].altId = A.M['legext-a'];
+    clubs[1].machineId = A.M.curl; clubs[1].altId = null;
+    const r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.curl, clubs }, today));
+    expect(r.error).toBeUndefined();
+    expect(r.data).toMatchObject({ plan_exercise_id: A.pe.la_hack, exercise_id: A.E.curl, old_exercise_id: A.E.hack, created: false });
+    // a) riga: nuovo esercizio, nuove macchine; serie, rep, RIR, giorno e posizione uguali
+    const after = await peRow(A.pe.la_hack);
+    expect(after).toMatchObject({ exercise_id: A.E.curl, sets: before.pe.sets, reps_min: before.pe.reps_min, reps_max: before.pe.reps_max,
+      rir_min: before.pe.rir_min, rir_max: before.pe.rir_max, plan_day_id: before.pe.plan_day_id, position: before.pe.position });
+    expect(await pemRows(A.pe.la_hack)).toEqual([
+      { club_id: A.club, machine_id: A.M.curl, alt_machine_id: A.M['legext-a'] }, { club_id: club2, machine_id: A.M.curl, alt_machine_id: null },
+    ].sort((x, y) => x.club_id.localeCompare(y.club_id)));
+    const pe = await snapPe(d, A.pe.la_hack);
+    expect(pe).toMatchObject({ exercise_id: A.E.curl, machine: { id: A.M.curl }, alt_machine: { id: A.M['legext-a'] } });
+    // la copia sul telefono fatta dall'app è uguale al piano scaricato di nuovo (esercizio e macchine)
+    const local = findPlanExercise(applyExerciseChange({ days: [{ id: 'x', exercises: [{ id: A.pe.la_hack }] }] }, A.pe.la_hack, { exercise: curl, clubs, homeClubId: A.club }), A.pe.la_hack);
+    expect([local.exercise_id, local.machine.id, local.alt_machine.id]).toEqual([pe.exercise_id, pe.machine.id, pe.alt_machine.id]);
+    // b) sedute vecchie: stesso esercizio, stessa macchina, stessi obiettivi
+    expect(await seRows(A.pe.la_hack)).toEqual(before.se);
+    expect(before.se.every((s) => s.exercise_id === A.E.hack && s.machine_id === A.M.hack)).toBe(true);
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    const idx = indexRows(d.local.list());
+    const list = historyList(idx, (await d.api.snapshot(A.userId)).data.plan, hist.exerciseNames, hist.machineInfo);
+    const old = list.flatMap((s) => s.exercises).filter((e) => before.se.some((x) => x.id === e.id));
+    expect(old.length).toBeGreaterThan(0);
+    expect(old.every((e) => e.name.it === 'Hack squat' && e.machine && e.machine.id === A.M.hack)).toBe(true);
+    // c) il nuovo esercizio su questa riga (leg curl sulla macchina del curl) non ha storico: "Volta scorsa" vuota
+    //    (il leg curl di Lower B era sulla stessa macchina: per non contarlo si guarda la riga con una macchina mai usata)
+    expect(lastPerformance(idx, { ...pe, machine: { id: A.M['legext-a'] } }, { onOrBefore: today })).toBeNull();
+    expect(lastPerformance(idx, { ...pe, exercise_id: A.E.curl, machine: { id: A.M.curl } }, { onOrBefore: today })).not.toBeNull();   // controllo della prova
+  });
+
+  it('c) esercizio appena creato: parte senza storico (Volta scorsa vuota)', async () => {
+    const d = await device(A.email, passA);
+    const r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: null, newName: 'Hack nuovo di prova', clubs: [{ clubId: A.club, machineId: A.M.hack }] }, today));
+    expect(r.error).toBeUndefined();
+    expect(r.data.created).toBe(true);
+    const [ex] = await exByName('Hack nuovo di prova');
+    expect(ex).toMatchObject({ id: r.data.exercise_id, created_by: A.userId, visibility: 'private', verified: false });
+    expect(ex.code).toMatch(/^u-hack-nuovo-di-prova-[0-9a-f]{8}$/);
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    const pe = await snapPe(d, A.pe.la_hack);
+    expect(pe.exercise.name.it).toBe('Hack nuovo di prova');
+    expect(lastPerformance(indexRows(d.local.list()), pe, { onOrBefore: today })).toBeNull();
+  });
+
+  it('d) serie fatte oggi su quella riga: cambio rifiutato con errore chiaro, niente cambiato', async () => {
+    const d = await device(A.email, passA);
+    expect(hasSetsToday(d.local.list(), A.pe.ub_lat, today)).toBe(false);   // telefono nuovo: il controllo vero è nel database
+    const before = { pe: await peRow(A.pe.ub_lat), pem: await pemRows(A.pe.ub_lat) };
+    const r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.ub_lat, { exerciseId: A.E.curl, clubs: [{ clubId: A.club, machineId: A.M.curl }] }, today));
+    expect(r.error && r.error.code).toBe('GE002');
+    expect(exerciseChangeErrorKey(r.error)).toBe('today');
+    expect(await peRow(A.pe.ub_lat)).toEqual(before.pe);
+    expect(await pemRows(A.pe.ub_lat)).toEqual(before.pem);
+    // e lo stesso controllo c'è anche sul telefono, dopo aver scaricato lo storico
+    const hist = await d.api.history(A.userId, addDays(today, -HISTORY_DAYS));
+    await d.local.mergeServer(hist.data, addDays(today, -HISTORY_DAYS));
+    expect(hasSetsToday(d.local.list(), A.pe.ub_lat, today)).toBe(true);
+  });
+
+  it('e) se la funzione fallisce a metà, non cambia niente (nemmeno l’esercizio nuovo resta creato)', async () => {
+    const d = await device(A.email, passA);
+    const before = { pe: await peRow(A.pe.la_hack), pem: await pemRows(A.pe.la_hack) };
+    // prima palestra giusta, seconda con una macchina che in quella palestra non c'è → errore dopo aver già cambiato esercizio e prima macchina
+    const r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: null, newName: 'Non deve restare', clubs: [
+      { clubId: A.club, machineId: A.M.curl }, { clubId: club2, machineId: A.M.lat } ] }, today));
+    expect(r.error && r.error.code).toBe('GE003');
+    expect(await peRow(A.pe.la_hack)).toEqual(before.pe);
+    expect(await pemRows(A.pe.la_hack)).toEqual(before.pem);
+    expect(await exByName('Non deve restare')).toEqual([]);
+    // palestra non dell'atleta, alternativa senza macchina, esercizio inesistente, nome vuoto: tutti rifiutati, niente cambiato
+    const other = (await admin.from('user_clubs').select('club_id').eq('user_id', B.userId)).data[0].club_id;
+    for (const [args, code] of [
+      [{ exerciseId: A.E.curl, clubs: [{ clubId: other, machineId: null }] }, 'GE003'],
+      [{ exerciseId: A.E.curl, clubs: [{ clubId: A.club, machineId: null, altId: A.M.curl }] }, null],
+      [{ exerciseId: '00000000-0000-4000-8000-000000000000', clubs: [] }, 'GE004'],
+    ]) {
+      const a = exerciseChangeArgs(A.pe.la_hack, args, today);
+      if (code === null) { a.p_machines = [{ club_id: A.club, machine_id: null, alt_machine_id: A.M.curl }]; }
+      const x = await d.api.changePlanExercise(a);
+      expect(x.error && x.error.code, JSON.stringify(args)).toBe(code || 'GE003');
+    }
+    const blank = await d.api.changePlanExercise({ p_plan_exercise_id: A.pe.la_hack, p_new_exercise_name: '   ', p_machines: [], p_today: today });
+    expect(blank.error && blank.error.code).toBe('GE005');
+    expect(await peRow(A.pe.la_hack)).toEqual(before.pe);
+    expect(await pemRows(A.pe.la_hack)).toEqual(before.pem);
+  });
+
+  it('f) un altro atleta non può cambiare gli esercizi del piano di A', async () => {
+    const b = await device(B.email, passB);
+    const before = { pe: await peRow(A.pe.la_hack), pem: await pemRows(A.pe.la_hack) };
+    const r = await b.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.panca, clubs: [] }, today));
+    expect(r.error && r.error.code).toBe('GE001');
+    const r2 = await b.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: null, newName: 'Di B nel piano di A', clubs: [] }, today));
+    expect(r2.error && r2.error.code).toBe('GE001');
+    expect(await peRow(A.pe.la_hack)).toEqual(before.pe);
+    expect(await pemRows(A.pe.la_hack)).toEqual(before.pem);
+    expect(await exByName('Di B nel piano di A')).toEqual([]);
+    // senza accesso: la funzione non si può nemmeno chiamare
+    const anon = makeApi({ url: S.url, key: S.anon, storage: memStorage() });
+    expect((await anon.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.panca, clubs: [] }, today))).error).toBeTruthy();
+  });
+
+  it('h) due atleti creano un esercizio con lo stesso nome: nessun errore, due esercizi distinti, B non vede quello di A', async () => {
+    const a = await device(A.email, passA), b = await device(B.email, passB);
+    const bPe = (await b.api.snapshot(B.userId)).data.plan.days[0].exercises[0];
+    const name = 'Stesso nome ' + tag;
+    const ra = await a.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: null, newName: name, clubs: [] }, today));
+    const rb = await b.api.changePlanExercise(exerciseChangeArgs(bPe.id, { exerciseId: null, newName: name, clubs: [] }, today));
+    expect(ra.error).toBeUndefined();
+    expect(rb.error).toBeUndefined();
+    expect(ra.data.exercise_id).not.toBe(rb.data.exercise_id);
+    const both = await exByName(name);
+    expect(both.map((e) => e.created_by).sort()).toEqual([A.userId, B.userId].sort());
+    expect(new Set(both.map((e) => e.code)).size).toBe(2);
+    // B non vede l'esercizio privato di A: né nella scelta, né cercandolo per id
+    const chB = await b.api.exerciseChoices(B.userId, bPe.id);
+    expect(chB.data.exercises.some((e) => e.id === ra.data.exercise_id)).toBe(false);
+    expect(chB.data.exercises.filter((e) => e.name.it === name).map((e) => e.id)).toEqual([rb.data.exercise_id]);
+    expect((await b.api.sb.from('exercises').select('id').eq('id', ra.data.exercise_id)).data).toEqual([]);
+    // nessun segnale che esista: la risposta a B contiene solo i suoi id, nessun avviso
+    expect(JSON.stringify(rb)).not.toContain(ra.data.exercise_id);
+    expect(JSON.stringify(rb)).not.toMatch(/duplic|already|exists|esiste|23505/i);
+    // e A non vede quello di B
+    const chA = await a.api.exerciseChoices(A.userId, A.pe.la_hack);
+    expect(chA.data.exercises.filter((e) => e.name.it === name).map((e) => e.id)).toEqual([ra.data.exercise_id]);
+  });
+
+  it('i) macchina scelta solo per una palestra: nell’altra la riga non ha più la macchina del vecchio esercizio', async () => {
+    const d = await device(A.email, passA);
+    // situazione di partenza: hack su tutte e due le palestre (con l'alternativa nella seconda)
+    let r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.hack, clubs: [
+      { clubId: A.club, machineId: A.M.hack }, { clubId: club2, machineId: A.M.hack, altId: A.M.curl } ] }, today));
+    expect(r.error).toBeUndefined();
+    expect((await pemRows(A.pe.la_hack)).every((x) => x.machine_id === A.M.hack)).toBe(true);
+    // cambio con la macchina scelta solo nella palestra principale (l'altra non mandata)
+    r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.curl, clubs: [{ clubId: A.club, machineId: A.M.curl }] }, today));
+    expect(r.error).toBeUndefined();
+    const rows = await pemRows(A.pe.la_hack);
+    expect(rows.find((x) => x.club_id === A.club)).toMatchObject({ machine_id: A.M.curl });
+    expect(rows.find((x) => x.club_id === club2)).toEqual({ club_id: club2, machine_id: null, alt_machine_id: null });
+    // e mandandola con "nessuna macchina": stessa cosa
+    r = await d.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: A.E.curl, clubs: [{ clubId: A.club, machineId: A.M.curl }, { clubId: club2, machineId: null }] }, today));
+    expect(r.error).toBeUndefined();
+    expect((await pemRows(A.pe.la_hack)).find((x) => x.club_id === club2)).toEqual({ club_id: club2, machine_id: null, alt_machine_id: null });
+  });
+});
+
+describe('Cancellazione: esercizio ancora usato e account con un esercizio suo (database locale)', () => {
+  it('cancellare un esercizio ancora usato resta vietato: errore a fine operazione, niente cancellato', async () => {
+    const a = await device(A.email, passA);
+    const r = await a.api.changePlanExercise(exerciseChangeArgs(A.pe.la_hack, { exerciseId: null, newName: 'Da non cancellare ' + tag, clubs: [{ clubId: A.club, machineId: A.M.hack }] }, today));
+    expect(r.error).toBeUndefined();
+    const exId = r.data.exercise_id;
+    // l'atleta (le regole gli permettono di cancellare i suoi esercizi privati) e il servizio: tutti e due fermati
+    const byAthlete = await a.api.sb.from('exercises').delete().eq('id', exId).select('id');
+    expect(byAthlete.error && byAthlete.error.code).toBe('23503');
+    const byService = await admin.from('exercises').delete().eq('id', exId).select('id');
+    expect(byService.error && byService.error.code).toBe('23503');
+    expect((await admin.from('exercises').select('id').eq('id', exId)).data).toHaveLength(1);
+    expect((await admin.from('plan_exercises').select('exercise_id').eq('id', A.pe.la_hack).single()).data.exercise_id).toBe(exId);
+  });
+
+  it('account con un esercizio creato da lui, usato nel piano E in serie registrate: cancellato senza errori, non resta niente di suo', async () => {
+    const passC = randomPassword();
+    const C = await createFakeAthlete(admin, { email: `prova.c.${tag}@example.test`, password: passC, today, history: false });
+    let deleted = false;
+    try {
+      const d = await device(C.email, passC);
+      // 1. esercizio suo nel piano (Lower B, leg curl → esercizio nuovo)
+      const r = await d.api.changePlanExercise(exerciseChangeArgs(C.pe.lb_curl, { exerciseId: null, newName: 'Esercizio di C ' + tag, clubs: [{ clubId: C.club, machineId: C.M.curl }] }, today));
+      expect(r.error).toBeUndefined();
+      const exId = r.data.exercise_id;
+      // 2. serie registrate su quell'esercizio (come fa l'app: sul telefono, poi inviate)
+      const snap = await pull(d);
+      const p = findPlanExercise(snap.plan, C.pe.lb_curl);
+      expect(p.exercise_id).toBe(exId);
+      await saveSet(d.local, { userId: C.userId, date: today, day: snap.plan.days.find((x) => x.name === 'Lower B'), plan: snap.plan, clubId: snap.homeClubId }, p, { weight: 40, unit: 'kg', reps: 10, rir: 1 });
+      expect(await flush(d.local, d.api)).toMatchObject({ failed: 0, offline: false });
+      expect((await admin.from('session_exercises').select('id').eq('user_id', C.userId).eq('exercise_id', exId)).data).toHaveLength(1);
+      expect(await count('sets', C.userId)).toBe(1);
+      // 3. cancellazione dell'account: la stessa delle prove
+      await deleteFakeAthlete(admin, C.userId);
+      deleted = true;
+      // 4. non resta niente di suo
+      const left = {};
+      // (conteggio sulla colonna user_id, che c'è in tutte: plan_exercise_machines e user_clubs non hanno una colonna id)
+      for (const t of ['plans', 'plan_days', 'plan_supersets', 'plan_exercises', 'plan_exercise_machines', 'sessions', 'session_exercises', 'sets', 'user_clubs']) {
+        const { count: c, error } = await admin.from(t).select('user_id', { count: 'exact', head: true }).eq('user_id', C.userId);
+        if (error) throw new Error(t + ': ' + (error.message || error.code || 'errore'));
+        left[t] = c;
+      }
+      left.profiles = (await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('id', C.userId)).count;
+      left.exercises = (await admin.from('exercises').select('id', { count: 'exact', head: true }).eq('created_by', C.userId)).count;
+      left.exercise = (await admin.from('exercises').select('id', { count: 'exact', head: true }).eq('id', exId)).count;
+      left.clubs = (await admin.from('clubs').select('id', { count: 'exact', head: true }).eq('created_by', C.userId)).count;
+      expect(left).toEqual({ plans: 0, plan_days: 0, plan_supersets: 0, plan_exercises: 0, plan_exercise_machines: 0, sessions: 0, session_exercises: 0, sets: 0, user_clubs: 0,
+        profiles: 0, exercises: 0, exercise: 0, clubs: 0 });
+      const u = await admin.auth.admin.getUserById(C.userId);
+      expect(u.data && u.data.user).toBeFalsy();
+    } finally {
+      if (!deleted) await deleteFakeAthlete(admin, C.userId).catch(() => {});   // se la prova si ferma prima, si prova comunque a pulire
+    }
+  }, 60000);
 });

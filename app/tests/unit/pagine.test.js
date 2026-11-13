@@ -41,9 +41,18 @@ describe('navigazione', () => {
     expect(pageFromState({ gymPage: 'progress' })).toBe('progress');
   });
 
-  it('niente "Library", "Importa" o "Crea nuovo programma" nell\'app', () => {
-    const src = read('src/main.js') + read('src/pages.js') + JSON.stringify(LANGS);
-    expect(src).not.toMatch(/library|importa|import plan|crea nuovo|new program/i);
+  it('niente pagina o voce di menu "Library" / "Libreria"; niente "Importa" o "Crea nuovo programma"', () => {
+    // pagine della barra in basso: solo le tre, nessuna "library"
+    expect(PAGES.some((p) => /librar|librer/i.test(p))).toBe(false);
+    // nomi delle pagine (barra in basso) nelle due lingue
+    const nav = [LANGS.it, LANGS.en].flatMap((L) => Object.entries(L).filter(([k]) => /^nav/.test(k)).map(([, v]) => String(v)));
+    expect(nav.join(' ')).not.toMatch(/librar|librer/i);
+    // nessun tasto di pagina o del menu che porti a una "library" (data-page, id dei tasti del menu)
+    const main = read('src/main.js');
+    expect(main).not.toMatch(/data-page=["']?librar|gymPage:\s*'librar|id=["']m\w*Lib/i);
+    // le funzioni rimandate restano fuori: importazione del piano e "crea nuovo programma"
+    const src = main + read('src/pages.js') + JSON.stringify(LANGS);
+    expect(src).not.toMatch(/importa|import plan|crea nuovo programma|new program/i);
   });
 
   it('etichette nelle due lingue', () => {

@@ -301,7 +301,8 @@ try {
   await page.click('[data-page=program]');
   await page.waitForSelector('#planName');
   check('Programma: piano, 4 giorni, esercizi con macchina', (await page.$$('.pday')).length === 4 && /Marca Finta · Incline Press · MF-10/.test(await page.textContent('.pex')) && (await tabOn()) === 'Programma');
-  check('Programma: niente Importa, Library, Crea programma', !/importa|library|crea/i.test(await page.textContent('#wrap')));
+  check('Programma: niente pagina "Library" nella barra, niente Importa o Crea nuovo programma',
+    !/library|libreria/i.test(await page.textContent('#tabs')) && !/importa|crea nuovo programma|new program/i.test(await page.textContent('#wrap')));
   await page.screenshot({ path: path.join(out, '14-program.png') });
   await page.click('[data-page=progress]');
   await page.waitForSelector('.hses');
@@ -408,6 +409,54 @@ try {
     check('superserie: tendina Giorno spenta e spiegazione', (await page.isDisabled('#pe_day')) && /superserie/.test(await page.textContent('#peSs')));
     await page.click('#peCancel');
     check('lo spostamento non tocca le serie né la coda', (await localRows()) === rowsBefore && (await serverSets()).length === 1);
+
+    // Cambia esercizio (funzione del database change_plan_exercise, solo online)
+    const curlFull = async () => (await admin.from('plan_exercises').select('exercise_id, sets, reps_min, reps_max, rir_min, rir_max, plan_day_id, position').eq('id', ref.pe.lb_curl).single()).data;
+    const curlMac = async () => (await admin.from('plan_exercise_machines').select('club_id, machine_id, alt_machine_id').eq('plan_exercise_id', ref.pe.lb_curl)).data;
+    const start = await curlFull(), startMac = await curlMac();
+    await openCurl();
+    await page.click('#peChange');
+    await page.waitForSelector('#chList .chEx');
+    check('Cambia esercizio: i campi lasciano il posto alla scelta, "Adesso: Leg curl seduto", elenco degli esercizi',
+      (await page.isHidden('#peForm')) && (await page.textContent('#chNow')) === 'Adesso: Leg curl seduto' && (await page.$$('#chList .chEx')).length >= 5);
+    check('una palestra (la principale) con Macchina = quella di adesso e Alternativa vuota',
+      (await page.$$('.chClub')).length === 1 && /principale/.test(await page.textContent('.chClub b')) &&
+      (await page.$eval('#chM0', (x) => x.options[x.selectedIndex].text)) === 'Marca Finta · Seated Leg Curl · MF-70' && (await page.inputValue('#chA0')) === '');
+    await page.fill('#chQ', 'hack');
+    { const found = await page.$$eval('#chList .chEx:not(.chNew)', (b) => b.map((x) => x.textContent));
+      check('ricerca "hack": tra gli esercizi trovati solo Hack squat', JSON.stringify(found) === '["Hack squat"]', JSON.stringify(found));
+      check('ricerca "hack": il tasto "Crea nuovo" dice «hack» (il nome scritto non è esattamente un esercizio)',
+        (await page.textContent('#chNew')) === '+ Crea nuovo esercizio: «hack»', await page.textContent('#chNew')); }
+    await page.fill('#chQ', 'Pulley basso prova');
+    check('nome che non c\'è: "+ Crea nuovo esercizio: «Pulley basso prova»"', (await page.textContent('#chNew')) === '+ Crea nuovo esercizio: «Pulley basso prova»');
+    await page.fill('#chQ', '');
+    await page.click('#peChg #chSave');
+    check('Salva senza scegliere: messaggio chiaro, niente cambiato', /Scegli un esercizio dall'elenco/.test(await page.textContent('#chErr')) && JSON.stringify(await curlFull()) === JSON.stringify(start));
+    await page.fill('#chQ', 'hack');
+    await page.click('#chList .chEx:has-text("Hack squat")');
+    await page.selectOption('#chM0', { label: 'Marca Finta · Hack Squat · MF-40' });
+    check('scelto: "Scelto: Hack squat"', (await page.textContent('#chPick')) === 'Scelto: Hack squat');
+    await page.screenshot({ path: path.join(out, '23-cambia-esercizio.png') });
+    await page.click('#peChg #chSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    { const row = await curlFull(), mac = await curlMac(), li = (await page.textContent('.pday:has-text("Lower B")')).replace(/\s+/g, ' ');
+      check('Salva: online nuovo esercizio e nuova macchina; serie, rep, RIR, giorno e posizione uguali',
+        row.exercise_id === ref.E.hack && mac.length === 1 && mac[0].machine_id === ref.M.hack &&
+        JSON.stringify({ ...row, exercise_id: 0 }) === JSON.stringify({ ...start, exercise_id: 0 }), JSON.stringify([row, mac]));
+      check('Salva: Programma aggiornato subito (Hack squat al posto di Leg curl, macchina MF-40)', !/Leg curl seduto/.test(li) && /Hack squat.*MF-40/.test(li), li.slice(0, 160)); }
+    // si rimette com'era (le prove dopo usano Lower B)
+    await page.click('.pday:has-text("Lower B") .pex li:first-child .peEd'); await page.waitForSelector('.sheet.pesheet');
+    await page.click('#peChange'); await page.waitForSelector('#chList .chEx');
+    await page.fill('#chQ', 'leg curl'); await page.click('#chList .chEx:has-text("Leg curl seduto")');
+    await page.selectOption('#chM0', { label: 'Marca Finta · Seated Leg Curl · MF-70' });
+    await page.click('#peChg #chSave');
+    await page.waitForSelector('.sheet.pesheet', { state: 'detached' });
+    check('rimesso com\'era: esercizio e macchine online uguali a prima', JSON.stringify(await curlFull()) === JSON.stringify(start) && JSON.stringify(await curlMac()) === JSON.stringify(startMac));
+    // Indietro: i campi tornano come erano
+    await openCurl(); await page.fill('#pe_sets', '4'); await page.click('#peChange'); await page.waitForSelector('#chBack'); await page.click('#chBack');
+    check('Indietro: i campi tornano, con quello che avevo scritto', (await page.isVisible('#peForm')) && (await page.inputValue('#pe_sets')) === '4');
+    await page.click('#peCancel');
+    check('cambio esercizio: serie e coda non toccate', (await localRows()) === rowsBefore && (await serverSets()).length === 1);
     await page.click('[data-page=track]'); await page.waitForSelector('#exv');
   }
 
@@ -437,6 +486,11 @@ try {
   check('senza rete: Modifica si apre ma Salva è spento, con "Serve internet per modificare il piano."',
     (await page.isDisabled('#peSave')) && (await page.textContent('#peNet')) === 'Serve internet per modificare il piano.', await page.textContent('#peNet'));
   await page.screenshot({ path: path.join(out, '20-modifica-offline.png') });
+  await page.click('#peChange');
+  await page.waitForSelector('#chNet');
+  check('senza rete: Cambia esercizio con Salva spento e "Serve internet per cambiare esercizio."',
+    (await page.isDisabled('#chSave')) && (await page.textContent('#chNet')) === 'Serve internet per cambiare esercizio.', await page.textContent('#chNet'));
+  await page.click('#chBack');
   await page.click('#peCancel');
   await page.click('[data-page=track]');
   await page.waitForSelector('#exv');

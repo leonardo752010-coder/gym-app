@@ -108,6 +108,31 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
       return { data: r.data };
     },
 
+    /**
+     * Dati per "Cambia esercizio" (solo online): esercizi che l'atleta può usare (quelli pubblici e i suoi; le regole
+     * di accesso filtrano), palestre dell'atleta, macchine di questa riga del piano, macchine di ogni palestra.
+     */
+    async exerciseChoices(userId, peId) {
+      const [ex, uc, rm] = await Promise.all([
+        wrap(sb.from('exercises').select('id, code, name, equipment, visibility, exercise_muscles(role, muscle:muscles(code, name))').is('archived_at', null).limit(2000)),
+        wrap(sb.from('user_clubs').select('club_id, is_home, club:clubs(id, name)').eq('user_id', userId)),
+        wrap(sb.from('plan_exercise_machines').select('club_id, machine_id, alt_machine_id, club:clubs(id, name)').eq('plan_exercise_id', peId)),
+      ]);
+      const err = ex.error || uc.error || rm.error;
+      if (err) return { error: err };
+      const clubIds = [...new Set([...uc.data.map((x) => x.club_id), ...rm.data.map((x) => x.club_id)])];
+      const cm = clubIds.length ? await wrap(sb.from('club_machines').select('club_id, machine:machines(' + MACHINE_COLS + ')').in('club_id', clubIds)) : { data: [] };
+      if (cm.error) return { error: cm.error };
+      const mach = (m) => m && ({ ...m, weight_min: n(m.weight_min), weight_max: n(m.weight_max), weight_step: n(m.weight_step),
+        weight_list: Array.isArray(m.weight_list) ? m.weight_list.map(Number) : null });
+      return { data: { exercises: ex.data, userClubs: uc.data, rowMachines: rm.data, clubMachines: cm.data.map((x) => ({ club_id: x.club_id, machine: mach(x.machine) })) } };
+    },
+
+    /** Cambia esercizio e macchine di una riga del piano con la funzione del database (tutto o niente). */
+    changePlanExercise(args) {
+      return wrap(sb.rpc('change_plan_exercise', args));
+    },
+
     upsert(table, rows) {
       return wrap(sb.from(table).upsert(rows, { onConflict: 'id', defaultToNull: true }));
     },
@@ -218,7 +243,8 @@ export function storedUser(storage = typeof localStorage !== 'undefined' ? local
   } catch (e) { return null; }
 }
 
-const n = (v) => (v == null ? null : Number(v));
+function n(v) { return v == null ? null : Number(v); }
+const MACHINE_COLS = 'id, code, brand, model, brand_code, name, weight_unit, weight_min, weight_max, weight_step, weight_list';
 
 /** Piano nella forma usata dall'app: giorni in ordine, esercizi in ordine, macchina della palestra principale. */
 export function shapePlan(p, homeClub) {

@@ -824,3 +824,15 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .pepos button{min-height:44px;min-width:76px;padding:0 12px;border-radius:12px;background:var(--chip);color:var(--tx);font-size:14px;font-weight:800}
 .pepos button:disabled{opacity:.4}
 .pess{display:block;margin-top:8px;font-size:12px;color:var(--mu);font-weight:600;line-height:1.4}
+/* finestra Modifica: "Cambia esercizio" (ricerca, crea nuovo, macchina per palestra) */
+.pesheet .chOpen{display:block;width:100%;min-height:44px;margin:0 0 14px;border-radius:12px;border:1px dashed var(--line);background:none;color:var(--ac);font-size:15px;font-weight:800}
+.pesheet [hidden]{display:none !important}
+.chList{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;margin:8px 0 12px;overscroll-behavior:contain}
+.chEx{min-height:44px;padding:8px 12px;border-radius:12px;background:var(--chip);color:var(--tx);font-size:15px;font-weight:700;text-align:left}
+.chEx.on{background:var(--acSoft);color:var(--tx);box-shadow:inset 0 0 0 2px var(--ac)}
+.chEx.chNew{background:none;border:1px dashed var(--ac);color:var(--ac)}
+.chPick{margin:8px 0 0;font-size:14px;font-weight:800;color:var(--ac)}
+.chPick:empty{display:none}
+.chClub{display:flex;flex-direction:column;gap:8px;padding:12px 0 4px;border-top:1px solid var(--line)}
+.chClub b{font-size:14px}
+.chKeep{margin-top:12px}

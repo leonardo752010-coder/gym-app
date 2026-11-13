@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove, PE_COLUMNS } from '../../src/modifica.js';
+import { PLAN_EDIT_FIELDS, planEditForm, validatePlanEdit, applyPlanEdit, findPlanExercise, moveInDay, orderForDay, dayOfExercise, planMoveRows, applyPlanMove, PE_COLUMNS,
+  normText, searchExercises, exactExercise, clubChoices, validateExerciseChange, exerciseChangeArgs, exerciseChangeErrorKey, hasSetsToday, applyExerciseChange } from '../../src/modifica.js';
 import { LANGS } from '../../src/i18n.js';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -202,5 +203,111 @@ describe('spostamento: giorno e righe da scrivere', () => {
     expect(P2.days[1].exercises.map((x) => x.id + '#' + x.position)).toEqual(['p#1', 'q#2', 'b#3']);
     expect(findPlanExercise(P2, 'b').sets).toBe(3);
     expect(dayOfExercise(P, 'b')).toBe(D1);
+  });
+});
+
+describe('Cambia esercizio: ricerca e scelta', () => {
+  const LIB = [
+    { id: 'e1', code: 'panca-inclinata', name: { it: 'Panca inclinata', en: 'Incline press' } },
+    { id: 'e2', code: 'alzate', name: { it: 'Alzate laterali', en: 'Lateral raise' } },
+    { id: 'e3', code: 'leg-curl', name: { it: 'Leg curl seduto', en: 'Seated leg curl' } },
+    { id: 'e4', code: 'u-pec-deck-1a2b3c4d', name: { it: 'Pec deck è', en: 'Pec deck è' } },
+  ];
+
+  it('ricerca: tutte le parole, senza badare a maiuscole e accenti, nel nome italiano, inglese o nel codice; in ordine di nome', () => {
+    expect(searchExercises(LIB, '', 'it').map((e) => e.id)).toEqual(['e2', 'e3', 'e1', 'e4']);
+    expect(searchExercises(LIB, 'PANCA', 'it').map((e) => e.id)).toEqual(['e1']);
+    expect(searchExercises(LIB, 'raise', 'it').map((e) => e.id)).toEqual(['e2']);
+    expect(searchExercises(LIB, 'curl sed', 'it').map((e) => e.id)).toEqual(['e3']);
+    expect(searchExercises(LIB, 'deck e', 'it').map((e) => e.id)).toEqual(['e4']);
+    expect(searchExercises(LIB, 'squat', 'it')).toEqual([]);
+    expect(searchExercises(LIB, '', 'it', 2)).toHaveLength(2);
+  });
+
+  it('nome esatto già nella libreria (niente doppioni con "Crea nuovo esercizio")', () => {
+    expect(exactExercise(LIB, '  panca INCLINATA ')).toBe(LIB[0]);
+    expect(exactExercise(LIB, 'incline press')).toBe(LIB[0]);
+    expect(exactExercise(LIB, 'Pec deck e')).toBe(LIB[3]);
+    expect(exactExercise(LIB, 'Panca')).toBeNull();
+    expect(exactExercise(LIB, '')).toBeNull();
+    expect(normText('  Alzàte   LATERALI ')).toBe('alzate laterali');
+  });
+
+  it('palestre: quelle dell\'atleta più quelle della riga, la principale per prima, con le loro macchine e la scelta di adesso', () => {
+    const M1 = { id: 'm1', code: 'a', brand: 'Marca', model: 'Zeta' }, M2 = { id: 'm2', code: 'b', brand: 'Marca', model: 'Alfa' }, M3 = { id: 'm3', code: 'c' };
+    const clubs = clubChoices(
+      [{ club_id: 'c2', is_home: false, club: { id: 'c2', name: 'Bravo' } }, { club_id: 'c1', is_home: true, club: { id: 'c1', name: 'Zulu' } }],
+      [{ club_id: 'c1', machine_id: 'm1', alt_machine_id: 'm2', club: { id: 'c1', name: 'Zulu' } }, { club_id: 'c3', machine_id: 'm9', alt_machine_id: null, club: { id: 'c3', name: 'Charlie' } }],
+      [{ club_id: 'c1', machine: M1 }, { club_id: 'c1', machine: M2 }, { club_id: 'c2', machine: M3 }, { club_id: 'c1', machine: M1 }],
+    );
+    expect(clubs.map((c) => [c.clubId, c.isHome])).toEqual([['c1', true], ['c2', false], ['c3', false]]);
+    expect(clubs[0]).toMatchObject({ name: 'Zulu', machineId: 'm1', altId: 'm2' });
+    expect(clubs[0].machines.map((m) => m.id)).toEqual(['m2', 'm1']);   // in ordine di nome, senza doppioni
+    expect(clubs[1]).toMatchObject({ machineId: null, altId: null });
+    expect(clubs[2]).toMatchObject({ machineId: null });                // macchina che non è (più) in quella palestra: nessuna
+  });
+});
+
+describe('Cambia esercizio: controlli, richiesta, errori, copia del piano', () => {
+  it('controlli: scegliere o creare; nome 1-80; alternativa solo con una macchina, e diversa', () => {
+    expect(validateExerciseChange({ exerciseId: null, newName: null, clubs: [] })).toEqual(['pick']);
+    expect(validateExerciseChange({ exerciseId: null, newName: '   ', clubs: [] })).toEqual(['pick', 'name']);
+    expect(validateExerciseChange({ exerciseId: null, newName: 'x'.repeat(81), clubs: [] })).toEqual(['name']);
+    expect(validateExerciseChange({ exerciseId: 'e1', newName: null, clubs: [{ clubId: 'c1', machineId: null, altId: null }] })).toEqual([]);
+    expect(validateExerciseChange({ exerciseId: 'e1', clubs: [{ clubId: 'c1', machineId: null, altId: 'm2' }] })).toEqual(['altNoMachine']);
+    expect(validateExerciseChange({ exerciseId: 'e1', clubs: [{ clubId: 'c1', machineId: 'm2', altId: 'm2' }] })).toEqual(['altSame']);
+    expect(validateExerciseChange({ exerciseId: null, newName: 'Pec deck', clubs: [] })).toEqual([]);
+  });
+
+  it('richiesta alla funzione del database: esercizio o nome nuovo, macchine per palestra, data di oggi', () => {
+    const clubs = [{ clubId: 'c1', machineId: 'm1', altId: 'm2' }, { clubId: 'c2', machineId: null, altId: 'm3' }];
+    expect(exerciseChangeArgs('pe1', { exerciseId: 'e1', newName: 'ignorato', clubs }, '2026-11-13')).toEqual({
+      p_plan_exercise_id: 'pe1', p_exercise_id: 'e1', p_new_exercise_name: null, p_today: '2026-11-13',
+      p_machines: [{ club_id: 'c1', machine_id: 'm1', alt_machine_id: 'm2' }, { club_id: 'c2', machine_id: null, alt_machine_id: null }],
+    });
+    expect(exerciseChangeArgs('pe1', { exerciseId: null, newName: '  Pec deck ', clubs: [] }, '2026-11-13')).toMatchObject({ p_exercise_id: null, p_new_exercise_name: 'Pec deck', p_machines: [] });
+  });
+
+  it('errori del database → messaggi chiari', () => {
+    expect(['GE001', 'GE002', 'GE003', 'GE004', 'GE005', '42501', undefined].map((code) => exerciseChangeErrorKey({ code })))
+      .toEqual(['notAllowed', 'today', 'machines', 'exercise', 'name', null, null]);
+    for (const L of [LANGS.it, LANGS.en]) for (const k of ['pick', 'name', 'altNoMachine', 'altSame', 'today', 'notAllowed', 'machines', 'exercise']) expect(L.chErr[k], k).toBeTruthy();
+    expect(LANGS.it.chBtn).toBe('Cambia esercizio');
+    expect(LANGS.it.chNeedNet).toBe('Serve internet per cambiare esercizio.');
+  });
+
+  it('serie di oggi sul telefono (anche non inviate) per quella riga del piano; cancellate e di altri giorni non contano', () => {
+    const T = '2026-11-13';
+    const rows = [
+      { table: 'sessions', data: { id: 's1', session_date: T, deleted_at: null } },
+      { table: 'sessions', data: { id: 's0', session_date: '2026-11-12', deleted_at: null } },
+      { table: 'session_exercises', data: { id: 'se1', session_id: 's1', plan_exercise_id: 'pe1', deleted_at: null } },
+      { table: 'session_exercises', data: { id: 'se0', session_id: 's0', plan_exercise_id: 'pe2', deleted_at: null } },
+      { table: 'session_exercises', data: { id: 'se3', session_id: 's1', plan_exercise_id: 'pe3', deleted_at: null } },
+      { table: 'sets', data: { id: 'x1', session_exercise_id: 'se1', deleted_at: null } },
+      { table: 'sets', data: { id: 'x0', session_exercise_id: 'se0', deleted_at: null } },
+      { table: 'sets', data: { id: 'x3', session_exercise_id: 'se3', deleted_at: '2026-11-13T10:00:00Z' } },
+    ];
+    expect(hasSetsToday(rows, 'pe1', T)).toBe(true);
+    expect(hasSetsToday(rows, 'pe2', T)).toBe(false);   // ieri
+    expect(hasSetsToday(rows, 'pe3', T)).toBe(false);   // serie cancellata
+    expect(hasSetsToday([], 'pe1', T)).toBe(false);
+  });
+
+  it('copia del piano: nuovo esercizio e macchina della palestra principale; serie, rep e RIR uguali', () => {
+    const P = { id: 'p', days: [{ id: 'd1', exercises: [{ id: 'pe1', exercise_id: 'e1', exercise: { id: 'e1', name: { it: 'Panca' } }, sets: 2, reps_min: 6, reps_max: 10, rir_min: 1, machine: { id: 'mOld' }, muscle: 'Petto' }] }] };
+    const M = { id: 'm5', code: 'x', brand: 'B', model: 'Curl' };
+    const ex = { id: 'e3', code: 'leg-curl', name: { it: 'Leg curl' }, exercise_muscles: [{ role: 'primary', muscle: { name: { it: 'Femorali' } } }] };
+    const P2 = applyExerciseChange(P, 'pe1', { exercise: ex, homeClubId: 'c1', clubs: [{ clubId: 'c2', machines: [], machineId: null }, { clubId: 'c1', machines: [M], machineId: 'm5', altId: null }] });
+    expect(findPlanExercise(P2, 'pe1')).toMatchObject({ exercise_id: 'e3', exercise: { name: { it: 'Leg curl' } }, machine: M, alt_machine: null, club_id: 'c1', sets: 2, reps_min: 6, reps_max: 10, rir_min: 1, muscle: { it: 'Femorali' } });
+    expect(findPlanExercise(P, 'pe1').exercise_id).toBe('e1');
+    const P3 = applyExerciseChange(P, 'pe1', { exercise: { id: 'e9', name: { it: 'Nuovo' } }, homeClubId: 'c1', clubs: [] });
+    expect(findPlanExercise(P3, 'pe1')).toMatchObject({ exercise_id: 'e9', machine: { id: 'mOld' }, muscle: null });
+  });
+
+  it('nessuna pagina "Library": la scelta sta dentro la finestra Modifica', () => {
+    const main = read('src/main.js');
+    expect(main).toMatch(/id="peChange"/);
+    expect(main).toMatch(/id="peChg" hidden/);
   });
 });

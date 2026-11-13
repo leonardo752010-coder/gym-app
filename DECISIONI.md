@@ -116,3 +116,19 @@ Leonardo ha chiesto a Claude di scegliere e giustificare tecnologia e hosting. D
 | Immagine | Piccola immagine nel menu accanto all'account (Leonardo). Program e Progress non esistono ancora |
 | Immagini | Prima segnaposto SVG; sostituiti (stessa sera) dalle mascotte vere, vedi sotto |
 | Mascotte vere (Leonardo, 2026-11-06) | Tre PNG trasparenti da 480 px (`gorilla.png`, `lion.png`, `tiger.png`), ritagliati da `docs/immagini/Vintage Trio Gym Mascots.png` (originale nel repository, così non si perde). Tagli trovati con le colonne vuote, non a occhio; stessa scala per tutte e tre; colori pieni (non a palette) perché già sotto i 150 KB. Nell'app sempre `object-fit: contain` (mai deformate); nel menu senza ritaglio a cerchio |
+
+## 2026-11-13 — Modifica del piano dall'app (Programma → Modifica)
+
+| Tema | Decisione |
+| --- | --- |
+| Versione 1 | Leonardo: la modifica del piano entra nella versione 1 (dopo aver letto `docs/NOTA_FUNZIONI_E_POSIZIONAMENTO.md`) |
+| Solo online | Ogni modifica del piano si salva solo con internet; il piano non entra nella coda offline (la coda resta sedute, esercizi della seduta, serie) |
+| Storico | Nomi degli esercizi e macchine dello storico presi dalla libreria (tramite `exercise_id` e `machine_id` della seduta), non dal piano: cambiare il piano non cambia lo storico |
+| Cambio macchina | Cambiare macchina azzera la "Volta scorsa" (Volta scorsa, suggerimento e grafico restano per esercizio + macchina) |
+| Serie, rep, RIR | Finestra "Modifica esercizio": serie, serie max, rep min/max, RIR min/max, recupero, note; solo la riga di `plan_exercises` di quell'esercizio. Rep min e max obbligatori; RIR e recupero si possono lasciare vuoti |
+| Spostamento | Giorno (tendina) e Su / Giù: cambiano solo giorno e posizione della riga (stesso id); posizioni senza buchi; tutte le righe in una sola richiesta (vincolo di posizione rinviabile). Un esercizio in superserie non cambia giorno e si muove solo dentro la superserie |
+| Cambia esercizio | Opzione A modificata (Leonardo): funzione del database `public.change_plan_exercise` (migrazione `20261113150000`, SECURITY INVOKER: valgono le regole di accesso di sempre) che in una sola operazione, tutto o niente, cambia `exercise_id` e rifà le macchine per palestra (nessuna riga cancellata: palestra non scelta = senza macchina). Rifiuta il cambio se oggi ci sono serie su quella riga. Serie, rep e RIR restano; le sedute vecchie restano col vecchio esercizio |
+| Esercizio nuovo | Dalla stessa finestra, "Crea nuovo esercizio" dal solo nome: esercizio privato dell'atleta (non condiviso, non verificato), codice creato dalla funzione. "Crea nuovo" compare quando il nome scritto non è esattamente un esercizio che c'è già. Nessuna pagina "Library" |
+| Prova "Library" | Stretta (Leonardo): vieta solo una pagina o una voce di menu "Library" / "Libreria" e le frasi "Importa" e "Crea nuovo programma"; non la parola ovunque (`app/tests/unit/pagine.test.js`, `app/scripts/e2e.mjs`) |
+| Cancellazione account | Collegamenti `plan_exercises.exercise_id` e `session_exercises.exercise_id` controllati a fine transazione (migrazione `20261113160000`, come la 9 per l'import): un account con un esercizio suo nel piano o in serie registrate si cancella; cancellare un esercizio ancora usato resta vietato. Prova fissa in `app/tests/locale/supabase.test.js` |
+| Online | Le migrazioni `20261113150000` e `20261113160000` sono solo locali. Online solo con l'ok di Leonardo, in quest'ordine: backup, `20261113150000`, `20261113160000`, poi pubblicazione dell'app. Le due migrazioni vanno insieme |
