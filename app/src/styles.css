@@ -667,8 +667,14 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 #exv#exv .mac{margin:5px 0 12px;font-size:13px;font-weight:600;line-height:1.35;color:var(--mu)}
 #exv#exv .mac b{font-weight:700;color:var(--vt,var(--ac))}
 #exv#exv .mac span{color:var(--mu)}
-#exv#exv .chips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 14px}
-#exv#exv .chips > span,#exv#exv .mini > span{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 6px;border-radius:9px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap}
+/* intestazione: quadrato col disegno della macchina a sinistra, nome e "marca · modello · codice" a destra */
+#exv#exv .exHead{display:flex;align-items:flex-start;gap:12px;margin:0 0 12px}
+#exv#exv .mico{flex:none;width:60px;height:60px;display:grid;place-items:center;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--tx)}
+#exv#exv .mico svg{width:46px;height:46px;opacity:.92}
+#exv#exv .exTx{flex:1;min-width:0}
+#exv#exv .exTx .mac{margin:5px 0 0}
+#exv#exv .chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px 5px;margin:0 0 14px}
+#exv#exv .chips > span,#exv#exv .mini > span{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap}
 #exv#exv .chips svg{width:14px;height:14px;flex:none;color:var(--mu)}
 #exv#exv .chips .mu{background:var(--acSoft);border-color:rgba(139,108,240,.4);color:var(--vt,var(--ac))}
 #exv#exv .chips .mu svg{color:var(--vt,var(--ac))}

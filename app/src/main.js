@@ -29,6 +29,7 @@ import {
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
+import { machineKind, machineIcon } from './macchine.js';
 
 // Mascotte (PNG ritagliati da docs/immagini/Vintage Trio Gym Mascots.png). La build le mette nella cache offline.
 const STARTER_IMG = { gorilla: gorillaImg, lion: lionImg, tiger: tigerImg };
@@ -430,6 +431,9 @@ function exView(v, exs, pe) {
     '<button class="arr nx" data-go="1" aria-label="' + esc(T.next) + '"' + (nav.next ? '' : ' disabled') + '>' + ICON_NEXT + '</button></span></div>';
   h += '<div class="bar">' + exs.map((x, i) => '<button data-idx="' + i + '" class="' + (i === S.idx ? 'cur' : exProg(v, x) >= 1 ? 'full' : '') + '" aria-label="' + esc(exName(x)) + '"></button>').join('') + '</div>';
   if (pe.superset_label) h += '<div class="ss">SUPERSET ' + esc(pe.superset_label) + '</div>';
+  // intestazione: a sinistra il disegno del tipo di macchina (dal modello; senza macchina il manubrio), a destra nome e macchina
+  const kind = machineKind(m, pe.exercise);
+  h += '<div class="exHead"><span class="mico" data-kind="' + kind + '">' + machineIcon(kind) + '</span><div class="exTx">';
   h += '<h1 class="ex">' + esc(exName(pe)) + '</h1>';
   // macchina: "marca · modello · codice" in viola tenue; salto dei pesi e alternativa in grigio, come prima
   if (m) {
@@ -439,6 +443,7 @@ function exView(v, exs, pe) {
     h += '<div class="mac"><b>' + esc(machineLabel(m) || tr(m.name, S.lang) || m.code) + '</b>' + (stepTxt ? ' <span>· ' + esc(stepTxt) + '</span>' : '') +
       (pe.alt_machine ? ' <span>· ' + T.alt + ': ' + esc(machineLabel(pe.alt_machine) || pe.alt_machine.code) + '</span>' : '') + '</div>';
   }
+  h += '</div></div>';
   // chip con icona: schema, RIR, muscolo (viola), Note (solo se l'esercizio del piano ha una nota: è un tasto), Storico (ultime 3 volte)
   const noteBtn = pe.notes ? '<button class="mini' + (S.openNotes ? ' on' : '') + '" id="notesBtn" aria-expanded="' + S.openNotes + '"><span>' + ICON_NOTE + esc(T.notesBtn) + '</span></button>' : '';
   const histBtn = '<button class="mini" id="histBtn" aria-haspopup="dialog"><span>' + ICON_HIST + esc(T.histBtn) + '</span></button>';
