@@ -1,17 +1,92 @@
 // Export dello storico in CSV per Excel in italiano. Logica pura (nessun DOM, nessuna rete):
-// riceve la lista di historyList (pages.js), la stessa dello Storico in Progressi, e restituisce il testo del file.
+// le serie arrivano da Supabase (api.exportSets, a pagine), diventano le righe di sempre (sessions, session_exercises,
+// sets), passano da historyList (pages.js) come lo Storico in Progressi, e alla fine si ha il testo del file.
 // Si prova con tests/unit/esporta.test.js.
-import { historyFilterOptions } from './pages.js';
+import { historyList, historyFilterOptions } from './pages.js';
 import { tr } from './i18n.js';
-import { machineLabel } from './logic.js';
+import { machineLabel, indexRows, addDays } from './logic.js';
 
 export const CSV_HEADER = ['Data', 'Workout', 'Giorno piano', 'Esercizio', 'Macchina', 'Serie', 'Peso (kg)', 'Ripetizioni', 'RIR', 'Note'];
 export const CSV_BOM = '﻿';
 export const CSV_SEP = ';';
 export const CSV_EOL = '\r\n';
 
-/** Nome del file: storico-allenamenti-AAAA-MM-GG.csv (data del telefono). */
-export const exportFileName = (dateKey) => 'storico-allenamenti-' + dateKey + '.csv';
+/** Periodi che si possono scegliere prima dell'export (giorni, oppure tutto). Di base: tutto. */
+export const EXPORT_PERIODS = ['14', '30', '90', 'all'];
+export const DEFAULT_PERIOD = 'all';
+
+/** Righe per richiesta a Supabase: il server ne dà al massimo 1000, quindi si va a pagine. */
+export const EXPORT_PAGE = 1000;
+
+/**
+ * Primo giorno del periodo ('AAAA-MM-GG'), contato sulla data della seduta, con oggi incluso:
+ * 14 giorni = oggi e i 13 giorni prima (una seduta di esattamente 14 giorni fa resta fuori). Tutto = null.
+ */
+export function periodFrom(today, period) {
+  if (!period || period === 'all') return null;
+  const n = Number(period);
+  return Number.isInteger(n) && n > 0 ? addDays(today, -(n - 1)) : null;
+}
+
+/** Sedute del periodo (dalla data della seduta in poi; nessun limite = tutte). Non cambia la lista di partenza. */
+export const inPeriod = (list, from) => (from ? list.filter((s) => s.date >= from) : list);
+
+/** Nome del file: storico-allenamenti-tutto-AAAA-MM-GG.csv oppure storico-allenamenti-30gg-AAAA-MM-GG.csv. */
+export const exportFileName = (dateKey, period = DEFAULT_PERIOD) =>
+  'storico-allenamenti-' + (!period || period === 'all' ? 'tutto' : period + 'gg') + '-' + dateKey + '.csv';
+
+/**
+ * Scarica TUTTE le pagine: chiede `pageSize` righe alla volta (fetchPage(da, a) → { data } | { error })
+ * e va avanti finché una pagina arriva vuota. Si conta quello che arriva davvero, così funziona anche se il
+ * server dà meno righe di quelle chieste. maxPages: freno di sicurezza (errore, mai un export a metà).
+ */
+export async function fetchAllPages(fetchPage, pageSize = EXPORT_PAGE, maxPages = 1000) {
+  const all = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = all.length;
+    const r = await fetchPage(from, from + pageSize - 1);
+    if (!r || r.error) return { error: (r && r.error) || { code: '', message: 'no response' } };
+    const got = r.data || [];
+    if (!got.length) return { data: all };
+    for (const x of got) all.push(x);
+  }
+  return { error: { code: 'too-many-pages', message: 'too many pages' } };
+}
+
+/**
+ * Serie scaricate per l'export (ognuna con la sua session_exercises e la sua sessions dentro) → righe come quelle
+ * sul telefono, più i nomi degli esercizi e le macchine dalla libreria (come history() in api.js).
+ */
+export function exportRowsFromSets(sets) {
+  const sessions = new Map(), ses = new Map(), rows = [], exerciseNames = {}, machineInfo = {};
+  for (const st of sets || []) {
+    const { session_exercises: se, ...sd } = st;
+    if (!se) continue;
+    const { sessions: s, exercise, machine, ...sed } = se;
+    if (!s) continue;
+    if (!sessions.has(s.id)) sessions.set(s.id, s);
+    if (!ses.has(sed.id)) ses.set(sed.id, sed);
+    if (exercise && exercise.id && exercise.name) exerciseNames[exercise.id] = exercise.name;
+    if (machine && machine.id) {
+      const { id, code, brand, model, brand_code, name } = machine;
+      machineInfo[id] = { id, code, brand, model, brand_code, name };
+    }
+    rows.push({ table: 'sets', data: sd });
+  }
+  for (const s of sessions.values()) rows.push({ table: 'sessions', data: s });
+  for (const se of ses.values()) rows.push({ table: 'session_exercises', data: se });
+  return { rows, exerciseNames, machineInfo };
+}
+
+/**
+ * Dalle serie scaricate alle righe del CSV, per il periodo scelto. Stessa strada dello Storico (indexRows,
+ * historyList: sedute e serie cancellate fuori, nomi e macchine dalla libreria), poi il periodo, poi historyCsvRows.
+ */
+export function exportFromSets(sets, plan, { today, period = DEFAULT_PERIOD, lang = 'it', timeZone } = {}) {
+  const { rows, exerciseNames, machineInfo } = exportRowsFromSets(sets);
+  const list = inPeriod(historyList(indexRows(rows), plan, exerciseNames, machineInfo), periodFrom(today, period));
+  return historyCsvRows(list, plan, { lang, timeZone });
+}
 
 /**
  * Data gg/mm/aaaa nel fuso orario del telefono (mai UTC).

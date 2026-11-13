@@ -1,6 +1,7 @@
 // Tutto quello che passa da Supabase (accesso, lettura del piano e dello storico, invio della coda).
 import { createClient } from '@supabase/supabase-js';
 import { PE_COLUMNS } from './modifica.js';
+import { fetchAllPages, EXPORT_PAGE } from './esporta.js';
 
 export const AUTH_KEY = 'gym-auth';
 export const HISTORY_DAYS = 120;
@@ -216,6 +217,27 @@ export function makeApi({ url, key, fetch: fetchImpl, storage } = {}) {
         }
       }
       return { data: rows, exerciseNames, machineInfo };
+    },
+
+    /**
+     * Export: TUTTE le serie dell'utente, lette da Supabase (non dal telefono), senza il limite dei 120 giorni.
+     * Il server dà al massimo 1000 righe per richiesta: si scarica a pagine (fetchAllPages) finché arriva tutto.
+     * Ogni serie porta con sé il suo esercizio della seduta e la sua seduta (join interni), più nome dell'esercizio e
+     * macchina dalla libreria. fromDate ('AAAA-MM-GG' o null): solo sedute da quel giorno in poi (data della seduta).
+     * Serie cancellate fuori qui; esercizi e sedute cancellati li toglie indexRows, come nello Storico.
+     * Ordine per id: stabile tra una pagina e l'altra (l'ordine del file lo decide historyCsvRows).
+     */
+    exportSets(userId, fromDate = null, pageSize = EXPORT_PAGE) {
+      return fetchAllPages((from, to) => {
+        let q = sb.from('sets').select(`id, session_exercise_id, user_id, set_number, set_type, weight_kg, reps, rir, performed_at, notes, deleted_at,
+          session_exercises!inner(id, session_id, user_id, position, exercise_id, machine_id, plan_exercise_id, deleted_at,
+            exercise:exercises(id, name),
+            machine:machines(id, code, brand, model, brand_code, name),
+            sessions!inner(id, user_id, session_date, started_at, ended_at, created_at, plan_day_id, day_name, deleted_at))`)
+          .eq('user_id', userId).is('deleted_at', null);
+        if (fromDate) q = q.gte('session_exercises.sessions.session_date', fromDate);
+        return wrap(q.order('id', { ascending: true }).range(from, to));
+      }, pageSize);
     },
   };
 }

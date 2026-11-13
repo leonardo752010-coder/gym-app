@@ -29,7 +29,7 @@ import {
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable, e1rmPoints, LB,
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
-import { historyCsvRows, toCsv, exportFileName } from './esporta.js';
+import { toCsv, exportFileName, exportFromSets, periodFrom, EXPORT_PERIODS, DEFAULT_PERIOD } from './esporta.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 import { machineKind, machineIcon } from './macchine.js';
@@ -66,6 +66,7 @@ const S = {
   page: START_PAGE,            // pagina della barra in basso: 'program' | 'track' | 'progress' (vedi pages.js)
   // Progressi: sezione (Storico / Grafico), filtri dello storico, esercizio+macchina del grafico, punto toccato. Solo in memoria.
   prog: { tab: 'history', day: '', ex: '', chart: '', pt: '' },
+  exp: { period: DEFAULT_PERIOD, busy: false, ready: null },   // export dello storico: periodo scelto, scaricamento in corso, file pronto da condividere
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -788,7 +789,7 @@ function renderProgress() {
   const T = S.T, P = S.prog;
   const idx = indexRows(S.local.list());
   const list = historyList(idx, plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
-  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>' + exportBtn(); return; }
+  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>' + exportBox(); return; }
   const tabs = '<div class="ptabs" role="tablist">' + ['history', 'chart'].map((t) => '<button role="tab" data-ptab="' + t + '" id="ptab-' + t + '" class="' + (P.tab === t ? 'on' : '') +
     '" aria-selected="' + (P.tab === t) + '">' + esc(t === 'history' ? T.histTab : T.chartTab) + '</button>').join('') + '</div>';
   $('wrap').innerHTML = tabs + (P.tab === 'chart' ? chartView(idx, list) : historyView(list));
@@ -810,7 +811,7 @@ function historyView(list) {
   const shown = filterHistory(list, { day: P.day, exercise: P.ex });
   if (!shown.length) return h + '<div class="load" id="noMatch">' + esc(T.noMatch) + '</div>';
   h += '<p class="pgNote">' + esc(T.historyNote) + '</p>';
-  return h + exportBtn() + shown.map((s) => {
+  return h + exportBox() + shown.map((s) => {
     const live = !s.ended && s.date === S.date;
     return '<section class="hses" data-ses="' + esc(s.id) + '"><div class="hsH"><b>' + esc(shortDate(s.date)) + '</b><span>' + esc(s.dayName) + '</span>' +
       '<small' + (live ? ' class="live"' : '') + '>' + esc(live ? T.inProgress : T.setCount(s.setCount)) + '</small></div>' +
@@ -820,33 +821,69 @@ function historyView(list) {
   }).join('');
 }
 
-/** Tasto "Esporta storico" (Progressi → Storico). */
-const exportBtn = () => '<button class="mini expBtn" id="exportBtn"><span>' + ICON_EXPORT + esc(S.T.exportBtn) + '</span></button>';
+/**
+ * Export (Progressi → Storico): scelta del periodo (di base Tutto) e tasto "Esporta storico".
+ * Mentre scarica il tasto è spento con la scritta di attesa. Se il telefono non lascia aprire il menu di
+ * condivisione dopo l'attesa, compare un secondo tasto per aprirlo con un tocco.
+ */
+const exportBox = () => {
+  const T = S.T, E = S.exp;
+  return '<div class="pfil one expBox">' + pfSelect('expPeriod', T.expPeriod, null, EXPORT_PERIODS.map((p) => ({ v: p, t: T.expPeriods[p] })), E.period) + '</div>' +
+    '<button class="mini expBtn" id="exportBtn"' + (E.busy ? ' disabled aria-busy="true"' : '') + '><span>' +
+    (E.busy ? esc(T.exportBusy) : ICON_EXPORT + esc(T.exportBtn)) + '</span></button>' +
+    (E.ready && !E.busy ? '<button class="mini expBtn p" id="exportShare"><span>' + ICON_EXPORT + esc(T.exportReady) + '</span></button>' : '');
+};
+
+/** Menu di condivisione su un telefono (schermo touch che sa condividere file), altrimenti scaricamento del file. */
+async function deliverCsv(blob, name) {
+  const file = typeof File === 'function' ? new File([blob], name, { type: 'text/csv' }) : null;
+  const touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  if (file && touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return 'shared'; }
+    catch (e) {
+      if (e && e.name === 'AbortError') return 'cancelled';      // menu chiuso senza scegliere: niente
+      if (e && e.name === 'NotAllowedError') return 'need-tap';  // il telefono vuole un tocco nuovo (dopo l'attesa)
+    }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; a.hidden = true;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return 'downloaded';
+}
 
 /**
- * Export di TUTTO lo storico sul telefono (stessa lista dello Storico, senza i filtri attivi) in CSV per Excel.
- * Sul telefono (schermo touch che sa condividere file) apre il menu di condivisione; altrimenti scarica il file.
- * Storico vuoto: solo il messaggio, nessun file. Non scrive niente, né sul telefono né online.
+ * Export di TUTTO lo storico (o del periodo scelto) letto da Supabase, non dal telefono, senza limite dei 120 giorni
+ * (a pagine da 1000). Nessun filtro dello Storico. Senza internet: messaggio, nessun file. Periodo vuoto: messaggio,
+ * nessun file. Non scrive niente, né sul telefono né online.
  */
 async function exportHistory() {
-  const T = S.T;
-  const list = historyList(indexRows(S.local.list()), plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
-  const rows = historyCsvRows(list, plan(), { lang: S.lang });
-  if (!rows.length) { toast(T.exportEmpty); return; }
-  const name = exportFileName(localDate());
+  const T = S.T, E = S.exp;
+  if (E.busy) return;
+  E.ready = null;
+  if (!api || !navigator.onLine) { render(); toast(T.exportNeedNet, true); return; }
+  const today = localDate(), period = E.period;
+  E.busy = true; render();
+  let r;
+  try { r = await api.exportSets(S.user.id, periodFrom(today, period)); } catch (e) { r = { error: { code: '', message: String(e && e.message || e), offline: true } }; }
+  E.busy = false;
+  if (r.error) { render(); toast(isOffline(r.error) || !navigator.onLine ? T.exportNeedNet : T.exportErr + r.error.message, true); return; }
+  const rows = exportFromSets(r.data, plan(), { today, period, lang: S.lang });
+  if (!rows.length) { render(); toast(period === 'all' ? T.exportEmpty : T.exportNone); return; }
+  const name = exportFileName(today, period);
   try {
     const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
-    const file = typeof File === 'function' ? new File([blob], name, { type: 'text/csv' }) : null;
-    const touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-    if (file && touch && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: name }); return; }
-      catch (e) { if (e && e.name === 'AbortError') return; }   // menu chiuso senza scegliere: niente; altri errori → si scarica
-    }
-    const url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = name; a.hidden = true;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (e) { toast(T.exportErr + (e && e.message || e), true); }
+    render();
+    if ((await deliverCsv(blob, name)) === 'need-tap') { E.ready = { blob, name }; render(); }
+  } catch (e) { render(); toast(T.exportErr + (e && e.message || e), true); }
+}
+
+/** Secondo tocco: menu di condivisione per il file già pronto (o scaricamento). */
+async function shareReady() {
+  const R = S.exp.ready; if (!R) return;
+  S.exp.ready = null; render();
+  try { if ((await deliverCsv(R.blob, R.name)) === 'need-tap') { S.exp.ready = R; render(); } }
+  catch (e) { toast(S.T.exportErr + (e && e.message || e), true); }
 }
 
 /** e1RM nell'unità mostrata, con un decimale (80 kg × 8 @2 → 106,7). */
@@ -1217,6 +1254,7 @@ document.addEventListener('click', (ev) => {
   if (b.dataset.ptab) { if (S.prog.tab !== b.dataset.ptab) { S.prog.tab = b.dataset.ptab; render(); } return; }
   if (b.dataset.pt) { S.prog.pt = b.dataset.pt; render(); return; }
   if (b.id === 'exportBtn') { exportHistory(); return; }
+  if (b.id === 'exportShare') { shareReady(); return; }
   if (b.id === 'dayBtn') { openDays(); return; }
   if (b.id === 'hBack') { if (setPage('program')) { render(); scrollTo(0, 0); } return; }   // freccia indietro: a Programma (come il tasto in basso)
   if (b.id === 'moreBtn') { openMore(); return; }
@@ -1264,6 +1302,7 @@ document.addEventListener('change', (ev) => {
   if (id === 'fDay') S.prog.day = ev.target.value;
   else if (id === 'fEx') S.prog.ex = ev.target.value;
   else if (id === 'cEx') { S.prog.chart = ev.target.value; S.prog.pt = ''; }
+  else if (id === 'expPeriod') { S.exp.period = ev.target.value; S.exp.ready = null; }
   else return;
   render();
 });

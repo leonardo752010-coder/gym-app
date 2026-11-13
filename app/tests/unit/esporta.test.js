@@ -3,10 +3,12 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { indexRows } from '../../src/logic.js';
+import { indexRows, addDays } from '../../src/logic.js';
 import { historyList } from '../../src/pages.js';
 import { LANGS } from '../../src/i18n.js';
-import { CSV_HEADER, historyCsvRows, toCsv, csvDate, csvNumber, csvField, csvSafeText, exportFileName } from '../../src/esporta.js';
+import { makeApi } from '../../src/api.js';
+import { CSV_HEADER, historyCsvRows, toCsv, csvDate, csvNumber, csvField, csvSafeText, exportFileName,
+  EXPORT_PERIODS, DEFAULT_PERIOD, periodFrom, fetchAllPages, exportFromSets } from '../../src/esporta.js';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(appDir, f), 'utf8');
@@ -137,23 +139,201 @@ describe('CSV dello storico', () => {
     expect(JSON.stringify(list)).toBe(prima);
   });
 
-  it('nome del file: storico-allenamenti-AAAA-MM-GG.csv', () => {
-    expect(exportFileName('2026-11-13')).toBe('storico-allenamenti-2026-11-13.csv');
+  it('nome del file: storico-allenamenti-tutto-AAAA-MM-GG.csv, oppure con i giorni (30gg…)', () => {
+    expect(exportFileName('2026-11-13')).toBe('storico-allenamenti-tutto-2026-11-13.csv');
+    expect(exportFileName('2026-11-13', 'all')).toBe('storico-allenamenti-tutto-2026-11-13.csv');
+    expect(exportFileName('2026-11-13', '14')).toBe('storico-allenamenti-14gg-2026-11-13.csv');
+    expect(exportFileName('2026-11-13', '30')).toBe('storico-allenamenti-30gg-2026-11-13.csv');
+    expect(exportFileName('2026-11-13', '90')).toBe('storico-allenamenti-90gg-2026-11-13.csv');
+  });
+});
+
+// ---------- serie come arrivano da Supabase (api.exportSets): ognuna con il suo esercizio della seduta e la sua seduta ----------
+const TODAY = '2026-11-13';
+const pad = (n) => String(n).padStart(5, '0');
+/** n serie finte, 10 per seduta, una seduta al giorno andando indietro da oggi (quindi anche oltre i 120 giorni). */
+function fakeSets(n, { perSession = 10, today = TODAY } = {}) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const day = Math.floor(i / perSession);
+    const sid = 'ses-' + pad(day), seid = 'se-' + pad(day);
+    out.push({
+      id: 'set-' + pad(i), session_exercise_id: seid, user_id: 'u1', set_number: (i % perSession) + 1, set_type: 'normal',
+      weight_kg: 50 + (i % 7) * 2.5, reps: 8, rir: 1, performed_at: null, notes: null, deleted_at: null,
+      session_exercises: {
+        id: seid, session_id: sid, user_id: 'u1', position: 1, exercise_id: 'ex1', machine_id: null, plan_exercise_id: null, deleted_at: null,
+        exercise: { id: 'ex1', name: 'Esercizio finto' }, machine: null,
+        sessions: { id: sid, user_id: 'u1', session_date: addDays(today, -day), started_at: null, ended_at: null, created_at: null, plan_day_id: null, day_name: 'Workout finto', deleted_at: null },
+      },
+    });
+  }
+  return out;
+}
+/** Una seduta finta con una serie, n giorni fa. */
+const oneAt = (daysAgo, id = 'd' + daysAgo) => fakeSets(1, { today: addDays(TODAY, -daysAgo) }).map((s) => ({
+  ...s, id: 'set-' + id, session_exercise_id: 'se-' + id,
+  session_exercises: { ...s.session_exercises, id: 'se-' + id, session_id: 'ses-' + id, sessions: { ...s.session_exercises.sessions, id: 'ses-' + id } },
+}))[0];
+
+/** Server finto di Supabase: dà al massimo `cap` righe per richiesta, come il vero (1000), e applica i filtri dell'export. */
+function fakeServer(all, { cap = 1000, failAt = -1 } = {}) {
+  const calls = [];
+  const fetchImpl = async (input) => {
+    const u = new URL(typeof input === 'string' ? input : input.url);
+    if (!u.pathname.endsWith('/rest/v1/sets')) return new Response('{}', { status: 404 });
+    const q = u.searchParams;
+    calls.push({ offset: Number(q.get('offset') || 0), limit: Number(q.get('limit') || 0), from: q.get('session_exercises.sessions.session_date'), user: q.get('user_id'), deleted: q.get('deleted_at'), order: q.get('order') });
+    if (calls.length - 1 === failAt) return new Response(JSON.stringify({ code: 'XX000', message: 'errore finto' }), { status: 500, headers: { 'content-type': 'application/json' } });
+    const from = (q.get('session_exercises.sessions.session_date') || '').replace(/^gte\./, '');
+    let rows = all.filter((s) => s.user_id === 'u1' && !s.deleted_at && (!from || s.session_exercises.sessions.session_date >= from));
+    rows = rows.sort((a, b) => a.id.localeCompare(b.id));
+    const off = Number(q.get('offset') || 0), lim = Math.min(Number(q.get('limit') || cap), cap);
+    return new Response(JSON.stringify(rows.slice(off, off + lim)), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  return { fetchImpl, calls };
+}
+const mem = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } }; };
+const apiWith = (fetchImpl) => makeApi({ url: 'https://example.invalid', key: 'sb_publishable_test', fetch: fetchImpl, storage: mem() });
+
+describe('Export da Supabase: tutto, a pagine', () => {
+  it('più di 1000 serie (2345): con il server che ne dà 1000 per volta arrivano tutte, e tutte nel CSV', async () => {
+    const all = fakeSets(2345);
+    const { fetchImpl, calls } = fakeServer(all);
+    const r = await apiWith(fetchImpl).exportSets('u1', null);
+    expect(r.error).toBeUndefined();
+    expect(r.data).toHaveLength(2345);
+    expect(new Set(r.data.map((s) => s.id)).size).toBe(2345);
+    expect(calls.map((c) => c.offset)).toEqual([0, 1000, 2000, 2345]);   // la pagina dopo l'ultima serie arriva vuota: fine
+    for (const c of calls) {
+      expect(c.limit).toBeLessThanOrEqual(1000);
+      expect(c.user).toBe('eq.u1');
+      expect(c.deleted).toBe('is.null');
+      expect(c.order).toBe('id.asc');
+      expect(c.from).toBeNull();   // Tutto: nessun limite di data (niente 120 giorni)
+    }
+    const rows = exportFromSets(r.data, null, { today: TODAY, period: 'all' });
+    expect(rows).toHaveLength(2345);
+    expect(rows[0][0]).toBe(csvDate(addDays(TODAY, -234)));   // la seduta più vecchia, 234 giorni fa (oltre i 120)
+    expect(rows[rows.length - 1][0]).toBe('13/11/2026');
+  });
+
+  it('se il server ne dà meno di quelle chieste (500 per volta) arrivano lo stesso tutte', async () => {
+    const all = fakeSets(1234);
+    const { fetchImpl, calls } = fakeServer(all, { cap: 500 });
+    const r = await apiWith(fetchImpl).exportSets('u1', null);
+    expect(r.data).toHaveLength(1234);
+    expect(calls.map((c) => c.offset)).toEqual([0, 500, 1000, 1234]);
+  });
+
+  it('errore a metà: nessun dato a metà (niente file incompleto)', async () => {
+    const { fetchImpl } = fakeServer(fakeSets(2345), { failAt: 1 });
+    const r = await apiWith(fetchImpl).exportSets('u1', null);
+    expect(r.data).toBeUndefined();
+    expect(r.error).toBeTruthy();
+  });
+
+  it('senza rete: errore "offline" (la pagina mostra "Serve internet…", nessun file)', async () => {
+    const r = await apiWith(async () => { throw new TypeError('Failed to fetch'); }).exportSets('u1', null);
+    expect(r.data).toBeUndefined();
+    expect(r.error.offline).toBe(true);
+  }, 20000);   // supabase-js riprova 3 volte (1 + 2 + 4 secondi) prima di dire che la rete non c'è
+
+  it('periodo: il filtro sulla data della seduta arriva al server', async () => {
+    const { fetchImpl, calls } = fakeServer(fakeSets(300));
+    const r = await apiWith(fetchImpl).exportSets('u1', periodFrom(TODAY, '14'));
+    expect(calls[0].from).toBe('gte.2026-10-31');
+    expect(r.data).toHaveLength(140);   // 14 sedute (oggi e i 13 giorni prima) × 10 serie
+  });
+
+  it('fetchAllPages: pagine fino a quella vuota; freno di sicurezza', async () => {
+    const seen = [];
+    const r = await fetchAllPages(async (a, b) => { seen.push([a, b]); return { data: a < 25 ? Array.from({ length: Math.min(10, 25 - a) }, (_, i) => a + i) : [] }; }, 10);
+    expect(r.data).toEqual(Array.from({ length: 25 }, (_, i) => i));
+    expect(seen).toEqual([[0, 9], [10, 19], [20, 29], [25, 34]]);
+    const loop = await fetchAllPages(async () => ({ data: [1] }), 1, 5);
+    expect(loop.error.code).toBe('too-many-pages');
+  });
+
+  it('serie scaricate → righe di sempre: sedute ed esercizi cancellati fuori, come nello Storico', () => {
+    const del = oneAt(3, 'cancellata');
+    del.session_exercises.sessions.deleted_at = '2026-11-10T10:00:00Z';
+    const rows = exportFromSets([oneAt(1), del, oneAt(2)], null, { today: TODAY });
+    expect(rows.map((r) => r[0])).toEqual(['11/11/2026', '12/11/2026']);
+    expect(rows[0][3]).toBe('Esercizio finto');
+    expect(rows[0][1]).toBe('Workout finto');
+    expect(rows[0][2]).toBe('');   // niente giorno del piano
+  });
+});
+
+describe('Periodo da esportare', () => {
+  const at = (...days) => days.map((d) => oneAt(d));
+  const dates = (sets, period) => exportFromSets(sets, null, { today: TODAY, period }).map((r) => r[0]);
+
+  it('di base: Tutto; scelte 14 / 30 / 90 / Tutto', () => {
+    expect(EXPORT_PERIODS).toEqual(['14', '30', '90', 'all']);
+    expect(DEFAULT_PERIOD).toBe('all');
+    for (const l of ['it', 'en']) for (const p of EXPORT_PERIODS) expect(LANGS[l].expPeriods[p]).toBeTruthy();
+    expect(LANGS.it.expPeriods.all).toBe('Tutto');
+  });
+
+  it('primo giorno del periodo, oggi incluso (anche a cavallo di mese e anno)', () => {
+    expect(periodFrom(TODAY, '14')).toBe('2026-10-31');
+    expect(periodFrom(TODAY, '30')).toBe('2026-10-15');
+    expect(periodFrom(TODAY, '90')).toBe('2026-08-16');
+    expect(periodFrom(TODAY, 'all')).toBeNull();
+    expect(periodFrom('2027-01-05', '14')).toBe('2026-12-23');
+    expect(periodFrom('2028-03-01', '14')).toBe('2028-02-17');   // anno bisestile
+  });
+
+  it('14 giorni: oggi e 13 giorni fa dentro; esattamente 14 giorni fa fuori', () => {
+    expect(dates(at(0, 13, 14, 15), '14')).toEqual(['31/10/2026', '13/11/2026']);
+  });
+
+  it('30 e 90 giorni: stesso limite', () => {
+    expect(dates(at(0, 29, 30), '30')).toEqual(['15/10/2026', '13/11/2026']);
+    expect(dates(at(0, 89, 90), '90')).toEqual(['16/08/2026', '13/11/2026']);
+  });
+
+  it('Tutto: anche le sedute vecchissime (oltre 120 giorni)', () => {
+    expect(dates(at(0, 121, 400), 'all')).toEqual([csvDate(addDays(TODAY, -400)), csvDate(addDays(TODAY, -121)), '13/11/2026']);
+  });
+
+  it('periodo senza sedute: nessuna riga (la pagina dice "Nessun allenamento in questo periodo", nessun file)', () => {
+    expect(exportFromSets(at(20, 40), null, { today: TODAY, period: '14' })).toEqual([]);
+    expect(exportFromSets([], null, { today: TODAY, period: 'all' })).toEqual([]);
+    expect(LANGS.it.exportNone).toBe('Nessun allenamento in questo periodo');
   });
 });
 
 describe('Tasto "Esporta storico"', () => {
+  const main = read('src/main.js');
+  const fn = (name) => (main.match(new RegExp('async function ' + name + '\\(\\)[\\s\\S]*?\\n}\\n')) || [''])[0];
+
   it('testi in italiano e in inglese', () => {
     expect(LANGS.it.exportBtn).toBe('Esporta storico');
     expect(LANGS.it.exportEmpty).toBe('Non ci sono ancora allenamenti da esportare');
-    expect(LANGS.en.exportBtn).toBeTruthy();
-    expect(LANGS.en.exportEmpty).toBeTruthy();
+    expect(LANGS.it.exportNeedNet).toBe('Serve internet per esportare lo storico completo');
+    for (const k of ['exportBtn', 'exportEmpty', 'exportNeedNet', 'exportNone', 'exportBusy', 'exportReady', 'expPeriod']) {
+      expect(LANGS.it[k]).toBeTruthy();
+      expect(LANGS.en[k]).toBeTruthy();
+    }
   });
 
-  it('Progressi → Storico ha il tasto e usa lo storico intero (non quello filtrato)', () => {
-    const main = read('src/main.js');
+  it('Progressi → Storico ha periodo e tasto; l\'export legge da Supabase, non dal telefono né dai filtri', () => {
     expect(main).toContain('id="exportBtn"');
-    expect(main).toMatch(/historyCsvRows\(\s*list\s*,/);
-    expect(main).not.toMatch(/historyCsvRows\(\s*shown/);
+    expect(main).toContain("pfSelect('expPeriod'");
+    const ex = fn('exportHistory');
+    expect(ex).toContain('api.exportSets(');
+    expect(ex).toContain('exportFromSets(');
+    expect(ex).not.toContain('S.local');
+    expect(ex).not.toContain('S.prog');
+    expect(ex).toMatch(/navigator\.onLine/);
+    expect(ex).toContain('T.exportNeedNet');
+    expect(ex).toContain('T.exportNone');
+  });
+
+  it('mentre scarica: tasto spento con la scritta di attesa', () => {
+    expect(main).toMatch(/E\.busy \? ' disabled aria-busy="true"'/);
+    expect(main).toContain('T.exportBusy');
   });
 });
