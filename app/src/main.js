@@ -30,6 +30,7 @@ import {
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
 import { buildXlsx, XLSX_TYPE, exportFileName, exportFromSets, periodFrom, EXPORT_PERIODS, DEFAULT_PERIOD } from './esporta.js';
+import { deliverFile, errorLabel } from './consegna.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 import { machineKind, machineIcon } from './macchine.js';
@@ -66,7 +67,7 @@ const S = {
   page: START_PAGE,            // pagina della barra in basso: 'program' | 'track' | 'progress' (vedi pages.js)
   // Progressi: sezione (Storico / Grafico), filtri dello storico, esercizio+macchina del grafico, punto toccato. Solo in memoria.
   prog: { tab: 'history', day: '', ex: '', chart: '', pt: '' },
-  exp: { period: DEFAULT_PERIOD, busy: false, ready: null },   // export dello storico: periodo scelto, scaricamento in corso, file pronto da condividere
+  exp: { period: DEFAULT_PERIOD, busy: false, ready: null, noShare: ls.get('noShare') === '1' },   // export dello storico: periodo scelto, scaricamento in corso, file pronto da condividere
 };
 S.T = LANGS[S.lang];
 document.documentElement.lang = S.lang;
@@ -837,22 +838,29 @@ const exportBox = () => {
     (E.ready && !E.busy ? '<button class="mini expBtn p" id="exportShare"><span>' + ICON_EXPORT + esc(T.exportReady) + '</span></button>' : '') + '</section>';
 };
 
-/** Menu di condivisione su un telefono (schermo touch che sa condividere file), altrimenti scaricamento del file. */
-async function deliverFile(blob, name) {
-  const file = typeof File === 'function' ? new File([blob], name, { type: XLSX_TYPE }) : null;
-  const touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  if (file && touch && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return 'shared'; }
-    catch (e) {
-      if (e && e.name === 'AbortError') return 'cancelled';      // menu chiuso senza scegliere: niente
-      if (e && e.name === 'NotAllowedError') return 'need-tap';  // il telefono vuole un tocco nuovo (dopo l'attesa)
-    }
+/**
+ * Consegna del file (logica in consegna.js): menu di condivisione solo dove funziona davvero, altrimenti download.
+ * fresh = tocco sul tasto viola. Mai in silenzio: download avviato → avviso; download non riuscito → nome dell'errore.
+ * Se la condivisione fallisce una volta su questo telefono, le volte dopo si scarica subito (ls 'noShare').
+ */
+async function deliver(blob, name, fresh) {
+  const T = S.T, E = S.exp;
+  const env = {
+    nav: navigator, ua: navigator.userAgent || '', fresh, noShare: E.noShare,
+    touch: !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
+    doc: document, url: URL, setTimeout: (f, ms) => setTimeout(f, ms),
+    makeFile: (b, n) => (typeof File === 'function' ? new File([b], n, { type: XLSX_TYPE }) : null),
+  };
+  let r;
+  try { r = await deliverFile(blob, name, env); }
+  catch (e) {
+    log('export download', errorLabel(e.downloadError || e), e.shareError ? errorLabel(e.shareError) : '');
+    toast(T.downloadErr(errorLabel(e.downloadError || e)), true);
+    return;
   }
-  const url = URL.createObjectURL(blob), a = document.createElement('a');
-  a.href = url; a.download = name; a.hidden = true;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-  return 'downloaded';
+  if (r.shareError) { log('export share', errorLabel(r.shareError)); E.noShare = true; ls.set('noShare', '1'); }
+  if (r.result === 'need-tap') { E.ready = { blob, name }; render(); return; }
+  if (r.result === 'downloaded') toast(T.downloadStarted(name));
 }
 
 /**
@@ -877,16 +885,14 @@ async function exportHistory() {
   try { blob = await buildXlsx(rows); }   // tasto ancora spento: qui si carica la libreria e si scrive il file
   catch (e) { E.busy = false; render(); toast(T.exportErr + (e && e.message || e), true); return; }
   E.busy = false; render();
-  try { if ((await deliverFile(blob, name)) === 'need-tap') { E.ready = { blob, name }; render(); } }
-  catch (e) { toast(T.exportErr + (e && e.message || e), true); }
+  await deliver(blob, name, false);
 }
 
 /** Secondo tocco: menu di condivisione per il file già pronto (o scaricamento). */
 async function shareReady() {
   const R = S.exp.ready; if (!R) return;
   S.exp.ready = null; render();
-  try { if ((await deliverFile(R.blob, R.name)) === 'need-tap') { S.exp.ready = R; render(); } }
-  catch (e) { toast(S.T.exportErr + (e && e.message || e), true); }
+  await deliver(R.blob, R.name, true);   // tocco nuovo: se la condivisione non va, si scarica (mai un altro tasto viola)
 }
 
 /** e1RM nell'unità mostrata, con un decimale (80 kg × 8 @2 → 106,7). */
