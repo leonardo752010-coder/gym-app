@@ -1,18 +1,22 @@
-// Export dello storico in CSV (Excel in italiano). Solo logica pura: nessun DOM, nessuna rete, dati finti.
+// Export dello storico in un file Excel (.xlsx). Solo dati finti, nessun DOM, nessuna rete vera:
+// Supabase è un server finto; il file .xlsx viene scritto con la libreria vera e poi riletto (zip + XML).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unzipSync, strFromU8 } from 'fflate';
 import { indexRows, addDays } from '../../src/logic.js';
 import { historyList } from '../../src/pages.js';
 import { LANGS } from '../../src/i18n.js';
 import { makeApi } from '../../src/api.js';
-import { CSV_HEADER, historyCsvRows, toCsv, csvDate, csvNumber, csvField, csvSafeText, exportFileName,
-  EXPORT_PERIODS, DEFAULT_PERIOD, periodFrom, fetchAllPages, exportFromSets } from '../../src/esporta.js';
+import { XLSX_HEADER, XLSX_TYPE, XLSX_DATE_FORMAT, ROW_KEYS, historyRows, dayKeyIn, excelDate, cellNumber, columnWidths, xlsxSheetData,
+  buildXlsx, exportFileName, EXPORT_PERIODS, DEFAULT_PERIOD, periodFrom, fetchAllPages, exportFromSets } from '../../src/esporta.js';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (f) => fs.readFileSync(path.join(appDir, f), 'utf8');
+const key = (d) => (d ? d.toISOString().slice(0, 10) : '');
 
+// ---------- righe come quelle sul telefono ----------
 const S = (id, date, extra = {}) => ({ table: 'sessions', data: { id, session_date: date, deleted_at: null, ended_at: null, started_at: date + 'T09:00:00Z', ...extra } });
 const SE = (id, sid, ex, mac, extra = {}) => ({ table: 'session_exercises', data: { id, session_id: sid, exercise_id: ex, machine_id: mac, plan_exercise_id: null, position: 1, deleted_at: null, ...extra } });
 const ST = (id, se, n, kg, reps, rir, extra = {}) => ({ table: 'sets', data: { id, session_exercise_id: se, set_number: n, weight_kg: kg, reps, rir, set_type: 'normal', performed_at: null, notes: null, deleted_at: null, ...extra } });
@@ -24,127 +28,224 @@ const PLAN = { id: 'p', name: 'Piano', days: [
     { id: 'pe2', exercise_id: 'row', exercise: { name: { it: 'Rematore', en: 'Row' } }, machine: null, alt_machine: null, sets: 3 },
   ] },
 ] };
-
-const rows = [
+const NOTE_LUNGA = 'spalla; un po\' "rigida"\nda controllare <bene> & poi';
+const local = [
   // seduta nuova, Upper A (giorno del piano); esercizi in ordine 2 → 1 nei dati, serie fuori ordine
   S('s2', '2026-11-05', { plan_day_id: 'dA', day_name: 'Upper A' }),
-  SE('b2', 's2', 'row', null, { position: 2 }), ST('y3', 'b2', 1, 60, 10, 2),
-  SE('b1', 's2', 'bench', 'm1', { position: 1 }), ST('y2', 'b1', 2, 82.5, 8, 1.5, { notes: 'spalla; un po\' "rigida"\nda controllare' }), ST('y1', 'b1', 1, 80, 9, 2),
+  SE('b2', 's2', 'row', null, { position: 2 }), ST('y3', 'b2', 1, 60, 10, 2, { notes: '@menzione' }),
+  SE('b1', 's2', 'bench', 'm1', { position: 1 }), ST('y2', 'b1', 2, 82.5, 8, 1.5, { notes: NOTE_LUNGA }), ST('y1', 'b1', 1, 80, 9, 2),
   // seduta vecchia importata: niente giorno del piano, stesso nome con maiuscole/spazi diversi
   S('s1', '2026-10-31', { day_name: ' upper a ' }),
   SE('a1', 's1', 'bench', 'm1'), ST('x1', 'a1', 1, 77.25, 10, null, { notes: '=SOMMA(A1:A2)' }),
   // serie cancellata: fuori
   ST('x9', 'a1', 2, 999, 1, 0, { deleted_at: '2026-10-31T10:00:00Z' }),
 ];
-const list = historyList(indexRows(rows), PLAN, { bench: { it: 'Panca', en: 'Bench' }, row: '-Rematore' }, { m1: M1 });
+const list = historyList(indexRows(local), PLAN, { bench: { it: 'Panca', en: 'Bench' }, row: '-Rematore' }, { m1: M1 });
 
-describe('CSV dello storico', () => {
-  const data = historyCsvRows(list, PLAN, { lang: 'it' });
-  const csv = toCsv(data);
+// ---------- lettura di un .xlsx: zip + XML del foglio, testi condivisi e stili ----------
+const unxml = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/&amp;/g, '&');
+async function readXlsx(blob) {
+  const zip = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+  const sheet = strFromU8(zip['xl/worksheets/sheet1.xml']);
+  const shared = zip['xl/sharedStrings.xml'] ? [...strFromU8(zip['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => unxml([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((t) => t[1]).join(''))) : [];
+  const styles = strFromU8(zip['xl/styles.xml']);
+  const numFmts = Object.fromEntries([...styles.matchAll(/<numFmt numFmtId="(\d+)" formatCode="([^"]*)"/g)].map((m) => [m[1], unxml(m[2])]));
+  const fonts = [...(styles.match(/<fonts[^>]*>([\s\S]*?)<\/fonts>/) || ['', ''])[1].matchAll(/<font>([\s\S]*?)<\/font>/g)].map((m) => /<b\/>/.test(m[1]));
+  const xfs = [...(styles.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/) || ['', ''])[1].matchAll(/<xf([^>]*)>([\s\S]*?)<\/xf>/g)].map((m) => ({
+    numFmt: (m[1].match(/numFmtId="(\d+)"/) || [])[1] || null, font: Number((m[1].match(/fontId="(\d+)"/) || [])[1] || 0), wrap: /wrapText="1"/.test(m[2]) }));
+  const cells = new Map();
+  for (const m of sheet.matchAll(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+    const attrs = m[2], inner = m[3] || '';
+    const t = (attrs.match(/ t="([^"]+)"/) || [])[1] || 'n';
+    const s = Number((attrs.match(/ s="(\d+)"/) || [])[1] || 0);
+    const v = (inner.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+    const isText = (inner.match(/<is>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>/) || [])[1];
+    const style = xfs[s] || {};
+    cells.set(m[1], {
+      t, formula: /<f[ >]/.test(inner), style, bold: !!fonts[style.font || 0], format: style.numFmt ? numFmts[style.numFmt] || 'builtin:' + style.numFmt : null,
+      value: t === 's' ? shared[Number(v)] : t === 'inlineStr' ? unxml(isText || '') : t === 'str' ? unxml(v || '') : v == null ? null : Number(v),
+    });
+  }
+  const rowsCount = (sheet.match(/<row /g) || []).length;
+  const frozen = /<pane [^>]*ySplit="1"[^>]*state="frozen"/.test(sheet);
+  const widths = [...sheet.matchAll(/<col min="(\d+)" max="(\d+)" width="([\d.]+)"/g)].map((m) => Number(m[3]));
+  return { cells, rowsCount, frozen, widths, sheet, files: Object.keys(zip) };
+}
+const COL = 'ABCDEFGHIJ';
+const excelSerial = (y, m, d) => (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000;
+
+describe('Righe dell\'export (stessi dati, stesso ordine)', () => {
+  const data = historyRows(list, PLAN, { lang: 'it' });
 
   it('una riga per serie, dalla seduta più vecchia, poi ordine degli esercizi, poi numero della serie', () => {
-    expect(data.map((r) => [r[0], r[3], r[5]])).toEqual([
-      ['31/10/2026', 'Panca', '1'],
-      ['05/11/2026', 'Panca', '1'],
-      ['05/11/2026', 'Panca', '2'],
-      ['05/11/2026', "'-Rematore", '1'],
+    expect(data.map((r) => [key(r.date), r.exercise, r.set])).toEqual([
+      ['2026-10-31', 'Panca', 1],
+      ['2026-11-05', 'Panca', 1],
+      ['2026-11-05', 'Panca', 2],
+      ['2026-11-05', '-Rematore', 1],
     ]);
   });
 
-  it('colonne nell\'ordine giusto, intestazione esatta', () => {
-    expect(CSV_HEADER).toEqual(['Data', 'Workout', 'Giorno piano', 'Esercizio', 'Macchina', 'Serie', 'Peso (kg)', 'Ripetizioni', 'RIR', 'Note']);
-    expect(csv.split('\r\n')[0]).toBe('﻿Data;Workout;Giorno piano;Esercizio;Macchina;Serie;Peso (kg);Ripetizioni;RIR;Note');
-    for (const r of data) expect(r).toHaveLength(10);
+  it('colonne nello stesso ordine di prima', () => {
+    expect(XLSX_HEADER).toEqual(['Data', 'Workout', 'Giorno piano', 'Esercizio', 'Macchina', 'Serie', 'Peso (kg)', 'Ripetizioni', 'RIR', 'Note']);
+    expect(ROW_KEYS).toHaveLength(XLSX_HEADER.length);
+    for (const r of data) expect(Object.keys(r)).toEqual(ROW_KEYS);
   });
 
-  it('decimali con la virgola (82,5; 77,25; RIR 1,5), niente punto; vuoto se manca', () => {
-    expect(data[2][6]).toBe('82,5');
-    expect(data[2][8]).toBe('1,5');
-    expect(data[0][6]).toBe('77,25');
-    expect(data[0][8]).toBe('');
-    expect(csvNumber(36.287390)).toBe('36,29');
-    expect(csvNumber(100)).toBe('100');
-    expect(csvNumber(null)).toBe('');
-    expect(csvNumber('')).toBe('');
-    expect(csvNumber(1234.5)).toBe('1234,5');
+  it('numeri veri (Serie, Peso, Ripetizioni, RIR), al massimo 2 decimali; RIR mancante = vuoto', () => {
+    expect(data[2]).toMatchObject({ set: 2, weight: 82.5, reps: 8, rir: 1.5 });
+    expect(data[0]).toMatchObject({ weight: 77.25, rir: null });
+    expect(cellNumber(36.28739)).toBe(36.29);
+    expect(cellNumber('')).toBeNull();
+    expect(cellNumber(null)).toBeNull();
+    expect(cellNumber(-2.5)).toBe(-2.5);
   });
 
-  it('; virgolette e a capo nelle note: campo tra virgolette, " raddoppiate', () => {
-    expect(csvField('a;b')).toBe('"a;b"');
-    expect(csvField('di "più"')).toBe('"di ""più"""');
-    expect(csvField('riga1\nriga2')).toBe('"riga1\nriga2"');
-    expect(csvField('normale')).toBe('normale');
-    expect(csv).toContain(';"spalla; un po\' ""rigida""\nda controllare"\r\n');
+  it('testi così come sono: nessun apostrofo davanti a = + - @', () => {
+    expect(data[0].notes).toBe('=SOMMA(A1:A2)');
+    expect(data[3].exercise).toBe('-Rematore');
+    expect(data[3].notes).toBe('@menzione');
+    expect(data[2].notes).toBe(NOTE_LUNGA);
   });
 
-  it('BOM UTF-8 all\'inizio, righe con CRLF, separatore ;', () => {
-    expect(csv.charCodeAt(0)).toBe(0xfeff);
-    expect([...new TextEncoder().encode(csv).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-    expect(csv.endsWith('\r\n')).toBe(true);
-    // ogni a capo fuori dalle virgolette è CRLF: tolte le note tra virgolette non resta nessun \n da solo
-    const fuori = csv.replace(/"(?:[^"]|"")*"/g, '');
-    expect(fuori).not.toMatch(/[^\r]\n/);
-    expect(fuori.split('\r\n').filter(Boolean).every((l) => l.split(';').length === 10)).toBe(true);
-  });
-
-  it('Workout come nel filtro dello Storico (un nome per tipo); Giorno piano vuoto senza giorno del piano', () => {
-    expect(data[0][1]).toBe('Upper A');   // ' upper a ' della seduta vecchia = tipo "Upper A" del piano
-    expect(data[0][2]).toBe('');          // seduta vecchia importata: nessun giorno del piano
-    expect(data[1][1]).toBe('Upper A');
-    expect(data[1][2]).toBe('Upper A');
+  it('Workout come nel filtro dello Storico; Giorno piano vuoto senza giorno del piano', () => {
+    expect(data[0]).toMatchObject({ workout: 'Upper A', planDay: '' });
+    expect(data[1]).toMatchObject({ workout: 'Upper A', planDay: 'Upper A' });
   });
 
   it('macchina con marca · modello · codice; vuota senza macchina', () => {
-    expect(data[0][4]).toBe('Marca Finta · Chest Press · CP1');
-    expect(data[3][4]).toBe('');
-  });
-
-  it('apostrofo davanti a = + - @ nei testi, mai nei numeri', () => {
-    expect(data[0][9]).toBe("'=SOMMA(A1:A2)");
-    expect(data[3][3]).toBe("'-Rematore");
-    for (const c of ['=1+1', '+39', '-x', '@a']) expect(csvSafeText(c)).toBe("'" + c);
-    expect(csvSafeText('Panca')).toBe('Panca');
-    expect(csvSafeText(null)).toBe('');
-    expect(csvNumber(-2.5)).toBe('-2,5');   // numero negativo: nessun apostrofo
-    const lista = historyList(indexRows([S('n', '2026-11-01'), SE('ne', 'n', 'x', null), ST('ns', 'ne', 1, -5, 3, 0)]), null, { x: '@Esercizio' });
-    const r = historyCsvRows(lista, null)[0];
-    expect(r[3]).toBe("'@Esercizio");
-    expect(r[6]).toBe('-5');
+    expect(data[0].machine).toBe('Marca Finta · Chest Press · CP1');
+    expect(data[3].machine).toBe('');
   });
 
   it('data vicino alla mezzanotte: giorno del telefono, non UTC', () => {
-    // session_date è già il giorno del telefono: resta quello in qualsiasi fuso (new Date('2026-11-13') a Honolulu sarebbe il 12)
-    for (const tz of ['Pacific/Auckland', 'UTC', 'Pacific/Honolulu']) expect(csvDate('2026-11-13', tz)).toBe('13/11/2026');
-    // orario completo: 11:30 UTC del 13/11 = 00:30 del 14/11 in Nuova Zelanda (UTC+13)
-    expect(csvDate('2026-11-13T11:30:00Z', 'Pacific/Auckland')).toBe('14/11/2026');
-    expect(csvDate('2026-11-13T11:30:00Z', 'UTC')).toBe('13/11/2026');
-    // 23:55 UTC del 12/11 = 12:55 del 13/11 in NZ
-    expect(csvDate('2026-11-12T23:55:00Z', 'Pacific/Auckland')).toBe('13/11/2026');
+    for (const tz of ['Pacific/Auckland', 'UTC', 'Pacific/Honolulu']) expect(dayKeyIn('2026-11-13', tz)).toBe('2026-11-13');
+    expect(dayKeyIn('2026-11-13T11:30:00Z', 'Pacific/Auckland')).toBe('2026-11-14');   // 00:30 del 14 in NZ
+    expect(dayKeyIn('2026-11-13T11:30:00Z', 'UTC')).toBe('2026-11-13');
+    expect(dayKeyIn('2026-11-12T23:55:00Z', 'Pacific/Auckland')).toBe('2026-11-13');
+    expect(dayKeyIn('', 'UTC')).toBe('');
     // seduta iniziata alle 23:50 in NZ (10:50 UTC) con session_date del telefono: nel file il giorno del telefono
-    const notte = historyList(indexRows([S('m', '2026-11-13', { started_at: '2026-11-13T10:50:00Z' }), SE('me', 'm', 'x', null), ST('ms', 'me', 1, 50, 5, 1, { performed_at: '2026-11-13T11:05:00Z' })]), null, { x: 'Curl' });
-    expect(historyCsvRows(notte, null, { timeZone: 'UTC' })[0][0]).toBe('13/11/2026');
-    expect(historyCsvRows(notte, null, { timeZone: 'Pacific/Auckland' })[0][0]).toBe('13/11/2026');
-    expect(csvDate('', 'UTC')).toBe('');
+    const notte = historyList(indexRows([S('m', '2026-11-13', { started_at: '2026-11-13T10:50:00Z' }), SE('me', 'm', 'x', null), ST('ms', 'me', 1, 50, 5, 1)]), null, { x: 'Curl' });
+    for (const timeZone of ['UTC', 'Pacific/Auckland', 'Pacific/Honolulu']) expect(key(historyRows(notte, null, { timeZone })[0].date)).toBe('2026-11-13');
+    // la data per Excel è la mezzanotte UTC di quel giorno (Excel conta i giorni, senza fuso)
+    expect(excelDate('2026-11-13').toISOString()).toBe('2026-11-13T00:00:00.000Z');
+    expect(excelDate('')).toBeNull();
   });
 
-  it('storico vuoto: nessuna riga, il file avrebbe solo l\'intestazione', () => {
-    expect(historyCsvRows([], PLAN)).toEqual([]);
-    expect(historyCsvRows([], null)).toEqual([]);
-    expect(toCsv([])).toBe('﻿' + CSV_HEADER.join(';') + '\r\n');
+  it('storico vuoto: nessuna riga', () => {
+    expect(historyRows([], PLAN)).toEqual([]);
+    expect(historyRows([], null)).toEqual([]);
   });
 
-  it('tutto lo storico: la lista di partenza non cambia (nessun filtro, nessun riordino)', () => {
+  it('la lista di partenza non cambia', () => {
     const prima = JSON.stringify(list);
-    historyCsvRows(list, PLAN);
+    historyRows(list, PLAN);
     expect(JSON.stringify(list)).toBe(prima);
   });
 
-  it('nome del file: storico-allenamenti-tutto-AAAA-MM-GG.csv, oppure con i giorni (30gg…)', () => {
-    expect(exportFileName('2026-11-13')).toBe('storico-allenamenti-tutto-2026-11-13.csv');
-    expect(exportFileName('2026-11-13', 'all')).toBe('storico-allenamenti-tutto-2026-11-13.csv');
-    expect(exportFileName('2026-11-13', '14')).toBe('storico-allenamenti-14gg-2026-11-13.csv');
-    expect(exportFileName('2026-11-13', '30')).toBe('storico-allenamenti-30gg-2026-11-13.csv');
-    expect(exportFileName('2026-11-13', '90')).toBe('storico-allenamenti-90gg-2026-11-13.csv');
+  it('nome del file: storico-allenamenti-tutto-AAAA-MM-GG.xlsx, oppure con i giorni (30gg…)', () => {
+    expect(exportFileName('2026-11-13')).toBe('storico-allenamenti-tutto-2026-11-13.xlsx');
+    expect(exportFileName('2026-11-13', 'all')).toBe('storico-allenamenti-tutto-2026-11-13.xlsx');
+    expect(exportFileName('2026-11-13', '14')).toBe('storico-allenamenti-14gg-2026-11-13.xlsx');
+    expect(exportFileName('2026-11-13', '30')).toBe('storico-allenamenti-30gg-2026-11-13.xlsx');
+    expect(exportFileName('2026-11-13', '90')).toBe('storico-allenamenti-90gg-2026-11-13.xlsx');
+  });
+});
+
+describe('File .xlsx: scritto e riletto', () => {
+  const data = historyRows(list, PLAN, { lang: 'it' });
+  let X;
+  const file = async () => (X ||= await readXlsx(await buildXlsx(data)));
+
+  it('è un vero .xlsx (zip con il foglio), tipo giusto', async () => {
+    const blob = await buildXlsx(data);
+    expect(blob.type).toBe(XLSX_TYPE);
+    const x = await file();
+    expect(x.files).toContain('xl/workbook.xml');
+    expect(x.rowsCount).toBe(1 + data.length);
+  });
+
+  it('prima riga: intestazione in grassetto e bloccata', async () => {
+    const x = await file();
+    XLSX_HEADER.forEach((h, i) => {
+      const c = x.cells.get(COL[i] + '1');
+      expect(c.value).toBe(h);
+      expect(c.bold).toBe(true);
+    });
+    expect(x.frozen).toBe(true);
+    expect(x.cells.get('A2').bold).toBe(false);
+  });
+
+  it('Data = data vera di Excel (numero di giorni) mostrata come gg/mm/aaaa', async () => {
+    const x = await file();
+    const a2 = x.cells.get('A2'), a3 = x.cells.get('A3');
+    expect(a2.t).toBe('n');
+    expect(a2.value).toBe(excelSerial(2026, 10, 31));
+    expect(a3.value).toBe(excelSerial(2026, 11, 5));
+    expect(a2.format).toBe(XLSX_DATE_FORMAT);
+    expect(XLSX_DATE_FORMAT).toBe('dd/mm/yyyy');
+  });
+
+  it('Serie, Peso, Ripetizioni, RIR = numeri veri; RIR vuoto resta vuoto', async () => {
+    const x = await file();
+    // riga 4 = seduta 5/11, Panca serie 2: 82,5 kg × 8 @1,5
+    for (const [c, v] of [['F4', 2], ['G4', 82.5], ['H4', 8], ['I4', 1.5]]) {
+      expect(x.cells.get(c).t).toBe('n');
+      expect(x.cells.get(c).value).toBe(v);
+    }
+    expect(x.cells.get('G2').value).toBe(77.25);
+    expect(x.cells.has('I2')).toBe(false);   // RIR mancante: nessuna cella
+  });
+
+  it('testi salvati come testo, anche quelli che iniziano con = @ - (nessuna formula, nessun apostrofo)', async () => {
+    const x = await file();
+    const checks = [['J2', '=SOMMA(A1:A2)'], ['D5', '-Rematore'], ['J5', '@menzione'], ['B2', 'Upper A'], ['E2', 'Marca Finta · Chest Press · CP1']];
+    for (const [c, v] of checks) {
+      const cell = x.cells.get(c);
+      expect(['s', 'inlineStr', 'str']).toContain(cell.t);
+      expect(cell.formula).toBe(false);
+      expect(cell.value).toBe(v);
+    }
+    expect(x.sheet).not.toMatch(/<f[ >]/);
+    expect(x.cells.has('C2')).toBe(false);   // Giorno piano vuoto: nessuna cella
+  });
+
+  it('note su più righe: una sola cella, a capo attivo, testo intero (anche ; " < & )', async () => {
+    const x = await file();
+    const j4 = x.cells.get('J4');
+    expect(j4.value).toBe(NOTE_LUNGA);
+    expect(j4.value).toContain('\n');
+    expect(j4.style.wrap).toBe(true);
+    expect(x.cells.has('J6')).toBe(false);   // la nota non si è sparsa in altre righe
+    expect(x.rowsCount).toBe(5);
+  });
+
+  it('colonne larghe abbastanza: almeno il testo più lungo (e l\'intestazione), al massimo 60', async () => {
+    const x = await file();
+    const w = columnWidths(data);
+    expect(x.widths).toEqual(w);
+    expect(w).toHaveLength(10);
+    expect(w[0]).toBeGreaterThanOrEqual(10);                                   // gg/mm/aaaa
+    expect(w[4]).toBeGreaterThanOrEqual('Marca Finta · Chest Press · CP1'.length);
+    expect(w[2]).toBeGreaterThanOrEqual('Giorno piano'.length);
+    expect(w[9]).toBeGreaterThanOrEqual('da controllare <bene> & poi'.length); // riga più lunga della nota
+    expect(columnWidths([{ ...data[0], notes: 'x'.repeat(500) }])[9]).toBe(60);
+  });
+
+  it('file vuoto mai creato: senza righe buildXlsx si ferma e la libreria non viene nemmeno caricata', async () => {
+    let loaded = false;
+    await expect(buildXlsx([], async () => { loaded = true; return () => ({ toBlob: async () => new Blob([]) }); })).rejects.toThrow();
+    await expect(buildXlsx(null)).rejects.toThrow();
+    expect(loaded).toBe(false);
+  });
+
+  it('dati del foglio: tipi giusti per ogni colonna', () => {
+    const sd = xlsxSheetData(data);
+    expect(sd[0].every((c) => c.fontWeight === 'bold' && c.type === String)).toBe(true);
+    expect(sd[1][0]).toMatchObject({ type: Date, format: 'dd/mm/yyyy' });
+    for (const i of [5, 6, 7]) expect(sd[1][i].type).toBe(Number);
+    expect(sd[1][8]).toBeNull();
+    for (const i of [1, 3, 4, 9]) expect(sd[1][i].type).toBe(String);
   });
 });
 
@@ -196,7 +297,7 @@ const mem = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.
 const apiWith = (fetchImpl) => makeApi({ url: 'https://example.invalid', key: 'sb_publishable_test', fetch: fetchImpl, storage: mem() });
 
 describe('Export da Supabase: tutto, a pagine', () => {
-  it('più di 1000 serie (2345): con il server che ne dà 1000 per volta arrivano tutte, e tutte nel CSV', async () => {
+  it('più di 1000 serie (2345): con il server che ne dà 1000 per volta arrivano tutte, e tutte nel file .xlsx', async () => {
     const all = fakeSets(2345);
     const { fetchImpl, calls } = fakeServer(all);
     const r = await apiWith(fetchImpl).exportSets('u1', null);
@@ -213,13 +314,15 @@ describe('Export da Supabase: tutto, a pagine', () => {
     }
     const rows = exportFromSets(r.data, null, { today: TODAY, period: 'all' });
     expect(rows).toHaveLength(2345);
-    expect(rows[0][0]).toBe(csvDate(addDays(TODAY, -234)));   // la seduta più vecchia, 234 giorni fa (oltre i 120)
-    expect(rows[rows.length - 1][0]).toBe('13/11/2026');
-  });
+    expect(key(rows[0].date)).toBe(addDays(TODAY, -234));   // la seduta più vecchia, 234 giorni fa (oltre i 120)
+    expect(key(rows[rows.length - 1].date)).toBe(TODAY);
+    const x = await readXlsx(await buildXlsx(rows));
+    expect(x.rowsCount).toBe(2346);   // intestazione + 2345 serie
+    expect(x.cells.get('A2346').value).toBe(excelSerial(2026, 11, 13));
+  }, 30000);
 
   it('se il server ne dà meno di quelle chieste (500 per volta) arrivano lo stesso tutte', async () => {
-    const all = fakeSets(1234);
-    const { fetchImpl, calls } = fakeServer(all, { cap: 500 });
+    const { fetchImpl, calls } = fakeServer(fakeSets(1234), { cap: 500 });
     const r = await apiWith(fetchImpl).exportSets('u1', null);
     expect(r.data).toHaveLength(1234);
     expect(calls.map((c) => c.offset)).toEqual([0, 500, 1000, 1234]);
@@ -258,16 +361,14 @@ describe('Export da Supabase: tutto, a pagine', () => {
     const del = oneAt(3, 'cancellata');
     del.session_exercises.sessions.deleted_at = '2026-11-10T10:00:00Z';
     const rows = exportFromSets([oneAt(1), del, oneAt(2)], null, { today: TODAY });
-    expect(rows.map((r) => r[0])).toEqual(['11/11/2026', '12/11/2026']);
-    expect(rows[0][3]).toBe('Esercizio finto');
-    expect(rows[0][1]).toBe('Workout finto');
-    expect(rows[0][2]).toBe('');   // niente giorno del piano
+    expect(rows.map((r) => key(r.date))).toEqual(['2026-11-11', '2026-11-12']);
+    expect(rows[0]).toMatchObject({ exercise: 'Esercizio finto', workout: 'Workout finto', planDay: '' });
   });
 });
 
 describe('Periodo da esportare', () => {
   const at = (...days) => days.map((d) => oneAt(d));
-  const dates = (sets, period) => exportFromSets(sets, null, { today: TODAY, period }).map((r) => r[0]);
+  const dates = (sets, period) => exportFromSets(sets, null, { today: TODAY, period }).map((r) => key(r.date));
 
   it('di base: Tutto; scelte 14 / 30 / 90 / Tutto', () => {
     expect(EXPORT_PERIODS).toEqual(['14', '30', '90', 'all']);
@@ -286,16 +387,16 @@ describe('Periodo da esportare', () => {
   });
 
   it('14 giorni: oggi e 13 giorni fa dentro; esattamente 14 giorni fa fuori', () => {
-    expect(dates(at(0, 13, 14, 15), '14')).toEqual(['31/10/2026', '13/11/2026']);
+    expect(dates(at(0, 13, 14, 15), '14')).toEqual(['2026-10-31', '2026-11-13']);
   });
 
   it('30 e 90 giorni: stesso limite', () => {
-    expect(dates(at(0, 29, 30), '30')).toEqual(['15/10/2026', '13/11/2026']);
-    expect(dates(at(0, 89, 90), '90')).toEqual(['16/08/2026', '13/11/2026']);
+    expect(dates(at(0, 29, 30), '30')).toEqual(['2026-10-15', '2026-11-13']);
+    expect(dates(at(0, 89, 90), '90')).toEqual(['2026-08-16', '2026-11-13']);
   });
 
   it('Tutto: anche le sedute vecchissime (oltre 120 giorni)', () => {
-    expect(dates(at(0, 121, 400), 'all')).toEqual([csvDate(addDays(TODAY, -400)), csvDate(addDays(TODAY, -121)), '13/11/2026']);
+    expect(dates(at(0, 121, 400), 'all')).toEqual([addDays(TODAY, -400), addDays(TODAY, -121), TODAY]);
   });
 
   it('periodo senza sedute: nessuna riga (la pagina dice "Nessun allenamento in questo periodo", nessun file)', () => {
@@ -313,27 +414,51 @@ describe('Tasto "Esporta storico"', () => {
     expect(LANGS.it.exportBtn).toBe('Esporta storico');
     expect(LANGS.it.exportEmpty).toBe('Non ci sono ancora allenamenti da esportare');
     expect(LANGS.it.exportNeedNet).toBe('Serve internet per esportare lo storico completo');
-    for (const k of ['exportBtn', 'exportEmpty', 'exportNeedNet', 'exportNone', 'exportBusy', 'exportReady', 'expPeriod']) {
+    expect(LANGS.it.exportHead).toBe('Esporta tutto lo storico del tuo account');
+    for (const k of ['exportBtn', 'exportEmpty', 'exportNeedNet', 'exportNone', 'exportBusy', 'exportReady', 'expPeriod', 'exportHead']) {
       expect(LANGS.it[k]).toBeTruthy();
       expect(LANGS.en[k]).toBeTruthy();
     }
   });
 
-  it('Progressi → Storico ha periodo e tasto; l\'export legge da Supabase, non dal telefono né dai filtri', () => {
+  it('in cima allo Storico: titolo, periodo e tasto; sotto filtri, "Sedute salvate su questo telefono" e lista', () => {
     expect(main).toContain('id="exportBtn"');
     expect(main).toContain("pfSelect('expPeriod'");
+    expect(main).toMatch(/expHead[^\n]*T\.exportHead/);
+    const hv = (main.match(/function historyView\(list\) \{[\s\S]*?\n}\n/) || [''])[0];
+    const iExp = hv.indexOf('exportBox()'), iFil = hv.indexOf("pfSelect('fDay'"), iNote = hv.indexOf('T.historyNote'), iList = hv.indexOf('shown.map(');
+    expect(iExp).toBeGreaterThan(-1);
+    expect(iExp).toBeLessThan(iFil);
+    expect(iFil).toBeLessThan(iNote);
+    expect(iNote).toBeLessThan(iList);
+    expect(hv.slice(iNote, iList)).not.toContain('exportBox');   // tra la nota e la lista nient'altro
+  });
+
+  it('l\'export legge da Supabase (non dal telefono né dai filtri) e scrive un .xlsx; niente CSV', () => {
     const ex = fn('exportHistory');
     expect(ex).toContain('api.exportSets(');
     expect(ex).toContain('exportFromSets(');
+    expect(ex).toContain('buildXlsx(');
     expect(ex).not.toContain('S.local');
     expect(ex).not.toContain('S.prog');
     expect(ex).toMatch(/navigator\.onLine/);
     expect(ex).toContain('T.exportNeedNet');
     expect(ex).toContain('T.exportNone');
+    expect(main).not.toMatch(/text\/csv|toCsv/);
   });
 
-  it('mentre scarica: tasto spento con la scritta di attesa', () => {
+  it('mentre scarica e scrive il file: tasto spento con la scritta di attesa', () => {
     expect(main).toMatch(/E\.busy \? ' disabled aria-busy="true"'/);
     expect(main).toContain('T.exportBusy');
+    const ex = fn('exportHistory');
+    expect(ex.indexOf('E.busy = true')).toBeLessThan(ex.indexOf('buildXlsx('));
+    expect(ex.indexOf('buildXlsx(')).toBeLessThan(ex.lastIndexOf('E.busy = false'));
+  });
+
+  it('libreria del file caricata solo al momento dell\'export (import dinamico, mai all\'apertura)', () => {
+    for (const f of fs.readdirSync(path.join(appDir, 'src')).filter((x) => x.endsWith('.js'))) {
+      expect(read('src/' + f)).not.toMatch(/^\s*import\s[^(]*['"]write-excel-file/m);
+    }
+    expect(read('src/esporta.js')).toMatch(/import\('write-excel-file\/universal'\)/);
   });
 });

@@ -1,15 +1,21 @@
-// Export dello storico in CSV per Excel in italiano. Logica pura (nessun DOM, nessuna rete):
+// Export dello storico in un file Excel (.xlsx). Logica senza DOM e senza rete:
 // le serie arrivano da Supabase (api.exportSets, a pagine), diventano le righe di sempre (sessions, session_exercises,
-// sets), passano da historyList (pages.js) come lo Storico in Progressi, e alla fine si ha il testo del file.
+// sets), passano da historyList (pages.js) come lo Storico in Progressi, poi diventano righe con tipi veri (data,
+// numeri, testo) e alla fine il file .xlsx. La libreria che scrive il file (write-excel-file) si carica solo al
+// momento dell'export (import dinamico in buildXlsx), così non pesa sull'apertura dell'app.
 // Si prova con tests/unit/esporta.test.js.
 import { historyList, historyFilterOptions } from './pages.js';
 import { tr } from './i18n.js';
 import { machineLabel, indexRows, addDays } from './logic.js';
 
-export const CSV_HEADER = ['Data', 'Workout', 'Giorno piano', 'Esercizio', 'Macchina', 'Serie', 'Peso (kg)', 'Ripetizioni', 'RIR', 'Note'];
-export const CSV_BOM = '﻿';
-export const CSV_SEP = ';';
-export const CSV_EOL = '\r\n';
+export const XLSX_HEADER = ['Data', 'Workout', 'Giorno piano', 'Esercizio', 'Macchina', 'Serie', 'Peso (kg)', 'Ripetizioni', 'RIR', 'Note'];
+export const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+export const XLSX_SHEET = 'Storico';
+/** Formato della colonna Data: giorno/mese/anno, uguale con Excel in qualsiasi lingua. */
+export const XLSX_DATE_FORMAT = 'dd/mm/yyyy';
+/** Chiavi delle righe, nello stesso ordine delle colonne. */
+export const ROW_KEYS = ['date', 'workout', 'planDay', 'exercise', 'machine', 'set', 'weight', 'reps', 'rir', 'notes'];
+const NUM_KEYS = new Set(['set', 'weight', 'reps', 'rir']);
 
 /** Periodi che si possono scegliere prima dell'export (giorni, oppure tutto). Di base: tutto. */
 export const EXPORT_PERIODS = ['14', '30', '90', 'all'];
@@ -31,9 +37,9 @@ export function periodFrom(today, period) {
 /** Sedute del periodo (dalla data della seduta in poi; nessun limite = tutte). Non cambia la lista di partenza. */
 export const inPeriod = (list, from) => (from ? list.filter((s) => s.date >= from) : list);
 
-/** Nome del file: storico-allenamenti-tutto-AAAA-MM-GG.csv oppure storico-allenamenti-30gg-AAAA-MM-GG.csv. */
+/** Nome del file: storico-allenamenti-tutto-AAAA-MM-GG.xlsx oppure storico-allenamenti-30gg-AAAA-MM-GG.xlsx. */
 export const exportFileName = (dateKey, period = DEFAULT_PERIOD) =>
-  'storico-allenamenti-' + (!period || period === 'all' ? 'tutto' : period + 'gg') + '-' + dateKey + '.csv';
+  'storico-allenamenti-' + (!period || period === 'all' ? 'tutto' : period + 'gg') + '-' + dateKey + '.xlsx';
 
 /**
  * Scarica TUTTE le pagine: chiede `pageSize` righe alla volta (fetchPage(da, a) → { data } | { error })
@@ -78,93 +84,135 @@ export function exportRowsFromSets(sets) {
   return { rows, exerciseNames, machineInfo };
 }
 
+
 /**
- * Dalle serie scaricate alle righe del CSV, per il periodo scelto. Stessa strada dello Storico (indexRows,
- * historyList: sedute e serie cancellate fuori, nomi e macchine dalla libreria), poi il periodo, poi historyCsvRows.
+ * Dalle serie scaricate alle righe del file, per il periodo scelto. Stessa strada dello Storico (indexRows,
+ * historyList: sedute e serie cancellate fuori, nomi e macchine dalla libreria), poi il periodo, poi historyRows.
  */
 export function exportFromSets(sets, plan, { today, period = DEFAULT_PERIOD, lang = 'it', timeZone } = {}) {
   const { rows, exerciseNames, machineInfo } = exportRowsFromSets(sets);
   const list = inPeriod(historyList(indexRows(rows), plan, exerciseNames, machineInfo), periodFrom(today, period));
-  return historyCsvRows(list, plan, { lang, timeZone });
+  return historyRows(list, plan, { lang, timeZone });
 }
 
 /**
- * Data gg/mm/aaaa nel fuso orario del telefono (mai UTC).
- * 'AAAA-MM-GG' (session_date) è già il giorno del telefono quando la seduta è iniziata: si gira il testo, senza Date
+ * Giorno 'AAAA-MM-GG' nel fuso orario del telefono (mai UTC).
+ * 'AAAA-MM-GG' (session_date) è già il giorno del telefono quando la seduta è iniziata: resta com'è, senza Date
  * (new Date('2026-11-13') sarebbe la mezzanotte UTC, cioè il giorno prima nei fusi dietro UTC).
  * Un orario completo (ISO con fuso) si converte nel fuso indicato; timeZone vuoto = quello del telefono.
  */
-export function csvDate(value, timeZone) {
+export function dayKeyIn(value, timeZone) {
   if (!value) return '';
   const s = String(value);
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';
   const p = {};
   for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: timeZone || undefined, day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(d)) p[x.type] = x.value;
-  return p.day + '/' + p.month + '/' + p.year;
+  return p.year + '-' + p.month + '-' + p.day;
 }
 
-/** Numero con la virgola (82,5), al massimo 2 decimali, niente separatore delle migliaia. Vuoto se manca. */
-export function csvNumber(v) {
-  if (v == null || v === '') return '';
+/**
+ * Giorno 'AAAA-MM-GG' → data per Excel: la mezzanotte UTC di quel giorno. La libreria la scrive come numero di
+ * giorni di Excel contato in UTC, quindi nel file c'è esattamente quel giorno, in qualsiasi fuso.
+ */
+export function excelDate(key) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ''));
+  return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+}
+
+/** Numero vero, al massimo 2 decimali; null se manca (cella vuota). */
+export function cellNumber(v) {
+  if (v == null || v === '') return null;
   const n = Number(v);
-  if (!Number.isFinite(n)) return '';
+  if (!Number.isFinite(n)) return null;
   const r = Math.round(n * 100) / 100;
-  return String(Object.is(r, -0) ? 0 : r).replace('.', ',');
+  return Object.is(r, -0) ? 0 : r;
 }
 
-/** Testo libero: se inizia con = + - @ un apostrofo davanti, così Excel non lo prende per una formula. */
-export function csvSafeText(v) {
-  const s = v == null ? '' : String(v);
-  return /^[=+\-@]/.test(s) ? "'" + s : s;
-}
-
-/** Un campo del file: tra virgolette (con le " interne raddoppiate) se contiene ; " o un a capo. */
-export function csvField(v) {
-  const s = v == null ? '' : String(v);
-  return /[;"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-
+const text = (v) => (v == null ? '' : String(v));
 const byStart = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || String(a.start).localeCompare(String(b.start)) || String(a.id).localeCompare(String(b.id));
 
 /**
- * Righe del CSV (senza intestazione): una per ogni serie registrata, dalla seduta più vecchia alla più nuova,
- * poi nell'ordine degli esercizi della seduta, poi per numero di serie. Tutto lo storico, nessun filtro.
+ * Righe del file (senza intestazione): una per ogni serie registrata, dalla seduta più vecchia alla più nuova,
+ * poi nell'ordine degli esercizi della seduta, poi per numero di serie. Tutto lo storico del periodo, nessun filtro.
+ * Ogni riga: { date: Date|null, workout, planDay, exercise, machine, set, weight, reps, rir, notes }.
  * Workout = il nome del tipo di workout come nel filtro dello Storico. Giorno piano = il giorno del piano della seduta
  * (vuoto se la seduta non ne ha uno, come le sedute vecchie importate). Peso sempre in kg (come salvato).
+ * Testi così come sono (nessun apostrofo: in un .xlsx un testo resta testo, non diventa una formula).
  */
-export function historyCsvRows(list, plan, { lang = 'it', timeZone } = {}) {
+export function historyRows(list, plan, { lang = 'it', timeZone } = {}) {
   const workout = new Map(historyFilterOptions(list, plan).days.map((d) => [d.key, d.name]));
   const planDays = new Map(((plan && plan.days) || []).map((d) => [d.id, d.name]));
   const rows = [];
   for (const s of [...list].sort(byStart)) {
-    const date = csvDate(s.date, timeZone) || csvDate(s.start, timeZone);
+    const date = excelDate(dayKeyIn(s.date, timeZone) || dayKeyIn(s.start, timeZone));
     const planDay = s.planDayId ? planDays.get(s.planDayId) || s.dayName || '' : '';
     for (const e of s.exercises) {
       const m = e.machine;
       const machine = m ? machineLabel(m) || tr(m.name, lang) || m.code || '' : '';
       for (const x of [...e.sets].sort((a, b) => (a.set_number ?? 0) - (b.set_number ?? 0))) {
-        rows.push([
+        rows.push({
           date,
-          csvSafeText(workout.get(s.dayKey) || ''),
-          csvSafeText(planDay),
-          csvSafeText(tr(e.name, lang)),
-          csvSafeText(machine),
-          x.set_number == null ? '' : String(x.set_number),
-          csvNumber(x.weight_kg),
-          csvNumber(x.reps),
-          csvNumber(x.rir),
-          csvSafeText(x.notes),
-        ]);
+          workout: text(workout.get(s.dayKey)),
+          planDay: text(planDay),
+          exercise: text(tr(e.name, lang)),
+          machine: text(machine),
+          set: cellNumber(x.set_number),
+          weight: cellNumber(x.weight_kg),
+          reps: cellNumber(x.reps),
+          rir: cellNumber(x.rir),
+          notes: text(x.notes),
+        });
       }
     }
   }
   return rows;
 }
 
-/** Testo del file: BOM UTF-8, intestazione, righe separate da CRLF (anche dopo l'ultima). */
-export function toCsv(rows) {
-  return CSV_BOM + [CSV_HEADER, ...rows].map((r) => r.map(csvField).join(CSV_SEP)).join(CSV_EOL) + CSV_EOL;
+/** Testo come appare nella colonna (per la larghezza): la riga più lunga di un testo su più righe. */
+const shownLength = (key, v) => {
+  if (v == null || v === '') return 0;
+  if (key === 'date') return XLSX_DATE_FORMAT.length;
+  return Math.max(...String(v).split(/\r?\n/).map((l) => [...l].length));
+};
+
+/** Larghezza delle colonne (in caratteri): il testo più lungo (intestazione compresa) + 2, tra 8 e 60. */
+export function columnWidths(rows) {
+  return ROW_KEYS.map((k, i) => {
+    let w = [...XLSX_HEADER[i]].length;
+    for (const r of rows) w = Math.max(w, shownLength(k, r[k]));
+    return Math.min(60, Math.max(8, w + 2));
+  });
+}
+
+/**
+ * Dati del foglio per write-excel-file: intestazione in grassetto, poi una riga per serie.
+ * Data = data vera di Excel (formato gg/mm/aaaa); Serie, Peso, Ripetizioni, RIR = numeri veri (vuoti se mancano);
+ * tutto il resto = testo. Un testo su più righe resta in una cella, con "a capo" attivo.
+ */
+export function xlsxSheetData(rows) {
+  const head = XLSX_HEADER.map((h) => ({ value: h, type: String, fontWeight: 'bold' }));
+  const cell = (k, v) => {
+    if (k === 'date') return v ? { value: v, type: Date, format: XLSX_DATE_FORMAT } : null;
+    if (NUM_KEYS.has(k)) return v == null ? null : { value: v, type: Number };
+    if (v === '' || v == null) return null;
+    return /[\r\n]/.test(v) ? { value: v, type: String, wrap: true } : { value: v, type: String };
+  };
+  return [head, ...rows.map((r) => ROW_KEYS.map((k) => cell(k, r[k])))];
+}
+
+/** Carica la libreria che scrive il file solo quando serve (Vite la mette in un file a parte). */
+export const loadXlsxWriter = () => import('write-excel-file/universal').then((m) => m.default);
+
+/**
+ * File .xlsx (Blob). Mai un file vuoto: senza righe si ferma con un errore (la pagina mostra il messaggio prima).
+ * Prima riga bloccata, colonne larghe quanto serve.
+ */
+export async function buildXlsx(rows, load = loadXlsxWriter) {
+  if (!rows || !rows.length) throw new Error('empty export');
+  const writeExcelFile = await load();
+  const columns = columnWidths(rows).map((width) => ({ width }));
+  const blob = await writeExcelFile(xlsxSheetData(rows), { sheet: XLSX_SHEET, columns, stickyRowsCount: 1 }).toBlob();
+  return blob.type === XLSX_TYPE ? blob : new Blob([blob], { type: XLSX_TYPE });
 }

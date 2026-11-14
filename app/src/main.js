@@ -29,7 +29,7 @@ import {
   restFor, defaultDay, looksWrong, machineLabel, setWeightIn, kgToUnit, round2, reopenable, e1rmPoints, LB,
 } from './logic.js';
 import { PAGES, START_PAGE, navStep, pageFromState, historyList, historyFilterOptions, filterHistory, chartChoices } from './pages.js';
-import { toCsv, exportFileName, exportFromSets, periodFrom, EXPORT_PERIODS, DEFAULT_PERIOD } from './esporta.js';
+import { buildXlsx, XLSX_TYPE, exportFileName, exportFromSets, periodFrom, EXPORT_PERIODS, DEFAULT_PERIOD } from './esporta.js';
 import { versionText } from './version.js';
 import { tableRows, exNav, dayOptions, clock, rirLabel, rirNext, vsLast } from './allenamento.js';
 import { machineKind, machineIcon } from './macchine.js';
@@ -789,7 +789,7 @@ function renderProgress() {
   const T = S.T, P = S.prog;
   const idx = indexRows(S.local.list());
   const list = historyList(idx, plan(), S.snap && S.snap.exerciseNames, S.snap && S.snap.machineInfo);
-  if (!list.length) { $('wrap').innerHTML = '<div class="load" id="noHistory">' + T.noHistory + '</div>' + exportBox(); return; }
+  if (!list.length) { $('wrap').innerHTML = exportBox() + '<div class="load" id="noHistory">' + T.noHistory + '</div>'; return; }
   const tabs = '<div class="ptabs" role="tablist">' + ['history', 'chart'].map((t) => '<button role="tab" data-ptab="' + t + '" id="ptab-' + t + '" class="' + (P.tab === t ? 'on' : '') +
     '" aria-selected="' + (P.tab === t) + '">' + esc(t === 'history' ? T.histTab : T.chartTab) + '</button>').join('') + '</div>';
   $('wrap').innerHTML = tabs + (P.tab === 'chart' ? chartView(idx, list) : historyView(list));
@@ -806,12 +806,13 @@ function historyView(list) {
   if (P.day && !opts.days.some((d) => d.key === P.day)) P.day = '';
   if (P.ex && !opts.exercises.some((e) => e.id === P.ex)) P.ex = '';
   const exItems = opts.exercises.map((e) => ({ v: e.id, t: tr(e.name, S.lang) || '—' })).sort((a, b) => a.t.localeCompare(b.t, T.locale));
-  let h = '<div class="pfil">' + pfSelect('fDay', T.fWorkout, T.allWorkouts, opts.days.map((d) => ({ v: d.key, t: d.name || '—' })), P.day) +
+  // in cima l'export (tutto lo storico dell'account, da Supabase); sotto filtri, nota e lista dello Storico (dati sul telefono)
+  let h = exportBox() + '<div class="pfil">' + pfSelect('fDay', T.fWorkout, T.allWorkouts, opts.days.map((d) => ({ v: d.key, t: d.name || '—' })), P.day) +
     pfSelect('fEx', T.fExercise, T.allExercises, exItems, P.ex) + '</div>';
   const shown = filterHistory(list, { day: P.day, exercise: P.ex });
   if (!shown.length) return h + '<div class="load" id="noMatch">' + esc(T.noMatch) + '</div>';
   h += '<p class="pgNote">' + esc(T.historyNote) + '</p>';
-  return h + exportBox() + shown.map((s) => {
+  return h + shown.map((s) => {
     const live = !s.ended && s.date === S.date;
     return '<section class="hses" data-ses="' + esc(s.id) + '"><div class="hsH"><b>' + esc(shortDate(s.date)) + '</b><span>' + esc(s.dayName) + '</span>' +
       '<small' + (live ? ' class="live"' : '') + '>' + esc(live ? T.inProgress : T.setCount(s.setCount)) + '</small></div>' +
@@ -822,21 +823,23 @@ function historyView(list) {
 }
 
 /**
- * Export (Progressi → Storico): scelta del periodo (di base Tutto) e tasto "Esporta storico".
+ * Export (Progressi → Storico, in cima): titolo "Esporta tutto lo storico del tuo account", periodo (di base Tutto)
+ * e tasto "Esporta storico".
  * Mentre scarica il tasto è spento con la scritta di attesa. Se il telefono non lascia aprire il menu di
  * condivisione dopo l'attesa, compare un secondo tasto per aprirlo con un tocco.
  */
 const exportBox = () => {
   const T = S.T, E = S.exp;
-  return '<div class="pfil one expBox">' + pfSelect('expPeriod', T.expPeriod, null, EXPORT_PERIODS.map((p) => ({ v: p, t: T.expPeriods[p] })), E.period) + '</div>' +
+  return '<section class="expSec" aria-labelledby="expHead"><p class="expHead" id="expHead">' + esc(T.exportHead) + '</p>' +
+    '<div class="pfil one expBox">' + pfSelect('expPeriod', T.expPeriod, null, EXPORT_PERIODS.map((p) => ({ v: p, t: T.expPeriods[p] })), E.period) + '</div>' +
     '<button class="mini expBtn" id="exportBtn"' + (E.busy ? ' disabled aria-busy="true"' : '') + '><span>' +
     (E.busy ? esc(T.exportBusy) : ICON_EXPORT + esc(T.exportBtn)) + '</span></button>' +
-    (E.ready && !E.busy ? '<button class="mini expBtn p" id="exportShare"><span>' + ICON_EXPORT + esc(T.exportReady) + '</span></button>' : '');
+    (E.ready && !E.busy ? '<button class="mini expBtn p" id="exportShare"><span>' + ICON_EXPORT + esc(T.exportReady) + '</span></button>' : '') + '</section>';
 };
 
 /** Menu di condivisione su un telefono (schermo touch che sa condividere file), altrimenti scaricamento del file. */
-async function deliverCsv(blob, name) {
-  const file = typeof File === 'function' ? new File([blob], name, { type: 'text/csv' }) : null;
+async function deliverFile(blob, name) {
+  const file = typeof File === 'function' ? new File([blob], name, { type: XLSX_TYPE }) : null;
   const touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   if (file && touch && navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: name }); return 'shared'; }
@@ -853,8 +856,8 @@ async function deliverCsv(blob, name) {
 }
 
 /**
- * Export di TUTTO lo storico (o del periodo scelto) letto da Supabase, non dal telefono, senza limite dei 120 giorni
- * (a pagine da 1000). Nessun filtro dello Storico. Senza internet: messaggio, nessun file. Periodo vuoto: messaggio,
+ * Export di TUTTO lo storico (o del periodo scelto) in un file Excel (.xlsx), letto da Supabase, non dal telefono, senza
+ * limite dei 120 giorni (a pagine da 1000). Nessun filtro dello Storico. La libreria del file .xlsx si carica solo qui. Senza internet: messaggio, nessun file. Periodo vuoto: messaggio,
  * nessun file. Non scrive niente, né sul telefono né online.
  */
 async function exportHistory() {
@@ -866,23 +869,23 @@ async function exportHistory() {
   E.busy = true; render();
   let r;
   try { r = await api.exportSets(S.user.id, periodFrom(today, period)); } catch (e) { r = { error: { code: '', message: String(e && e.message || e), offline: true } }; }
-  E.busy = false;
-  if (r.error) { render(); toast(isOffline(r.error) || !navigator.onLine ? T.exportNeedNet : T.exportErr + r.error.message, true); return; }
+  if (r.error) { E.busy = false; render(); toast(isOffline(r.error) || !navigator.onLine ? T.exportNeedNet : T.exportErr + r.error.message, true); return; }
   const rows = exportFromSets(r.data, plan(), { today, period, lang: S.lang });
-  if (!rows.length) { render(); toast(period === 'all' ? T.exportEmpty : T.exportNone); return; }
+  if (!rows.length) { E.busy = false; render(); toast(period === 'all' ? T.exportEmpty : T.exportNone); return; }   // nessun file vuoto
   const name = exportFileName(today, period);
-  try {
-    const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
-    render();
-    if ((await deliverCsv(blob, name)) === 'need-tap') { E.ready = { blob, name }; render(); }
-  } catch (e) { render(); toast(T.exportErr + (e && e.message || e), true); }
+  let blob;
+  try { blob = await buildXlsx(rows); }   // tasto ancora spento: qui si carica la libreria e si scrive il file
+  catch (e) { E.busy = false; render(); toast(T.exportErr + (e && e.message || e), true); return; }
+  E.busy = false; render();
+  try { if ((await deliverFile(blob, name)) === 'need-tap') { E.ready = { blob, name }; render(); } }
+  catch (e) { toast(T.exportErr + (e && e.message || e), true); }
 }
 
 /** Secondo tocco: menu di condivisione per il file già pronto (o scaricamento). */
 async function shareReady() {
   const R = S.exp.ready; if (!R) return;
   S.exp.ready = null; render();
-  try { if ((await deliverCsv(R.blob, R.name)) === 'need-tap') { S.exp.ready = R; render(); } }
+  try { if ((await deliverFile(R.blob, R.name)) === 'need-tap') { S.exp.ready = R; render(); } }
   catch (e) { toast(S.T.exportErr + (e && e.message || e), true); }
 }
 

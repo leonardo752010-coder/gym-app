@@ -778,7 +778,11 @@ body:has(.tabbar:not(:empty)) .timer{bottom:calc(74px + env(safe-area-inset-bott
 .expBtn{display:flex;width:100%;justify-content:center;margin:0 0 12px}
 .expBtn span{display:inline-flex;align-items:center;gap:8px}
 .expBtn svg{width:18px;height:18px;flex:none}
-.load + .expBox{margin-top:12px}
+/* blocco export in cima allo Storico, separato dalla lista (che è solo quella sul telefono) */
+.expSec{margin:0 0 14px;padding:0 0 14px;border-bottom:1px solid var(--line)}
+.expHead{margin:0 0 8px;font-size:14px;font-weight:800;color:var(--tx)}
+.expSec .expBtn{margin-bottom:0}
+.expSec .expBtn + .expBtn{margin-top:8px}
 .expBox{margin-bottom:8px}
 .expBtn:disabled{opacity:.6}
 .expBtn.p{background:var(--ac);border-color:transparent;color:var(--acTx)}   /* file pronto: stesso viola dei tasti principali */
